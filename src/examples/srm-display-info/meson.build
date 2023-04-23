@@ -1,0 +1,10 @@
+sources = run_command('find', '.', '-type', 'f', '-name', '*[.c,.cpp,.h,.hpp]').stdout().strip().split('\n')
+
+executable(
+    'srm-display-info',
+    sources : sources,
+    dependencies : [
+        srm_dep
+    ],
+    install : true, 
+    install_dir : EXAMPLES_PATH)

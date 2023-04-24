@@ -624,7 +624,6 @@ static int ITS_render(SRMConnector *connector)
 
 static int DUM_render(SRMConnector *connector)
 {
-    return 1;
     eglMakeCurrent(connector->device()->rendererDevice()->imp()->eglDisplay,
                    connector->imp()->rendererEGLSurface,
                    connector->imp()->rendererEGLSurface,
@@ -639,7 +638,6 @@ static int DUM_render(SRMConnector *connector)
 
 static int ITS_pageFlip(SRMConnector *connector)
 {
-    return 1;
     eglSwapBuffers(connector->device()->imp()->eglDisplay, connector->imp()->connectorEGLSurface);
     gbm_surface_lock_front_buffer(connector->imp()->connectorGBMSurface);
 
@@ -684,47 +682,119 @@ static int ITS_pageFlip(SRMConnector *connector)
 
 static int DUM_pageFlip(SRMConnector *connector)
 {
-    return 1;
-    eglSwapBuffers(connector->device()->imp()->eglDisplay,
-                   connector->imp()->connectorEGLSurface);
+    UInt32 b = connector->imp()->currentBufferIndex;
+    UInt32 h = connector->imp()->dumbBuffers[b].height;
+    UInt32 w = connector->imp()->dumbBuffers[b].width;
+    UInt32 p = connector->imp()->dumbBuffers[b].pitch;
 
-    gbm_surface_lock_front_buffer(connector->imp()->connectorGBMSurface);
+    eglSwapBuffers(connector->device()->rendererDevice()->imp()->eglDisplay,
+                   connector->imp()->rendererEGLSurface);
 
-    connector->imp()->pendingPageFlip = true;
+    auto start = std::chrono::high_resolution_clock::now();
 
-    drmModePageFlip(connector->device()->fd(),
-                    connector->currentCrtc()->id(),
-                    connector->imp()->connectorDRMFramebuffers[connector->imp()->currentBufferIndex],
-                    DRM_MODE_PAGE_FLIP_EVENT,
-                    connector);
-
-    // Prevent multiple threads invoking the drmHandleEvent at a time wich causes bugs
-    // If more than 1 connector is requesting a page flip, both can be handled here
-    // since the struct passed to drmHandleEvent is standard and could be handling events
-    // from any connector (E.g. pageFlipHandler(conn1) or pageFlipHandler(conn2))
-    connector->device()->imp()->pageFlipMutex.lock();
-
-    pollfd fds;
-    fds.fd = connector->device()->fd();
-    fds.events = POLLIN;
-    fds.revents = 0;
-
-    while(connector->imp()->pendingPageFlip)
+    /*
+    for (UInt32 i = 0; i < h; i++)
     {
-        poll(&fds, 1, 100);
+        glReadPixels(0,
+                     h-i-1,
+                     w,
+                     1,
+                     GL_RGBA,
+                     GL_UNSIGNED_BYTE,
+                     &connector->imp()->dumbMaps[b][
+                     i*p]);
+    }
+    */
 
-        if(fds.revents & POLLIN)
-            drmHandleEvent(fds.fd, &connector->imp()->drmEventCtx);
 
-        if(connector->state() != SRM_CONNECTOR_STATE_INITIALIZED)
-            break;
+    glReadPixels(0,
+                 0,
+                 w,
+                 h,
+                 GL_RGBA,
+                 GL_UNSIGNED_BYTE,
+                 connector->imp()->dumbMaps[b]);
+
+    // Get the ending time point
+    auto end = std::chrono::high_resolution_clock::now();
+
+    // Calculate the time difference in milliseconds
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+    printf("glReadLapse %ld ms\n",duration.count());
+
+    gbm_surface_lock_front_buffer(connector->imp()->rendererGBMSurface);
+
+    if (connector->device()->clientCapAtomic())
+    {
+        drmModeAtomicReqPtr req;
+        req = drmModeAtomicAlloc();
+
+        // Plane
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.FB_ID,
+                                 connector->imp()->connectorDRMFramebuffers[b]);
+
+        auto start = std::chrono::high_resolution_clock::now();
+
+        // Commit
+        drmModeAtomicCommit(connector->device()->fd(),
+                            req,
+                            DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_PAGE_FLIP_EVENT,
+                            NULL);
+
+        // Get the ending time point
+        auto end = std::chrono::high_resolution_clock::now();
+
+        // Calculate the time difference in milliseconds
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+        printf("ATOMIC COMMIT %ld ms\n",duration.count());
+
+        drmModeAtomicFree(req);
+    }
+    else
+    {
+        connector->imp()->pendingPageFlip = true;
+
+        drmModePageFlip(connector->device()->fd(),
+                        connector->currentCrtc()->id(),
+                        connector->imp()->connectorDRMFramebuffers[b],
+                        DRM_MODE_PAGE_FLIP_EVENT,
+                        connector);
+
+        // Prevent multiple threads invoking the drmHandleEvent at a time wich causes bugs
+        // If more than 1 connector is requesting a page flip, both can be handled here
+        // since the struct passed to drmHandleEvent is standard and could be handling events
+        // from any connector (E.g. pageFlipHandler(conn1) or pageFlipHandler(conn2))
+        connector->device()->imp()->pageFlipMutex.lock();
+
+        pollfd fds;
+        fds.fd = connector->device()->fd();
+        fds.events = POLLIN;
+        fds.revents = 0;
+
+        while(connector->imp()->pendingPageFlip)
+        {
+            poll(&fds, 1, 100);
+
+            if(fds.revents & POLLIN)
+                drmHandleEvent(fds.fd, &connector->imp()->drmEventCtx);
+
+            if(connector->state() != SRM_CONNECTOR_STATE_INITIALIZED)
+                break;
+        }
+
+        connector->device()->imp()->pageFlipMutex.unlock();
     }
 
-    connector->device()->imp()->pageFlipMutex.unlock();
 
-    connector->imp()->currentBufferIndex = !connector->imp()->currentBufferIndex;
+    connector->imp()->currentBufferIndex = !b;
 
-    gbm_surface_release_buffer(connector->imp()->connectorGBMSurface, connector->imp()->connectorBOs[connector->imp()->currentBufferIndex]);
+    gbm_surface_release_buffer(connector->imp()->rendererGBMSurface,
+                               connector->imp()->rendererBOs[connector->imp()->currentBufferIndex]);
 
     return 1;
 }
@@ -776,27 +846,15 @@ static int DUM_initCrtc(SRMConnector *connector)
         .sequence_handler = NULL
     };
 
-    printf("A\n");
-
-    eglSwapBuffers(connector->device()->rendererDevice()->imp()->eglDisplay,
-                   connector->imp()->rendererEGLSurface);
-
-    printf("B\n");
-
-    gbm_surface_lock_front_buffer(connector->imp()->rendererGBMSurface);
-
-    printf("C\n");
-
     UInt32 b = connector->imp()->currentBufferIndex;
     UInt32 h = connector->imp()->dumbBuffers[b].height;
     UInt32 w = connector->imp()->dumbBuffers[b].width;
     UInt32 p = connector->imp()->dumbBuffers[b].pitch;
 
-    /*
     for (UInt32 i = 0; i < h; i++)
     {
         glReadPixels(0,
-                     h - (i + 1),
+                     h-i-1,
                      w,
                      1,
                      GL_RGBA,
@@ -804,12 +862,12 @@ static int DUM_initCrtc(SRMConnector *connector)
                      &connector->imp()->dumbMaps[b][
                      i*p]);
     }
-    */
 
-    memset(connector->imp()->dumbMaps[b], 255, connector->imp()->dumbBuffers[b].size);
-    memset(connector->imp()->dumbMaps[!b], 255, connector->imp()->dumbBuffers[!b].size);
+    eglSwapBuffers(connector->device()->rendererDevice()->imp()->eglDisplay,
+                   connector->imp()->rendererEGLSurface);
 
-    printf("D\n");
+    gbm_surface_lock_front_buffer(connector->imp()->rendererGBMSurface);
+
 
     if (connector->device()->clientCapAtomic())
     {
@@ -848,6 +906,12 @@ static int DUM_initCrtc(SRMConnector *connector)
 
         // Plane
 
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.rotation,
+                                 DRM_MODE_REFLECT_Y);
+
         drmModeAtomicAddProperty(req,
                                  connector->currentPrimaryPlane()->id(),
                                  connector->currentPrimaryPlane()->imp()->propIDs.CRTC_ID,
@@ -857,6 +921,7 @@ static int DUM_initCrtc(SRMConnector *connector)
                                  connector->currentPrimaryPlane()->id(),
                                  connector->currentPrimaryPlane()->imp()->propIDs.CRTC_X,
                                  0);
+
 
         drmModeAtomicAddProperty(req,
                                  connector->currentPrimaryPlane()->id(),
@@ -901,10 +966,12 @@ static int DUM_initCrtc(SRMConnector *connector)
         // Commit
         drmModeAtomicCommit(connector->device()->fd(),
                             req,
-                            DRM_MODE_ATOMIC_ALLOW_MODESET,
+                            DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_PAGE_FLIP_EVENT,
                             NULL);
 
         drmModeAtomicFree(req);
+
+
     }
     else
     {
@@ -917,8 +984,6 @@ static int DUM_initCrtc(SRMConnector *connector)
                        1,
                        &connector->currentMode()->imp()->info);
     }
-
-    printf("E\n");
 
     connector->imp()->currentBufferIndex = !b;
 
@@ -1039,12 +1104,8 @@ void SRM_FUNC::initRenderer(SRMConnector *connector, Int32 *initResult)
         return;
     }
 
-    /*
     if (!COM_createCursor(connector))
-    {
         SRMLog::warning("Failed to create hardware cursor for connector %d.", connector->id());
-    }
-    */
 
     *initResult = 1;
 
@@ -1057,8 +1118,6 @@ void SRM_FUNC::initRenderer(SRMConnector *connector, Int32 *initResult)
 
     while (1)
     {
-        usleep(100000);
-        continue;
         COM_waitForRepaintRequest(connector);
         connector->imp()->rendererInterface.render(connector);
         connector->imp()->rendererInterface.pageFlip(connector);

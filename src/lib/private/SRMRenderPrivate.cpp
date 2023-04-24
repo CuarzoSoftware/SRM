@@ -2,11 +2,20 @@
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMConnectorModePrivate.h>
 #include <private/SRMCrtcPrivate.h>
+#include <private/SRMPlanePrivate.h>
+#include <SRMLog.h>
 
+#include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <GLES2/gl2.h>
 #include <sys/poll.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <string.h>
+
+
 
 using namespace SRM;
 
@@ -42,7 +51,7 @@ static int ITS_createGBMSurfaces(SRMConnector *connector)
 
     if (!connector->imp()->connectorGBMSurface)
     {
-        fprintf(stderr, "Failed to create GBM surface for connector %d.\n", connector->id());
+        SRMLog::error("Failed to create GBM surface for connector %d (ITSELF MODE).", connector->id());
         return 0;
     }
 
@@ -60,7 +69,7 @@ static int DUM_createGBMSurfaces(SRMConnector *connector)
 
     if (!connector->imp()->rendererGBMSurface)
     {
-        fprintf(stderr, "Failed to create GBM surface for connector %d.\n", connector->id());
+        SRMLog::error("Failed to create GBM surface for connector %d (DUMB MODE).", connector->id());
         return 0;
     }
 
@@ -78,7 +87,7 @@ static int CPU_createGBMSurfaces(SRMConnector *connector)
 
     if (!connector->imp()->connectorGBMSurface)
     {
-        fprintf(stderr, "Failed to create GBM surface for connector %d.\n", connector->id());
+        SRMLog::error("Failed to create connector GBM surface for connector %d (CPU MODE).", connector->id());
         return 0;
     }
 
@@ -91,7 +100,7 @@ static int CPU_createGBMSurfaces(SRMConnector *connector)
 
     if (!connector->imp()->rendererGBMSurface)
     {
-        fprintf(stderr, "Failed to create GBM surface for connector %d.\n", connector->id());
+        SRMLog::error("Failed to create renderer GBM surface for connector %d (CPU MODE).", connector->id());
         gbm_surface_destroy(connector->imp()->connectorGBMSurface);
         return 0;
     }
@@ -126,7 +135,7 @@ static int COM_chooseEGLConfiguration(EGLDisplay egl_display, const EGLint *attr
 
     if (!eglGetConfigs(egl_display, NULL, 0, &count) || count < 1)
     {
-        //LLog::error("No EGL configs to choose from.\n");
+        SRMLog::error("No EGL configs to choose from.");
         return 0;
     }
 
@@ -137,7 +146,7 @@ static int COM_chooseEGLConfiguration(EGLDisplay egl_display, const EGLint *attr
 
     if (!eglChooseConfig(egl_display, attribs, configs, count, &matched) || !matched)
     {
-        //LLog::error("No EGL configs with appropriate attributes.\n");
+        SRMLog::error("No EGL configs with appropriate attributes.");
         goto out;
     }
 
@@ -171,7 +180,7 @@ static int ITS_getEGLConfigurations(SRMConnector *connector)
                                 GBM_FORMAT_XRGB8888,
                                 &connector->imp()->connectorEGLConfig))
     {
-        printf("Failed to choose EGL config.\n");
+        SRMLog::error("Failed to choose EGL configuration for connector %d (ITSELF MODE).", connector->id());
         return 0;
     }
 
@@ -183,9 +192,9 @@ static int DUM_getEGLConfigurations(SRMConnector *connector)
     if (!COM_chooseEGLConfiguration(connector->device()->rendererDevice()->imp()->eglDisplay,
                                 COM_eglConfigAttribs,
                                 GBM_FORMAT_XRGB8888,
-                                &connector->imp()->connectorEGLConfig))
+                                &connector->imp()->rendererEGLConfig))
     {
-        printf("Failed to choose EGL config.\n");
+        SRMLog::error("Failed to choose renderer EGL configuration for connector %d (DUMB MODE).", connector->id());
         return 0;
     }
 
@@ -199,7 +208,7 @@ static int CPU_getEGLConfigurations(SRMConnector *connector)
                                 GBM_FORMAT_XRGB8888,
                                 &connector->imp()->connectorEGLConfig))
     {
-        printf("Failed to choose EGL config.\n");
+        SRMLog::error("Failed to choose connector EGL configuration for connector %d (CPU MODE).", connector->id());
         return 0;
     }
 
@@ -208,7 +217,7 @@ static int CPU_getEGLConfigurations(SRMConnector *connector)
                                 GBM_FORMAT_XRGB8888,
                                 &connector->imp()->connectorEGLConfig))
     {
-        printf("Failed to choose EGL config.\n");
+        SRMLog::error("Failed to choose renderer EGL configuration for connector %d (CPU MODE).", connector->id());
         return 0;
     }
 
@@ -226,7 +235,10 @@ static int ITS_createEGLContexts(SRMConnector *connector)
                                                              COM_eglContextAttribs);
 
     if (connector->imp()->connectorEGLContext == EGL_NO_CONTEXT)
+    {
+        SRMLog::error("Failed to create EGL context for connector %d (ITSELF MODE).", connector->id());
         return 0;
+    }
 
     // Store it if is the first context created for this device, so that later on shared context can be created
     if (connector->device()->imp()->eglSharedContext == EGL_NO_CONTEXT)
@@ -243,7 +255,10 @@ static int DUM_createEGLContexts(SRMConnector *connector)
                                                             COM_eglContextAttribs);
 
     if (connector->imp()->rendererEGLContext == EGL_NO_CONTEXT)
+    {
+        SRMLog::error("Failed to create EGL context for connector %d (DUMB MODE).", connector->id());
         return 0;
+    }
 
     // Store it if is the first context created for this device, so that later on shared context can be created
     if (connector->device()->rendererDevice()->imp()->eglSharedContext == EGL_NO_CONTEXT)
@@ -261,7 +276,10 @@ static int CPU_createEGLContexts(SRMConnector *connector)
                                                              COM_eglContextAttribs);
 
     if (connector->imp()->connectorEGLContext == EGL_NO_CONTEXT)
+    {
+        SRMLog::error("Failed to create connector EGL context for connector %d (CPU MODE).", connector->id());
         return 0;
+    }
 
     bool wasNoContext = connector->device()->imp()->eglSharedContext == EGL_NO_CONTEXT;
 
@@ -275,6 +293,8 @@ static int CPU_createEGLContexts(SRMConnector *connector)
 
     if (connector->imp()->rendererEGLContext == EGL_NO_CONTEXT)
     {
+        SRMLog::error("Failed to create renderer EGL context for connector %d (CPU MODE).", connector->id());
+
         eglDestroyContext(connector->device()->rendererDevice()->imp()->eglDisplay,
                           connector->imp()->connectorEGLContext);
 
@@ -302,7 +322,7 @@ static int ITS_createEGLSurfaces(SRMConnector *connector)
 
     if (connector->imp()->connectorEGLSurface == EGL_NO_SURFACE)
     {
-        printf("Failed to create EGL surface.\n");
+        SRMLog::error("Failed to create EGL surface for connector %d (ITSELF MODE).", connector->id());
         return 0;
     }
 
@@ -318,7 +338,7 @@ static int DUM_createEGLSurfaces(SRMConnector *connector)
 
     if (connector->imp()->rendererEGLSurface == EGL_NO_SURFACE)
     {
-        printf("Failed to create EGL surface.\n");
+        SRMLog::error("Failed to create renderer EGL surface for connector %d (DUMB MODE).", connector->id());
         return 0;
     }
 
@@ -334,7 +354,7 @@ static int CPU_createEGLSurfaces(SRMConnector *connector)
 
     if (connector->imp()->connectorEGLSurface == EGL_NO_SURFACE)
     {
-        printf("Failed to create EGL surface.\n");
+        SRMLog::error("Failed to create connector EGL surface for connector %d (CPU MODE).", connector->id());
         return 0;
     }
 
@@ -348,7 +368,7 @@ static int CPU_createEGLSurfaces(SRMConnector *connector)
         eglDestroySurface(connector->device()->imp()->eglDisplay,
                           connector->imp()->connectorEGLSurface);
 
-        printf("Failed to create EGL surface.\n");
+        SRMLog::error("Failed to create renderer EGL surface for connector %d (CPU MODE).", connector->id());
         return 0;
     }
 
@@ -383,7 +403,7 @@ static int ITS_createDRMFramebuffers(SRMConnector *connector)
 
     if (ret)
     {
-        printf("Failed o create 2nd DRM framebuffer for connector %d.\n", connector->id());
+        SRMLog::error("Failed o create 2nd DRM framebuffer for connector %d (ITSELF MODE).", connector->id());
         return 0;
     }
 
@@ -406,7 +426,7 @@ static int ITS_createDRMFramebuffers(SRMConnector *connector)
 
     if (ret)
     {
-        printf("Failed o create 1st DRM framebuffer for connector %d.\n", connector->id());
+        SRMLog::error("Failed o create 1st DRM framebuffer for connector %d (ITSELF MODE).", connector->id());
         return 1;
     }
 
@@ -415,6 +435,177 @@ static int ITS_createDRMFramebuffers(SRMConnector *connector)
     connector->imp()->currentBufferIndex = 1;
 
     return 1;
+}
+
+static int DUM_createDRMFramebuffers(SRMConnector *connector)
+{
+    Int32 ret;
+    drm_mode_map_dumb dumbMapRequest;
+
+    eglMakeCurrent(connector->device()->rendererDevice()->imp()->eglDisplay,
+                   connector->imp()->rendererEGLSurface,
+                   connector->imp()->rendererEGLSurface,
+                   connector->imp()->rendererEGLContext);
+
+    // 2nd buffer
+
+    eglSwapBuffers(connector->device()->rendererDevice()->imp()->eglDisplay,
+                   connector->imp()->rendererEGLSurface);
+
+    connector->imp()->rendererBOs[1] = gbm_surface_lock_front_buffer(connector->imp()->rendererGBMSurface);
+
+    gbm_surface_release_buffer(connector->imp()->rendererGBMSurface, connector->imp()->rendererBOs[0]);
+
+    connector->imp()->dumbBuffers[1] =
+    {
+        .height = connector->currentMode()->height(),
+        .width  = connector->currentMode()->width(),
+        .bpp    = 32
+    };
+
+    ret = ioctl(connector->device()->fd(),
+                DRM_IOCTL_MODE_CREATE_DUMB,
+                &connector->imp()->dumbBuffers[1]);
+
+    if (ret)
+    {
+        SRMLog::error("Failed to create 2nd dumb buffer for connector %d.", connector->id());
+        goto FAIL_DUMB_CREATE_2;
+    }
+
+    dumbMapRequest.handle = connector->imp()->dumbBuffers[1].handle;
+
+    ret = ioctl(connector->device()->fd(), DRM_IOCTL_MODE_MAP_DUMB, &dumbMapRequest);
+
+    if (ret)
+    {
+        SRMLog::error("Failed to get the 2nd dumb buffer map offset for connector %d (DUMB MODE): %s.", connector->id(), strerror(errno));
+        goto FAIL_DUMB_MAP_2;
+    }
+
+    connector->imp()->dumbMaps[1] = (UInt8*)mmap(0,
+                                                 connector->imp()->dumbBuffers[1].size,
+                                                 PROT_READ | PROT_WRITE,
+                                                 MAP_SHARED,
+                                                 connector->device()->fd(),
+                                                 dumbMapRequest.offset);
+
+    if (connector->imp()->dumbMaps[1] == NULL || connector->imp()->dumbMaps[1] == MAP_FAILED)
+    {
+        SRMLog::error("Failed to map the 2nd dumb buffer FD for connector %d (DUMB MODE).", connector->id());
+        goto FAIL_DUMB_MAP_2;
+    }
+
+    ret = drmModeAddFB(connector->device()->fd(),
+                       connector->currentMode()->width(),
+                       connector->currentMode()->height(),
+                       24,
+                       connector->imp()->dumbBuffers[1].bpp,
+                       connector->imp()->dumbBuffers[1].pitch,
+                       connector->imp()->dumbBuffers[1].handle,
+                       &connector->imp()->connectorDRMFramebuffers[1]);
+
+    if (ret)
+    {
+        SRMLog::error("Failed to create 2nd DRM framebuffer for connector %d (DUMB MODE).", connector->id());
+        goto FAIL_FB_CREATE_2;
+    }
+
+    // 1st buffer
+
+    eglSwapBuffers(connector->device()->rendererDevice()->imp()->eglDisplay, connector->imp()->rendererEGLSurface);
+
+    connector->imp()->rendererBOs[0] = gbm_surface_lock_front_buffer(connector->imp()->rendererGBMSurface);
+
+    gbm_surface_release_buffer(connector->imp()->rendererGBMSurface, connector->imp()->rendererBOs[1]);
+
+    connector->imp()->dumbBuffers[0] =
+    {
+        .height = connector->currentMode()->height(),
+        .width  = connector->currentMode()->width(),
+        .bpp    = 32
+    };
+
+    ret = ioctl(connector->device()->fd(),
+                DRM_IOCTL_MODE_CREATE_DUMB,
+                &connector->imp()->dumbBuffers[0]);
+
+    if (ret)
+    {
+        SRMLog::error("Failed to create 1st dumb buffer for connector %d.", connector->id());
+        goto FAIL_DUMB_CREATE_1;
+    }
+
+    dumbMapRequest.handle = connector->imp()->dumbBuffers[0].handle;
+
+    ret = ioctl(connector->device()->fd(), DRM_IOCTL_MODE_MAP_DUMB, &dumbMapRequest);
+
+    if (ret)
+    {
+        SRMLog::error("Failed to get the 1st dumb buffer map offset for connector %d (DUMB MODE): %s.", connector->id(), strerror(errno));
+        goto FAIL_DUMB_MAP_1;
+    }
+
+    connector->imp()->dumbMaps[0] = (UInt8*)mmap(0,
+                                                 connector->imp()->dumbBuffers[0].size,
+                                                 PROT_READ | PROT_WRITE,
+                                                 MAP_SHARED,
+                                                 connector->device()->fd(),
+                                                 dumbMapRequest.offset);
+
+    if (connector->imp()->dumbMaps[0] == NULL || connector->imp()->dumbMaps[0] == MAP_FAILED)
+    {
+        SRMLog::error("Failed to map the 1st dumb buffer FD for connector %d (DUMB MODE).", connector->id());
+        goto FAIL_DUMB_MAP_1;
+    }
+
+    ret = drmModeAddFB(connector->device()->fd(),
+                       connector->currentMode()->width(),
+                       connector->currentMode()->height(),
+                       24,
+                       connector->imp()->dumbBuffers[0].bpp,
+                       connector->imp()->dumbBuffers[0].pitch,
+                       connector->imp()->dumbBuffers[0].handle,
+                       &connector->imp()->connectorDRMFramebuffers[0]);
+
+    if (ret)
+    {
+        SRMLog::error("Failed to create 1st DRM framebuffer for connector %d (DUMB MODE).", connector->id());
+        goto FAIL_FB_CREATE_1;
+    }
+
+    return 1;
+
+    FAIL_FB_CREATE_1:
+
+        munmap(connector->imp()->dumbMaps[0],
+               connector->imp()->dumbBuffers[0].size);
+
+    FAIL_DUMB_MAP_1:
+
+        ioctl(connector->device()->fd(),
+              DRM_IOCTL_MODE_DESTROY_DUMB,
+              &connector->imp()->dumbBuffers[0].handle);
+
+    FAIL_DUMB_CREATE_1:
+
+        drmModeRmFB(connector->device()->fd(),
+                    connector->imp()->connectorDRMFramebuffers[1]);
+
+    FAIL_FB_CREATE_2:
+
+        munmap(connector->imp()->dumbMaps[1],
+               connector->imp()->dumbBuffers[1].size);
+
+    FAIL_DUMB_MAP_2:
+
+        ioctl(connector->device()->fd(),
+              DRM_IOCTL_MODE_DESTROY_DUMB,
+              &connector->imp()->dumbBuffers[1].handle);
+
+    FAIL_DUMB_CREATE_2:
+
+        return 0;
 }
 
 // Do rendering
@@ -431,11 +622,72 @@ static int ITS_render(SRMConnector *connector)
     return 1;
 }
 
+static int DUM_render(SRMConnector *connector)
+{
+    return 1;
+    eglMakeCurrent(connector->device()->rendererDevice()->imp()->eglDisplay,
+                   connector->imp()->rendererEGLSurface,
+                   connector->imp()->rendererEGLSurface,
+                   connector->imp()->rendererEGLContext);
+
+    connector->imp()->interface->paintGL(connector, connector->imp()->interfaceData);
+
+    return 1;
+}
+
 // Page flipping
 
 static int ITS_pageFlip(SRMConnector *connector)
 {
+    return 1;
     eglSwapBuffers(connector->device()->imp()->eglDisplay, connector->imp()->connectorEGLSurface);
+    gbm_surface_lock_front_buffer(connector->imp()->connectorGBMSurface);
+
+    connector->imp()->pendingPageFlip = true;
+
+    drmModePageFlip(connector->device()->fd(),
+                    connector->currentCrtc()->id(),
+                    connector->imp()->connectorDRMFramebuffers[connector->imp()->currentBufferIndex],
+                    DRM_MODE_PAGE_FLIP_EVENT,
+                    connector);
+
+    // Prevent multiple threads invoking the drmHandleEvent at a time wich causes bugs
+    // If more than 1 connector is requesting a page flip, both can be handled here
+    // since the struct passed to drmHandleEvent is standard and could be handling events
+    // from any connector (E.g. pageFlipHandler(conn1) or pageFlipHandler(conn2))
+    connector->device()->imp()->pageFlipMutex.lock();
+
+    pollfd fds;
+    fds.fd = connector->device()->fd();
+    fds.events = POLLIN;
+    fds.revents = 0;
+
+    while(connector->imp()->pendingPageFlip)
+    {
+        poll(&fds, 1, 100);
+
+        if(fds.revents & POLLIN)
+            drmHandleEvent(fds.fd, &connector->imp()->drmEventCtx);
+
+        if(connector->state() != SRM_CONNECTOR_STATE_INITIALIZED)
+            break;
+    }
+
+    connector->device()->imp()->pageFlipMutex.unlock();
+
+    connector->imp()->currentBufferIndex = !connector->imp()->currentBufferIndex;
+
+    gbm_surface_release_buffer(connector->imp()->connectorGBMSurface, connector->imp()->connectorBOs[connector->imp()->currentBufferIndex]);
+
+    return 1;
+}
+
+static int DUM_pageFlip(SRMConnector *connector)
+{
+    return 1;
+    eglSwapBuffers(connector->device()->imp()->eglDisplay,
+                   connector->imp()->connectorEGLSurface);
+
     gbm_surface_lock_front_buffer(connector->imp()->connectorGBMSurface);
 
     connector->imp()->pendingPageFlip = true;
@@ -483,7 +735,7 @@ static void COM_pageFlipHandler(int, unsigned int, unsigned int, unsigned int, v
     connector->imp()->pendingPageFlip = false;
 }
 
-static int COM_initCrtc(SRMConnector *connector)
+static int ITS_initCrtc(SRMConnector *connector)
 {
     connector->imp()->drmEventCtx =
     {
@@ -510,6 +762,168 @@ static int COM_initCrtc(SRMConnector *connector)
 
     gbm_surface_release_buffer(connector->imp()->connectorGBMSurface, connector->imp()->connectorBOs[connector->imp()->currentBufferIndex]);
 
+    return 1;
+}
+
+static int DUM_initCrtc(SRMConnector *connector)
+{
+    connector->imp()->drmEventCtx =
+    {
+        .version = DRM_EVENT_CONTEXT_VERSION,
+        .vblank_handler = NULL,
+        .page_flip_handler = &COM_pageFlipHandler,
+        .page_flip_handler2 = NULL,
+        .sequence_handler = NULL
+    };
+
+    printf("A\n");
+
+    eglSwapBuffers(connector->device()->rendererDevice()->imp()->eglDisplay,
+                   connector->imp()->rendererEGLSurface);
+
+    printf("B\n");
+
+    gbm_surface_lock_front_buffer(connector->imp()->rendererGBMSurface);
+
+    printf("C\n");
+
+    UInt32 b = connector->imp()->currentBufferIndex;
+    UInt32 h = connector->imp()->dumbBuffers[b].height;
+    UInt32 w = connector->imp()->dumbBuffers[b].width;
+    UInt32 p = connector->imp()->dumbBuffers[b].pitch;
+
+    /*
+    for (UInt32 i = 0; i < h; i++)
+    {
+        glReadPixels(0,
+                     h - (i + 1),
+                     w,
+                     1,
+                     GL_RGBA,
+                     GL_UNSIGNED_BYTE,
+                     &connector->imp()->dumbMaps[b][
+                     i*p]);
+    }
+    */
+
+    memset(connector->imp()->dumbMaps[b], 255, connector->imp()->dumbBuffers[b].size);
+    memset(connector->imp()->dumbMaps[!b], 255, connector->imp()->dumbBuffers[!b].size);
+
+    printf("D\n");
+
+    if (connector->device()->clientCapAtomic())
+    {
+        drmModeAtomicReqPtr req;
+        req = drmModeAtomicAlloc();
+
+        UInt32 modeID;
+
+        drmModeCreatePropertyBlob(connector->device()->fd(),
+                                  &connector->currentMode()->imp()->info,
+                                  sizeof(drmModeModeInfo),
+                                  &modeID);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentCrtc()->id(),
+                                 connector->currentCrtc()->imp()->propIDs.MODE_ID,
+                                 modeID);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentCrtc()->id(),
+                                 connector->currentCrtc()->imp()->propIDs.ACTIVE,
+                                 1);
+
+        // Connector
+
+        drmModeAtomicAddProperty(req,
+                                 connector->id(),
+                                 connector->imp()->propIDs.CRTC_ID,
+                                 connector->currentCrtc()->id());
+
+        drmModeAtomicAddProperty(req,
+                                 connector->id(),
+                                 connector->imp()->propIDs.link_status,
+                                 DRM_MODE_LINK_STATUS_GOOD);
+
+
+        // Plane
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.CRTC_ID,
+                                 connector->currentCrtc()->id());
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.CRTC_X,
+                                 0);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.CRTC_Y,
+                                 0);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.CRTC_W,
+                                 connector->currentMode()->width());
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.CRTC_H,
+                                 connector->currentMode()->height());
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.FB_ID,
+                                 connector->imp()->connectorDRMFramebuffers[b]);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.SRC_X,
+                                 0);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.SRC_Y,
+                                 0);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.SRC_W,
+                                 (UInt64)connector->currentMode()->width() << 16);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane()->id(),
+                                 connector->currentPrimaryPlane()->imp()->propIDs.SRC_H,
+                                 (UInt64)connector->currentMode()->height() << 16);
+
+        // Commit
+        drmModeAtomicCommit(connector->device()->fd(),
+                            req,
+                            DRM_MODE_ATOMIC_ALLOW_MODESET,
+                            NULL);
+
+        drmModeAtomicFree(req);
+    }
+    else
+    {
+        drmModeSetCrtc(connector->device()->fd(),
+                       connector->currentCrtc()->id(),
+                       connector->imp()->connectorDRMFramebuffers[b],
+                       0,
+                       0,
+                       &connector->imp()->id,
+                       1,
+                       &connector->currentMode()->imp()->info);
+    }
+
+    printf("E\n");
+
+    connector->imp()->currentBufferIndex = !b;
+
+    gbm_surface_release_buffer(connector->imp()->rendererGBMSurface,
+                               connector->imp()->rendererBOs[connector->imp()->currentBufferIndex]);
 
     return 1;
 }
@@ -543,6 +957,7 @@ static int COM_setupRendererInterface(SRMConnector *connector)
             connector->imp()->rendererInterface.createEGLContexts       = &ITS_createEGLContexts;
             connector->imp()->rendererInterface.createEGLSurfaces       = &ITS_createEGLSurfaces;
             connector->imp()->rendererInterface.createDRMFramebuffers   = &ITS_createDRMFramebuffers;
+            connector->imp()->rendererInterface.initCrtc                = &ITS_initCrtc;
             connector->imp()->rendererInterface.render                  = &ITS_render;
             connector->imp()->rendererInterface.pageFlip                = &ITS_pageFlip;
             return 1;
@@ -553,7 +968,10 @@ static int COM_setupRendererInterface(SRMConnector *connector)
             connector->imp()->rendererInterface.getEGLConfiguration     = &DUM_getEGLConfigurations;
             connector->imp()->rendererInterface.createEGLContexts       = &DUM_createEGLContexts;
             connector->imp()->rendererInterface.createEGLSurfaces       = &DUM_createEGLSurfaces;
-            //connector->imp()->rendererInterface.createDRMFramebuffers   = &DUM_createDRMFramebuffers;
+            connector->imp()->rendererInterface.createDRMFramebuffers   = &DUM_createDRMFramebuffers;
+            connector->imp()->rendererInterface.initCrtc                = &DUM_initCrtc;
+            connector->imp()->rendererInterface.render                  = &DUM_render;
+            connector->imp()->rendererInterface.pageFlip                = &DUM_pageFlip;
             return 1;
         }break;
         case SRM_RENDER_MODE_CPU:
@@ -570,17 +988,16 @@ static int COM_setupRendererInterface(SRMConnector *connector)
 
 void SRM_FUNC::initRenderer(SRMConnector *connector, Int32 *initResult)
 {
-
     if (!eglBindAPI(EGL_OPENGL_ES_API))
     {
-        printf("Failed to bind GLES API.\n");
+        SRMLog::error("Failed to bind GLES API for connector %d.", connector->id());
         *initResult = -1;
         return;
     }
 
     if (!COM_setupRendererInterface(connector))
     {
-        printf("Failed to setup renderer interface.\n");
+        SRMLog::error("Failed to setup renderer interface for connector %d.", connector->id());
         *initResult = -1;
         return;
     }
@@ -589,40 +1006,45 @@ void SRM_FUNC::initRenderer(SRMConnector *connector, Int32 *initResult)
 
     if (!iface->createGBMSurfaces(connector))
     {
-        printf("Failed GBM surf.\n");
+        SRMLog::error("Failed to create GBM surfaces for connector %d.", connector->id());
         *initResult = -1;
         return;
     }
 
     if (!iface->getEGLConfiguration(connector))
     {
-        printf("Failed egl CONF.\n");
+        SRMLog::error("Failed to get a valid EGL configuration for connector %d.", connector->id());
         *initResult = -1;
         return;
     }
 
     if (!iface->createEGLContexts(connector))
     {
-        printf("Failed egl CONTex.\n");
+        SRMLog::error("Failed to create EGL contexts for connector %d.", connector->id());
         *initResult = -1;
         return;
     }
 
     if (!iface->createEGLSurfaces(connector))
     {
-        printf("Failed egl surfs.\n");
+        SRMLog::error("Failed to create EGL surfaces for connector %d.", connector->id());
         *initResult = -1;
         return;
     }
 
     if (!iface->createDRMFramebuffers(connector))
     {
-        printf("Failed drm fbs.\n");
+        SRMLog::error("Failed to create DRM framebuffers for connector %d.", connector->id());
         *initResult = -1;
         return;
     }
 
-    COM_createCursor(connector);
+    /*
+    if (!COM_createCursor(connector))
+    {
+        SRMLog::warning("Failed to create hardware cursor for connector %d.", connector->id());
+    }
+    */
 
     *initResult = 1;
 
@@ -631,10 +1053,12 @@ void SRM_FUNC::initRenderer(SRMConnector *connector, Int32 *initResult)
     // User initializeGL
     connector->imp()->interface->initializeGL(connector, connector->imp()->interfaceData);
 
-    COM_initCrtc(connector);
+    iface->initCrtc(connector);
 
     while (1)
     {
+        usleep(100000);
+        continue;
         COM_waitForRepaintRequest(connector);
         connector->imp()->rendererInterface.render(connector);
         connector->imp()->rendererInterface.pageFlip(connector);

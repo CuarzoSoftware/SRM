@@ -6,6 +6,7 @@
 #include <SRMEncoder.h>
 #include <SRMCrtc.h>
 #include <SRMPlane.h>
+#include <SRMLog.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -177,7 +178,7 @@ int SRMConnector::SRMConnectorPrivate::updateProperties()
 
     if (!connectorRes)
     {
-        fprintf(stderr, "SRM Error: Could not get connector %d resources.\n", id);
+        SRMLog::error("Could not get connector %d resources.", id);
         return 0;
     }
 
@@ -186,6 +187,50 @@ int SRMConnector::SRMConnectorPrivate::updateProperties()
     connected = connectorRes->connection == DRM_MODE_CONNECTED;
 
     drmModeFreeConnector(connectorRes);
+
+    drmModeObjectPropertiesPtr props = drmModeObjectGetProperties(device->fd(), id, DRM_MODE_OBJECT_CONNECTOR);
+
+    if (!props)
+    {
+        SRMLog::error("Unable to get DRM connector %d properties.", id);
+        return 0;
+    }
+
+    memset(&propIDs, 0, sizeof(SRMConnectorPropIDs));
+
+    for (UInt32 i = 0; i < props->count_props; i++)
+    {
+        drmModePropertyPtr prop = drmModeGetProperty(device->fd(), props->props[i]);
+
+        if (!prop)
+        {
+            SRMLog::warning("Could not get property %d of connector %d.", props->props[i], id);
+            continue;
+        }
+
+        if (strcmp(prop->name, "CRTC_ID") == 0)
+            propIDs.CRTC_ID = prop->prop_id;
+        else if (strcmp(prop->name, "DPMS") == 0)
+            propIDs.DPMS = prop->prop_id;
+        else if (strcmp(prop->name, "EDID") == 0)
+            propIDs.EDID = prop->prop_id;
+        else if (strcmp(prop->name, "PATH") == 0)
+            propIDs.PATH = prop->prop_id;
+        else if (strcmp(prop->name, "link-status") == 0)
+            propIDs.link_status = prop->prop_id;
+        else if (strcmp(prop->name, "non-desktop") == 0)
+            propIDs.non_desktop = prop->prop_id;
+        else if (strcmp(prop->name, "panel orientation") == 0)
+            propIDs.panel_orientation = prop->prop_id;
+        else if (strcmp(prop->name, "subconnector") == 0)
+            propIDs.subconnector = prop->prop_id;
+        else if (strcmp(prop->name, "vrr_capable") == 0)
+            propIDs.vrr_capable = prop->prop_id;
+
+        drmModeFreeProperty(prop);
+    }
+
+    drmModeFreeObjectProperties(props);
 
     return 1;
 }

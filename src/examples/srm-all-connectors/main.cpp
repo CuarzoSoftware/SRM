@@ -6,6 +6,7 @@
 #include <SRMPlane.h>
 #include <SRMConnector.h>
 #include <SRMConnectorMode.h>
+#include <SRMLog.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -107,33 +108,35 @@ SRMConnectorInterface connectorInterface
 
 void deviceCreatedEvent(SRMListener *, SRMDevice *device)
 {
-    fprintf(stdout, "DRM device created: %s\n", device->name());
+    SRMLog::log("DRM device created: %s.", device->name());
 }
 
 void deviceRemovedEvent(SRMListener *, SRMDevice *device)
 {
-    fprintf(stdout, "DRM device removed: %s\n", device->name());
+    SRMLog::log("DRM device removed: %s.", device->name());
 }
 
 void connectorPluggedEvent(SRMListener *, SRMConnector *connector)
 {
-    fprintf(stdout, "DRM connector plugged: %s\n", "HOLA");
+    SRMLog::log("DRM connector plugged: %s.", "HOLA");
 }
 
 void connectorUnpluggedEvent(SRMListener *, SRMConnector *connector)
 {
-    fprintf(stdout, "DRM connector unplugged: %s\n", "HOLA");
+    SRMLog::log("DRM connector unplugged: %s.", "HOLA");
 }
 
 int main(void)
 {
-    //setenv("EGL_LOG_LEVEL", "debug", 1);
+    /* setenv("EGL_LOG_LEVEL", "debug", 1); */
+
+    setenv("SRM_DEBUG", "4", 1);
 
     SRMCore *srm = SRMCore::createSRM(&srmInterface);
 
     if (!srm)
     {
-        fprintf(stderr, "Failed to initialize SRM.\n");
+        SRMLog::fatal("Failed to initialize SRM.");
         return 1;
     }
 
@@ -145,30 +148,28 @@ int main(void)
     {
         for (SRMConnector *connector : device->connectors())
         {
-            if (connector->connected())
+            if (connector->connected() && connector->id() == 42)
             {
-                printf("%s\n", connector->manufacturer());
+                SRMLog::log("Connector: %s.", connector->manufacturer());
+
                 float *phase = new float();
                 if (!connector->initialize(&connectorInterface, phase))
                 {
                     delete phase;
-                    fprintf(stderr, "Failed to initialize connector %d\n", connector->id());
+                    SRMLog::error("Failed to initialize connector %d.", connector->id());
                 }
             }
         }
     }
 
-    int count = 0;
+    usleep(10000000);
+    printf("DIE\n");
+    abort();
 
     while (1)
     {
         // Poll DRM devices/connectors hotplugging events (0 disables timeout)
-        srm->processMonitor(1000);
-
-        if (count == 6)
-            exit(0);
-
-        count++;
+        srm->processMonitor(-1);
     }
 
     // Unsuscribe to DRM events

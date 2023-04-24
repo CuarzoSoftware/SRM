@@ -25,6 +25,7 @@ HEADERS += \
     SRMDevice.h \
     SRMEncoder.h \
     SRMListener.h \
+    SRMLog.h \
     SRMNamespaces.h \
     SRMPlane.h \
     private/SRMConnectorModePrivate.h \
@@ -44,6 +45,7 @@ SOURCES += \
     SRMDevice.cpp \
     SRMEncoder.cpp \
     SRMListener.cpp \
+    SRMLog.cpp \
     SRMNamespaces.cpp \
     SRMPlane.cpp \
     private/SRMConnectorModePrivate.cpp \

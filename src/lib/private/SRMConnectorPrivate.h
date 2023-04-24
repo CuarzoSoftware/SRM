@@ -69,6 +69,8 @@ public:
     std::condition_variable renderConditionVariable;
     bool pendingPageFlip = false;
     drmEventContext drmEventCtx;
+    drm_mode_create_dumb dumbBuffers[2];
+    UInt8 *dumbMaps[2];
 
     struct SRMRendererInterface
     {
@@ -77,9 +79,24 @@ public:
         int(*createEGLContexts)(SRMConnector*connector);
         int(*createEGLSurfaces)(SRMConnector*connector);
         int(*createDRMFramebuffers)(SRMConnector*connector);
+        int(*initCrtc)(SRMConnector*connector);
         int(*render)(SRMConnector*connector);
         int(*pageFlip)(SRMConnector*connector);
     }rendererInterface;
+
+    struct SRMConnectorPropIDs
+    {
+        UInt32
+        CRTC_ID,
+        DPMS,
+        EDID,
+        PATH,
+        link_status,
+        non_desktop,
+        panel_orientation,
+        subconnector,
+        vrr_capable;
+    } propIDs;
 };
 
 #endif // SRMCONNECTORPRIVATE_H

@@ -1,7 +1,9 @@
+#include <cstring>
 #include <private/SRMCrtcPrivate.h>
 #include <SRMDevice.h>
 #include <xf86drmMode.h>
 #include <stdio.h>
+#include <SRMLog.h>
 
 SRM::SRMCrtc::SRMCrtcPrivate::SRMCrtcPrivate(SRMCrtc *crtc)
 {
@@ -10,17 +12,42 @@ SRM::SRMCrtc::SRMCrtcPrivate::SRMCrtcPrivate(SRMCrtc *crtc)
 
 int SRM::SRMCrtc::SRMCrtcPrivate::updateProperties()
 {
-    drmModeCrtc *res = drmModeGetCrtc(device->fd(), id);
+    drmModeObjectPropertiesPtr props = drmModeObjectGetProperties(device->fd(), id, DRM_MODE_OBJECT_CRTC);
 
-    if (!res)
+    if (!props)
     {
-        fprintf(stderr, "SRM Error: Could not get CRTC properties.\n");
+        SRMLog::error("Unable to get DRM crtc %d properties.", id);
         return 0;
     }
 
-    // TODO use this props ?
+    memset(&propIDs, 0, sizeof(SRMCrtcPropIDs));
 
-    drmModeFreeCrtc(res);
+    for (UInt32 i = 0; i < props->count_props; i++)
+    {
+        drmModePropertyPtr prop = drmModeGetProperty(device->fd(), props->props[i]);
+
+        if (!prop)
+        {
+            SRMLog::warning("Could not get property %d of crtc %d.", props->props[i], id);
+            continue;
+        }
+
+        if (strcmp(prop->name, "ACTIVE") == 0)
+            propIDs.ACTIVE = prop->prop_id;
+        else if (strcmp(prop->name, "GAMMA_LUT") == 0)
+            propIDs.GAMMA_LUT = prop->prop_id;
+        else if (strcmp(prop->name, "GAMMA_LUT_SIZE") == 0)
+            propIDs.GAMMA_LUT_SIZE = prop->prop_id;
+        else if (strcmp(prop->name, "MODE_ID") == 0)
+            propIDs.MODE_ID = prop->prop_id;
+        else if (strcmp(prop->name, "VRR_ENABLED") == 0)
+            propIDs.VRR_ENABLED = prop->prop_id;
+
+        drmModeFreeProperty(prop);
+    }
+
+    drmModeFreeObjectProperties(props);
+
 
     return 1;
 }

@@ -1,6 +1,7 @@
 #include <private/SRMCorePrivate.h>
 #include <private/SRMDevicePrivate.h>
 #include <SRMListener.h>
+#include <SRMLog.h>
 #include <stdio.h>
 #include <sys/poll.h>
 #include <string.h>
@@ -14,6 +15,7 @@ using namespace SRM;
 
 SRMCore::SRMCore()
 {
+    SRMLog::init();
     srand(time(NULL));
     m_imp = new SRMCorePrivate(this);
 }
@@ -83,7 +85,7 @@ int SRMCore::processMonitor(int msTimeout)
 
                     if (card_fd < 0)
                     {
-                        fprintf(stderr, "SRM Error: Failed to open DRM device.\n");
+                        SRMLog::error("Failed to open device %s.", devnode);
                         goto unref;
                     }
 

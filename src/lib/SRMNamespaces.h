@@ -24,6 +24,7 @@ namespace SRM
     class SRMConnector;
     class SRMConnectorMode;
     class SRMListener;
+    class SRMLog;
 
     struct SRMInterface
     {

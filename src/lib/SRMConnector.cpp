@@ -3,6 +3,7 @@
 #include <private/SRMEncoderPrivate.h>
 #include <private/SRMCrtcPrivate.h>
 #include <private/SRMPlanePrivate.h>
+#include <SRMLog.h>
 #include <xf86drmMode.h>
 #include <gbm.h>
 
@@ -163,7 +164,7 @@ int SRMConnector::initialize(SRMConnectorInterface *interface, void *data)
     if (!imp()->getBestConfiguration(&bestEncoder, &bestCrtc, &bestPrimaryPlane, &bestCursorPlane))
     {
         // Fails to get a valid encoder, crtc or primary plane
-        printf("No connector conf.\n");
+        SRMLog::warning("Could not get a Encoder, Crtc and Primary Plane trio for connector %d.", id());
         return 0;
     }
 

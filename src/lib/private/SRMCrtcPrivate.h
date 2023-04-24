@@ -14,6 +14,16 @@ public:
     SRMConnector *currentConnector = nullptr;
     std::list<SRMCrtc*>::iterator deviceLink;
     int updateProperties();
+
+    struct SRMCrtcPropIDs
+    {
+        UInt32
+        ACTIVE,
+        GAMMA_LUT,
+        GAMMA_LUT_SIZE,
+        MODE_ID,
+        VRR_ENABLED;
+    } propIDs;
 };
 
 #endif // SRMCRTCPRIVATE_H

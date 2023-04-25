@@ -16,13 +16,14 @@
 #include <GLES2/gl2.h>
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMConnectorPrivate.h>
+
 using namespace SRM;
 
 UInt8 cursor[64*64*4];
 
 static int openRestricted(const char *path, int flags, void *)
 {
-    // Here libseat could be used instead
+    // Here something like libseat could be used instead
     return open(path, flags);
 }
 
@@ -37,53 +38,44 @@ SRMInterface srmInterface
     .closeRestricted = &closeRestricted
 };
 
-static void initializeGL(SRMConnector *connector, void *data)
+static void drawColorSquares(UInt32 w, UInt32 h)
 {
-    glEnable(GL_SCISSOR_TEST);
-    glDisable(GL_DEPTH_BUFFER_BIT);
-
-    glViewport(0,
-               0,
-               connector->currentMode()->width(),
-               connector->currentMode()->height());
-
-    glScissor(0,
-              connector->currentMode()->height()/2,
-              connector->currentMode()->width()/2,
-              connector->currentMode()->height()/2);
+    // Red TL square
+    glScissor(0, h/2, w/2, h/2);
     glClearColor(1.f, 0.f, 0.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glScissor(connector->currentMode()->width()/2,
-              connector->currentMode()->height()/2,
-              connector->currentMode()->width()/2,
-              connector->currentMode()->height()/2);
+    // Green TR square
+    glScissor(w/2, h/2, w/2, h/2);
     glClearColor(0.f, 1.f, 0.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glScissor(0,
-              0,
-              connector->currentMode()->width()/2,
-              connector->currentMode()->height()/2);
+    // Blue BL square
+    glScissor(0, 0, w/2, h/2);
     glClearColor(0.f, 0.f, 1.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glScissor(connector->currentMode()->width()/2,
-              0,
-              connector->currentMode()->width()/2,
-              connector->currentMode()->height()/2);
-    glClearColor(1.f, 1.f, 1.f, 1.f);
+    // White BR square
+    glScissor(w/2, 0, w/2, h/2);
+    glClearColor(1.f, 1.f, 0.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
+}
 
+static void initializeGL(SRMConnector *connector, void *data)
+{
+    UInt32 w = connector->currentMode()->width();
+    UInt32 h = connector->currentMode()->width();
 
-    glScissor(0,
-              0,
-              connector->currentMode()->width(),
-              connector->currentMode()->height());
+    glEnable(GL_SCISSOR_TEST);
+    glDisable(GL_DEPTH_BUFFER_BIT);
+    glViewport(0, 0, w, h);
 
+    // Draw color squares
+    drawColorSquares(w, h);
+
+    // Create a gray cursor
     memset(cursor, 200, sizeof(cursor));
-
-    //connector->setCursor(cursor);
+    connector->setCursor(cursor);
 
     float *phase = (float*)data;
     *phase = 0;
@@ -93,55 +85,30 @@ static void initializeGL(SRMConnector *connector, void *data)
 
 static void paintGL(SRMConnector *connector, void *data)
 {
+    UInt32 w = connector->currentMode()->width();
+    UInt32 h = connector->currentMode()->height();
     float *phase = (float*)data;
     float cosine = cosf(*phase);
     float sine = sinf(*phase);
 
-    glScissor(0,
-              0,
-              connector->currentMode()->width(),
-              connector->currentMode()->height());
+    // Draw color squares
+    drawColorSquares(w, h);
 
-    glClearColor(0.f,
-                 0.f,
-                 0.f,
-                 1.f);
-
+    // Moving black vertical line
+    glScissor((w-5)*(1.f+cosine)/2, 0, 10, h);
+    glClearColor(1.f, 1.f, 1.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glScissor(connector->currentMode()->width()*(1.f+cosine)/2,
-              0,
-              1,
-              connector->currentMode()->height());
+    // Update cursor pos
+    Int32 x = ((w - 64)/2)*(1 + cosine);
+    Int32 y = ((h - 64)/2)*(1 + sine);
+    connector->setCursorPos(x, y);
 
-    glClearColor(1.f,
-                 1.f,
-                 1.f,
-                 1.f);
-
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glScissor(0,
-              100,
-              connector->currentMode()->width(),
-              1);
-
-    glClearColor(1.f,
-                 1.f,
-                 1.f,
-                 1.f);
-
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    *phase += 0.05f;
-
-    Int32 x = ((connector->currentMode()->width() - 64)/2)*(1 + cosine);
-    Int32 y = ((connector->currentMode()->height() - 64)/2)*(1 + sine);
+    // Increase phase
+    *phase += 0.015f;
 
     if (*phase >= 2*M_PI)
         *phase -= 2*M_PI;
-
-    //connector->setCursorPos(x, y);
 
     connector->repaint();
 }
@@ -211,23 +178,23 @@ int main(void)
     {
         for (SRMConnector *connector : device->connectors())
         {
-            if (connector->connected())// && connector->id() == 42)
+            if (connector->connected())
             {
-                SRMLog::log("Connector: %s.", connector->manufacturer());
-
                 float *phase = new float();
                 if (!connector->initialize(&connectorInterface, phase))
                 {
                     delete phase;
                     SRMLog::error("Failed to initialize connector %d.", connector->id());
                 }
+
+                SRMLog::log("Initialized Connector: %s.", connector->manufacturer());
             }
         }
     }
 
-    usleep(5000000);
+    usleep(10000000);
     printf("DIE\n");
-    abort();
+    exit(0);
 
     while (1)
     {

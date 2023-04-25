@@ -3,6 +3,7 @@
 #include <xf86drm.h>
 #include <drm.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <private/SRMCrtcPrivate.h>
 #include <private/SRMEncoderPrivate.h>
 #include <private/SRMPlanePrivate.h>
@@ -89,6 +90,30 @@ int SRMDevice::SRMDevicePrivate::updateCaps()
     drmGetCap(fd, DRM_CAP_PRIME, &value);
     capPrimeImport = value & DRM_PRIME_CAP_IMPORT;
     capPrimeExport = value & DRM_PRIME_CAP_EXPORT;
+
+    // Validate EXPORT cap
+    if (capPrimeExport)
+    {
+        bool primeExport = false;
+
+        gbm_bo *bo = gbm_bo_create(gbm, 256, 256, GBM_FORMAT_ARGB8888, GBM_BO_USE_LINEAR);
+
+        if (bo)
+        {
+            int dma = gbm_bo_get_fd(bo);
+
+            if (dma != -1)
+            {
+                primeExport = true;
+                close(dma);
+            }
+
+            gbm_bo_destroy(bo);
+        }
+
+        capPrimeExport = primeExport;
+    }
+
 
     drmGetCap(fd, DRM_CAP_ADDFB2_MODIFIERS, &value);
     capAddFb2Modifiers = value == 1;

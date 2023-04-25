@@ -182,7 +182,7 @@ SRM::SRMDevice *SRMDevice::rendererDevice() const
 
 SRM_RENDER_MODE SRMDevice::renderMode() const
 {
-    return SRM_RENDER_MODE_DUMB;
+    //return SRM_RENDER_MODE_DUMB;
 
     if (this == rendererDevice())
         return SRM_RENDER_MODE_ITSELF;

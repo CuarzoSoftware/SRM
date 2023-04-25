@@ -3,6 +3,7 @@
 #include <private/SRMConnectorModePrivate.h>
 #include <private/SRMCrtcPrivate.h>
 #include <private/SRMPlanePrivate.h>
+#include <private/SRMCorePrivate.h>
 #include <SRMLog.h>
 
 #include <errno.h>
@@ -14,8 +15,8 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <string.h>
-
-
+#include <drm_fourcc.h>
+#include <drm.h>
 
 using namespace SRM;
 
@@ -692,7 +693,6 @@ static int DUM_pageFlip(SRMConnector *connector)
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    /*
     for (UInt32 i = 0; i < h; i++)
     {
         glReadPixels(0,
@@ -704,16 +704,6 @@ static int DUM_pageFlip(SRMConnector *connector)
                      &connector->imp()->dumbMaps[b][
                      i*p]);
     }
-    */
-
-
-    glReadPixels(0,
-                 0,
-                 w,
-                 h,
-                 GL_RGBA,
-                 GL_UNSIGNED_BYTE,
-                 connector->imp()->dumbMaps[b]);
 
     // Get the ending time point
     auto end = std::chrono::high_resolution_clock::now();
@@ -742,7 +732,7 @@ static int DUM_pageFlip(SRMConnector *connector)
         // Commit
         drmModeAtomicCommit(connector->device()->fd(),
                             req,
-                            DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_PAGE_FLIP_EVENT,
+                            DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT,
                             NULL);
 
         // Get the ending time point
@@ -819,7 +809,8 @@ static int ITS_initCrtc(SRMConnector *connector)
     eglSwapBuffers(connector->device()->imp()->eglDisplay, connector->imp()->connectorEGLSurface);
     gbm_surface_lock_front_buffer(connector->imp()->connectorGBMSurface);
 
-    drmModeSetCrtc(connector->device()->fd(),
+
+    Int32 ret = drmModeSetCrtc(connector->device()->fd(),
                    connector->currentCrtc()->id(),
                    connector->imp()->connectorDRMFramebuffers[connector->imp()->currentBufferIndex],
                    0,
@@ -827,6 +818,12 @@ static int ITS_initCrtc(SRMConnector *connector)
                    &connector->imp()->id,
                    1,
                    &connector->currentMode()->imp()->info);
+
+    if (ret)
+    {
+        SRMLog::error("Failed to set crtc mode on connector %d.", connector->id());
+        return 0;
+    }
 
     connector->imp()->currentBufferIndex = !connector->imp()->currentBufferIndex;
 
@@ -906,11 +903,11 @@ static int DUM_initCrtc(SRMConnector *connector)
 
         // Plane
 
-
+        /*
         drmModeAtomicAddProperty(req,
                                  connector->currentPrimaryPlane()->id(),
                                  connector->currentPrimaryPlane()->imp()->propIDs.rotation,
-                                 DRM_MODE_REFLECT_Y);
+                                 DRM_MODE_REFLECT_Y); */
 
         drmModeAtomicAddProperty(req,
                                  connector->currentPrimaryPlane()->id(),
@@ -966,7 +963,7 @@ static int DUM_initCrtc(SRMConnector *connector)
         // Commit
         drmModeAtomicCommit(connector->device()->fd(),
                             req,
-                            DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_PAGE_FLIP_EVENT,
+                            DRM_MODE_ATOMIC_ALLOW_MODESET,
                             NULL);
 
         drmModeAtomicFree(req);
@@ -1114,7 +1111,12 @@ void SRM_FUNC::initRenderer(SRMConnector *connector, Int32 *initResult)
     // User initializeGL
     connector->imp()->interface->initializeGL(connector, connector->imp()->interfaceData);
 
-    iface->initCrtc(connector);
+    if (!iface->initCrtc(connector))
+    {
+        printf("BIG F");
+        exit(1);
+        return;
+    }
 
     while (1)
     {

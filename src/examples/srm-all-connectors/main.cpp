@@ -1,3 +1,13 @@
+/*
+ * Proj: srm-all-connectors example
+ *
+ * Auth: Eduardo Hopperdietzel
+ *
+ * Desc: This example renders to all
+ *       avaliable connectors at a time
+ *       for a few seconds.
+ */
+
 #include <SRMCore.h>
 #include <SRMDevice.h>
 #include <SRMListener.h>
@@ -7,15 +17,13 @@
 #include <SRMConnector.h>
 #include <SRMConnectorMode.h>
 #include <SRMLog.h>
+#include <GLES2/gl2.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <GLES2/gl2.h>
-#include <private/SRMDevicePrivate.h>
-#include <private/SRMConnectorPrivate.h>
 
 using namespace SRM;
 
@@ -138,28 +146,30 @@ SRMConnectorInterface connectorInterface
 
 void deviceCreatedEvent(SRMListener *, SRMDevice *device)
 {
-    SRMLog::log("DRM device created: %s.", device->name());
+    SRMLog::debug("DRM device (GPU) created: %s.", device->name());
 }
 
 void deviceRemovedEvent(SRMListener *, SRMDevice *device)
 {
-    SRMLog::log("DRM device removed: %s.", device->name());
+    SRMLog::debug("DRM device (GPU) removed: %s.", device->name());
 }
 
 void connectorPluggedEvent(SRMListener *, SRMConnector *connector)
 {
-    SRMLog::log("DRM connector plugged: %s.", "HOLA");
+    SRMLog::debug("DRM connector plugged (%d): %s.",
+                  connector->id(),
+                  connector->model());
 }
 
 void connectorUnpluggedEvent(SRMListener *, SRMConnector *connector)
 {
-    SRMLog::log("DRM connector unplugged: %s.", "HOLA");
+    SRMLog::debug("DRM connector unplugged (%d): %s.",
+                  connector->id(),
+                  connector->model());
 }
 
 int main(void)
 {
-    /* setenv("EGL_LOG_LEVEL", "debug", 1); */
-
     setenv("SRM_DEBUG", "4", 1);
 
     SRMCore *srm = SRMCore::createSRM(&srmInterface);
@@ -199,7 +209,8 @@ int main(void)
     while (1)
     {
         // Poll DRM devices/connectors hotplugging events (0 disables timeout)
-        srm->processMonitor(-1);
+        if (srm->processMonitor(-1) < 0)
+            break;
     }
 
     // Unsuscribe to DRM events

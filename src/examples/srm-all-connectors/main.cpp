@@ -188,7 +188,7 @@ int main(void)
     {
         for (SRMConnector *connector : device->connectors())
         {
-            if (connector->connected())
+            if (connector->connected() && connector->mmWidth() != 0)
             {
                 float *phase = new float();
                 if (!connector->initialize(&connectorInterface, phase))
@@ -202,9 +202,11 @@ int main(void)
         }
     }
 
+    /*
     usleep(10000000);
     printf("DIE\n");
     exit(0);
+    */
 
     while (1)
     {

@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 #include <sys/poll.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -17,6 +18,11 @@
 #include <string.h>
 #include <drm_fourcc.h>
 #include <drm.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+
+#include <xf86drm.h>
+#include <xf86drmMode.h>
 
 using namespace SRM;
 
@@ -61,18 +67,9 @@ static int ITS_createGBMSurfaces(SRMConnector *connector)
 
 static int DUM_createGBMSurfaces(SRMConnector *connector)
 {
-    connector->imp()->rendererGBMSurface = gbm_surface_create(
-        connector->device()->rendererDevice()->imp()->gbm,
-        connector->currentMode()->width(),
-        connector->currentMode()->height(),
-        GBM_FORMAT_XRGB8888,
-        GBM_BO_USE_RENDERING);
+    (void)connector;
 
-    if (!connector->imp()->rendererGBMSurface)
-    {
-        SRMLog::error("Failed to create GBM surface for connector %d (DUMB MODE).", connector->id());
-        return 0;
-    }
+    // This mode does not need gbm Surfaces.
 
     return 1;
 }
@@ -190,10 +187,13 @@ static int ITS_getEGLConfigurations(SRMConnector *connector)
 
 static int DUM_getEGLConfigurations(SRMConnector *connector)
 {
-    if (!COM_chooseEGLConfiguration(connector->device()->rendererDevice()->imp()->eglDisplay,
-                                COM_eglConfigAttribs,
-                                GBM_FORMAT_XRGB8888,
-                                &connector->imp()->rendererEGLConfig))
+    EGLint n;
+    eglChooseConfig(connector->device()->rendererDevice()->imp()->eglDisplay,
+                    COM_eglConfigAttribs,
+                    &connector->imp()->rendererEGLConfig,
+                    1,
+                    &n);
+    if (n != 1)
     {
         SRMLog::error("Failed to choose renderer EGL configuration for connector %d (DUMB MODE).", connector->id());
         return 0;
@@ -228,7 +228,7 @@ static int CPU_getEGLConfigurations(SRMConnector *connector)
 // Create EGL contexts
 
 static int ITS_createEGLContexts(SRMConnector *connector)
-{
+{    
     connector->imp()->connectorEGLContext = eglCreateContext(connector->device()->imp()->eglDisplay,
                                                              connector->imp()->connectorEGLConfig,
                                                              // It is EGL_NO_CONTEXT if no context was previously created in this device
@@ -315,7 +315,7 @@ static int CPU_createEGLContexts(SRMConnector *connector)
 // Create EGL surfaces
 
 static int ITS_createEGLSurfaces(SRMConnector *connector)
-{
+{    
     connector->imp()->connectorEGLSurface = eglCreateWindowSurface(connector->device()->imp()->eglDisplay,
                                                                    connector->imp()->connectorEGLConfig,
                                                                    connector->imp()->connectorGBMSurface,
@@ -332,16 +332,9 @@ static int ITS_createEGLSurfaces(SRMConnector *connector)
 
 static int DUM_createEGLSurfaces(SRMConnector *connector)
 {
-    connector->imp()->rendererEGLSurface = eglCreateWindowSurface(connector->device()->rendererDevice()->imp()->eglDisplay,
-                                                                   connector->imp()->rendererEGLConfig,
-                                                                   connector->imp()->rendererGBMSurface,
-                                                                   NULL);
+    (void)connector;
 
-    if (connector->imp()->rendererEGLSurface == EGL_NO_SURFACE)
-    {
-        SRMLog::error("Failed to create renderer EGL surface for connector %d (DUMB MODE).", connector->id());
-        return 0;
-    }
+    // This mode does not need EGL Surfaces.
 
     return 1;
 }
@@ -444,18 +437,29 @@ static int DUM_createDRMFramebuffers(SRMConnector *connector)
     drm_mode_map_dumb dumbMapRequest;
 
     eglMakeCurrent(connector->device()->rendererDevice()->imp()->eglDisplay,
-                   connector->imp()->rendererEGLSurface,
-                   connector->imp()->rendererEGLSurface,
+                   EGL_NO_SURFACE,
+                   EGL_NO_SURFACE,
                    connector->imp()->rendererEGLContext);
 
+    // The renderer GPU only needs one GLES2 renderbuffer since it is copied
+    // to the DUMB Buffer map each frame
+    glGenFramebuffers(1, &connector->imp()->dumbRendererFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, connector->imp()->dumbRendererFBO);
+    glGenRenderbuffers(1, &connector->imp()->dumbRenderbuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, connector->imp()->dumbRenderbuffer);
+
+    glRenderbufferStorage(GL_RENDERBUFFER,
+                          GL_RGB8_OES,
+                          connector->currentMode()->width(),
+                          connector->currentMode()->height());
+
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER,
+                              GL_COLOR_ATTACHMENT0,
+                              GL_RENDERBUFFER,
+                              connector->imp()->dumbRenderbuffer);
+
+
     // 2nd buffer
-
-    eglSwapBuffers(connector->device()->rendererDevice()->imp()->eglDisplay,
-                   connector->imp()->rendererEGLSurface);
-
-    connector->imp()->rendererBOs[1] = gbm_surface_lock_front_buffer(connector->imp()->rendererGBMSurface);
-
-    gbm_surface_release_buffer(connector->imp()->rendererGBMSurface, connector->imp()->rendererBOs[0]);
 
     connector->imp()->dumbBuffers[1] =
     {
@@ -513,12 +517,6 @@ static int DUM_createDRMFramebuffers(SRMConnector *connector)
     }
 
     // 1st buffer
-
-    eglSwapBuffers(connector->device()->rendererDevice()->imp()->eglDisplay, connector->imp()->rendererEGLSurface);
-
-    connector->imp()->rendererBOs[0] = gbm_surface_lock_front_buffer(connector->imp()->rendererGBMSurface);
-
-    gbm_surface_release_buffer(connector->imp()->rendererGBMSurface, connector->imp()->rendererBOs[1]);
 
     connector->imp()->dumbBuffers[0] =
     {
@@ -626,9 +624,11 @@ static int ITS_render(SRMConnector *connector)
 static int DUM_render(SRMConnector *connector)
 {
     eglMakeCurrent(connector->device()->rendererDevice()->imp()->eglDisplay,
-                   connector->imp()->rendererEGLSurface,
-                   connector->imp()->rendererEGLSurface,
+                   EGL_NO_SURFACE,
+                   EGL_NO_SURFACE,
                    connector->imp()->rendererEGLContext);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, connector->imp()->dumbRendererFBO);
 
     connector->imp()->interface->paintGL(connector, connector->imp()->interfaceData);
 
@@ -688,9 +688,6 @@ static int DUM_pageFlip(SRMConnector *connector)
     UInt32 w = connector->imp()->dumbBuffers[b].width;
     UInt32 p = connector->imp()->dumbBuffers[b].pitch;
 
-    eglSwapBuffers(connector->device()->rendererDevice()->imp()->eglDisplay,
-                   connector->imp()->rendererEGLSurface);
-
     auto start = std::chrono::high_resolution_clock::now();
 
     for (UInt32 i = 0; i < h; i++)
@@ -699,7 +696,7 @@ static int DUM_pageFlip(SRMConnector *connector)
                      h-i-1,
                      w,
                      1,
-                     GL_RGBA,
+                     GL_BGRA_EXT,
                      GL_UNSIGNED_BYTE,
                      &connector->imp()->dumbMaps[b][
                      i*p]);
@@ -712,8 +709,6 @@ static int DUM_pageFlip(SRMConnector *connector)
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
     printf("glReadLapse %ld ms\n",duration.count());
-
-    gbm_surface_lock_front_buffer(connector->imp()->rendererGBMSurface);
 
     if (connector->device()->clientCapAtomic())
     {
@@ -729,11 +724,33 @@ static int DUM_pageFlip(SRMConnector *connector)
 
         auto start = std::chrono::high_resolution_clock::now();
 
+        connector->imp()->pendingPageFlip = true;
+
         // Commit
         drmModeAtomicCommit(connector->device()->fd(),
                             req,
-                            DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT,
-                            NULL);
+                            DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
+                            connector);
+
+        connector->device()->imp()->pageFlipMutex.lock();
+
+        pollfd fds;
+        fds.fd = connector->device()->fd();
+        fds.events = POLLIN;
+        fds.revents = 0;
+
+        while(connector->imp()->pendingPageFlip)
+        {
+            poll(&fds, 1, 100);
+
+            if(fds.revents & POLLIN)
+                drmHandleEvent(fds.fd, &connector->imp()->drmEventCtx);
+
+            if(connector->state() != SRM_CONNECTOR_STATE_INITIALIZED)
+                break;
+        }
+
+        connector->device()->imp()->pageFlipMutex.unlock();
 
         // Get the ending time point
         auto end = std::chrono::high_resolution_clock::now();
@@ -780,11 +797,7 @@ static int DUM_pageFlip(SRMConnector *connector)
         connector->device()->imp()->pageFlipMutex.unlock();
     }
 
-
     connector->imp()->currentBufferIndex = !b;
-
-    gbm_surface_release_buffer(connector->imp()->rendererGBMSurface,
-                               connector->imp()->rendererBOs[connector->imp()->currentBufferIndex]);
 
     return 1;
 }
@@ -848,23 +861,19 @@ static int DUM_initCrtc(SRMConnector *connector)
     UInt32 w = connector->imp()->dumbBuffers[b].width;
     UInt32 p = connector->imp()->dumbBuffers[b].pitch;
 
+    glBindFramebuffer(GL_FRAMEBUFFER, connector->imp()->dumbRendererFBO);
+
     for (UInt32 i = 0; i < h; i++)
     {
         glReadPixels(0,
                      h-i-1,
                      w,
                      1,
-                     GL_RGBA,
+                     GL_BGRA_EXT,
                      GL_UNSIGNED_BYTE,
                      &connector->imp()->dumbMaps[b][
                      i*p]);
     }
-
-    eglSwapBuffers(connector->device()->rendererDevice()->imp()->eglDisplay,
-                   connector->imp()->rendererEGLSurface);
-
-    gbm_surface_lock_front_buffer(connector->imp()->rendererGBMSurface);
-
 
     if (connector->device()->clientCapAtomic())
     {
@@ -964,7 +973,7 @@ static int DUM_initCrtc(SRMConnector *connector)
         drmModeAtomicCommit(connector->device()->fd(),
                             req,
                             DRM_MODE_ATOMIC_ALLOW_MODESET,
-                            NULL);
+                            connector);
 
         drmModeAtomicFree(req);
 
@@ -983,9 +992,6 @@ static int DUM_initCrtc(SRMConnector *connector)
     }
 
     connector->imp()->currentBufferIndex = !b;
-
-    gbm_surface_release_buffer(connector->imp()->rendererGBMSurface,
-                               connector->imp()->rendererBOs[connector->imp()->currentBufferIndex]);
 
     return 1;
 }

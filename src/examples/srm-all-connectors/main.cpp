@@ -63,9 +63,9 @@ static void drawColorSquares(UInt32 w, UInt32 h)
     glClearColor(0.f, 0.f, 1.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // White BR square
+    // Black BR square
     glScissor(w/2, 0, w/2, h/2);
-    glClearColor(1.f, 1.f, 0.f, 1.f);
+    glClearColor(0.f, 0.f, 0.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 }
 
@@ -188,7 +188,7 @@ int main(void)
     {
         for (SRMConnector *connector : device->connectors())
         {
-            if (connector->connected() && connector->mmWidth() != 0)
+            if (connector->connected() && connector->mmWidth() != 0) // && connector->id() == 63)
             {
                 float *phase = new float();
                 if (!connector->initialize(&connectorInterface, phase))
@@ -202,11 +202,14 @@ int main(void)
         }
     }
 
-    /*
+
     usleep(10000000);
     printf("DIE\n");
+
+    for (SRMDevice *dev : srm->devices())
+        close(dev->fd());
     exit(0);
-    */
+
 
     while (1)
     {

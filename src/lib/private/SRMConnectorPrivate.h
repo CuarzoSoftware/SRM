@@ -1,6 +1,7 @@
 #ifndef SRMCONNECTORPRIVATE_H
 #define SRMCONNECTORPRIVATE_H
 
+#include <GLES2/gl2.h>
 #include <SRMConnector.h>
 #include <thread>
 #include <gbm.h>
@@ -62,6 +63,9 @@ public:
     gbm_bo *connectorBOs[2] = {nullptr, nullptr};
     gbm_bo *rendererBOs[2] = {nullptr, nullptr};
     UInt32 currentBufferIndex = 1;
+
+    GLuint dumbRendererFBO;
+    GLuint dumbRenderbuffer;
 
     gbm_bo *cursorBO = nullptr;
     bool repaintRequested = false;

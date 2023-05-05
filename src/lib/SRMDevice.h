@@ -1,51 +1,37 @@
 #ifndef SRMDEVICE_H
 #define SRMDEVICE_H
 
-#include <SRMNamespaces.h>
+#include <SRMTypes.h>
 
-class SRM::SRMDevice
-{
-public:
-    static SRMDevice *createDevice(SRMCore *core, const char *path);
-    ~SRMDevice();
+SRMCore *srmDeviceGetCore(SRMDevice *device);
+const char *srmDeviceGetName(SRMDevice *device);
+Int32 srmDeviceGetFD(SRMDevice *device);
 
-    SRMCore *core() const;
+// Client caps
+UInt8 srmDeviceGetClientCapStereo3D(SRMDevice *device);
+UInt8 srmDeviceGetClientCapUniversalPlanes(SRMDevice *device);
+UInt8 srmDeviceGetClientCapAtomic(SRMDevice *device);
+UInt8 srmDeviceGetClientCapAspectRatio(SRMDevice *device);
+UInt8 srmDeviceGetClientCapWritebackConnectors(SRMDevice *device);
 
-    const char *name() const;
-    int fd() const;
+// Caps
+UInt8 srmDeviceGetCapDumbBuffer(SRMDevice *device);
+UInt8 srmDeviceGetCapPrimeImport(SRMDevice *device);
+UInt8 srmDeviceGetCapPrimeExport(SRMDevice *device);
+UInt8 srmDeviceGetCapAddFb2Modifiers(SRMDevice *device);
 
-    // Client caps
-    bool clientCapStereo3D() const;
-    bool clientCapUniversalPlanes() const;
-    bool clientCapAtomic() const;
-    bool clientCapAspectRatio() const;
-    bool clientCapWritebackConnectors() const;
+// Enables or disables the GPU
+UInt8 srmDeviceSetEnabled(SRMDevice *device, UInt8 enabled);
+UInt8 srmDeviceIsEnabled(SRMDevice *device);
+UInt8 srmDeviceIsRenderer(SRMDevice *device);
+SRMDevice *srmDeviceGetRendererDevice(SRMDevice *device);
+SRM_RENDER_MODE srmDeviceGetRenderMode(SRMDevice *device);
 
-    // Caps
-    bool capDumbBuffer() const;
-    bool capPrimeImport() const;
-    bool capPrimeExport() const;
-    bool capAddFb2Modifiers() const;
+// Resources
+SRMList *srmDeviceGetCrtcs(SRMDevice *device);
+SRMList *srmDeviceGetEncoders(SRMDevice *device);
+SRMList *srmDeviceGetPlanes(SRMDevice *device);
+SRMList *srmDeviceGetConnectors(SRMDevice *device);
 
-    // Enables or disables the GPU
-    int setEnabled(bool enabled);
-    bool enabled() const;
-    bool isRenderer() const;
-    SRMDevice *rendererDevice() const;
-    SRM_RENDER_MODE renderMode() const;
-
-    std::list<SRMCrtc*>&crtcs() const;
-    std::list<SRMEncoder*>&encoders() const;
-    std::list<SRMPlane*>&planes() const;
-    std::list<SRMConnector*>&connectors() const;
-
-    class SRMDevicePrivate;
-    SRMDevicePrivate *imp() const;
-
-private:
-    SRMDevice(SRMCore *core, const char *path);
-    SRMDevicePrivate *m_imp = nullptr;
-
-};
 
 #endif // SRMDEVICE_H

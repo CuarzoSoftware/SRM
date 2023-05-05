@@ -1,21 +1,10 @@
 #ifndef SRMCRTC_H
 #define SRMCRTC_H
 
-#include <SRMNamespaces.h>
+#include <SRMTypes.h>
 
-class SRM::SRMCrtc
-{
-public:
-    class SRMCrtcPrivate;
-    SRMCrtcPrivate *imp() const;
-    UInt32 id() const;
-    SRMConnector *currentConnector() const;
-private:
-    friend class SRMDevice;
-    static SRMCrtc *createCrtc(SRMDevice *device, UInt32 id);
-    SRMCrtc(SRMDevice *device, UInt32 id);
-    ~SRMCrtc();
-    SRMCrtcPrivate *m_imp = nullptr;
-};
+UInt32 srmCrtcGetID(SRMCrtc *crtc);
+SRMDevice *srmCrtcGetDevice(SRMCrtc *crtc);
+SRMConnector *srmCrtcGetCurrentConnector(SRMCrtc *crtc);
 
 #endif // SRMCRTC_H

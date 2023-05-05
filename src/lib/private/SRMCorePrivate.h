@@ -5,40 +5,39 @@
 #include <libudev.h>
 #include <sys/poll.h>
 
-class SRM::SRMCore::SRMCorePrivate
+struct SRMCoreStruct
 {
-
-public:
-    SRMCorePrivate(SRMCore *core);
-    ~SRMCorePrivate();
-
-    int createUDEV();
-    int enumerateDevices();
-    int initMonitor();
-
-    SRMCore *core = nullptr;
-
     SRMInterface *interface;
-    void *userdata;
+    void *interfaceUserData;
 
-    struct udev *udev = nullptr;
-    udev_monitor *monitor = nullptr;
-    pollfd monitorFd;
+    struct udev *udev;
+    struct udev_monitor *monitor;
+    struct pollfd monitorFd;
 
-    std::list<SRMDevice*>devices;
+    SRMList *devices;
 
-    std::list<SRMListener*>deviceCreatedListeners;
-    std::list<SRMListener*>deviceRemovedListeners;
-    std::list<SRMListener*>connectorPluggedListeners;
-    std::list<SRMListener*>connectorUnpluggedListeners;
+    SRMList *deviceCreatedListeners;
+    SRMList *deviceRemovedListeners;
+    SRMList *connectorPluggedListeners;
+    SRMList *connectorUnpluggedListeners;
 
-
-    // Config
-    void updateBestConfiguration();
-    SRMDevice *findBestAllocatorDevice();
-    SRMDevice *allocatorDevice = nullptr;
-    void assignRendererDevices();
-
+    SRMDevice *allocatorDevice;
 };
+
+int srmCoreCreateUdev(SRMCore *core);
+int srmCoreEnumerateDevices(SRMCore *core);
+int srmCoreInitMonitor(SRMCore *core);
+SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core);
+void srmCoreAssignRendererDevices(SRMCore *core);
+int srmCoreUpdateBestConfiguration(SRMCore *core);
+
+/*
+
+// Config
+void updateBestConfiguration();
+SRMDevice *findBestAllocatorDevice();
+void assignRendererDevices();
+*/
+
 
 #endif // SRMCOREPRIVATE_H

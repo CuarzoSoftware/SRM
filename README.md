@@ -1,6 +1,6 @@
 # Simple Rendering Manager
 
-SRM is a C++ library that simplifies the development of Linux DRM/KMS API applications.
+SRM is a C library that simplifies the development of Linux DRM/KMS API applications.
 
 > Still under development ⚠️
 

@@ -1,26 +1,12 @@
 #ifndef SRMPLANE_H
 #define SRMPLANE_H
 
-#include <SRMNamespaces.h>
+#include <SRMTypes.h>
 
-class SRM::SRMPlane
-{
-public:
-    class SRMPlanePrivate;
-    SRMPlanePrivate *imp() const;
-    UInt32 id() const;
-    SRM_PLANE_TYPE type() const;
-    std::list<SRMCrtc*>&crtcs() const;
-    SRMDevice *device() const;
-    SRMCore *core() const;
-    SRMConnector *currentConnector() const;
-private:
-    friend class SRMDevice;
-    static SRMPlane *createPlane(SRMDevice *device, UInt32 id);
-    SRMPlane(SRMDevice *device, UInt32 id);
-    ~SRMPlane();
-
-    SRMPlanePrivate * m_imp = nullptr;
-};
+UInt32 srmPlaneGetID(SRMPlane *plane);
+SRMDevice *srmPlaneGetDevice(SRMPlane *plane);
+SRMList *srmPlaneGetCrtcs(SRMPlane *plane);
+SRMConnector *srmPlaneGetCurrentConnector(SRMPlane *plane);
+SRM_PLANE_TYPE srmPlaneGetType(SRMPlane *plane);
 
 #endif // SRMPLANE_H

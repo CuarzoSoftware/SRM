@@ -3,17 +3,13 @@
 
 #include <SRMListener.h>
 
-using namespace SRM;
-
-class SRMListener::SRMListenerPrivate
+struct SRMListenerStruct
 {
-public:
-    SRMListenerPrivate() = default;
-    ~SRMListenerPrivate() = default;
-    void *callback = nullptr;
-    void *userdata = nullptr;
-    std::list<SRMListener*>*list;
-    std::list<SRMListener*>::iterator link;
+    void *callback;
+    void *userData;
+    SRMListItem *link;
 };
+
+SRMListener *srmListenerCreate(SRMList *list, void *callbackFunction, void *userData);
 
 #endif // SRMLISTENERPRIVATE_H

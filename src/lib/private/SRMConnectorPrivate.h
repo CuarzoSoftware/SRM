@@ -3,39 +3,16 @@
 
 #include <GLES2/gl2.h>
 #include <SRMConnector.h>
-#include <thread>
 #include <gbm.h>
 #include <EGL/egl.h>
-#include <condition_variable>
 #include <xf86drm.h>
 
+/*
 class SRM::SRMConnector::SRMConnectorPrivate
 {
 public:
     SRMConnectorPrivate(SRMDevice *device, SRMConnector *connector, UInt32 id);
     ~SRMConnectorPrivate() = default;
-    SRMDevice *device;
-    SRMConnector *connector;
-    UInt32 id, mmWidth, mmHeight;
-    std::list<SRMConnector*>::iterator deviceLink;
-
-    std::list<SRMEncoder*>encoders;
-    std::list<SRMConnectorMode*>modes;
-
-    SRMConnectorMode *preferredMode = nullptr;
-    SRMConnectorMode *currentMode = nullptr;
-    SRMEncoder *currentEncoder = nullptr;
-    SRMCrtc *currentCrtc = nullptr;
-    SRMPlane *currentPrimaryPlane = nullptr;
-    SRMPlane *currentCursorPlane = nullptr;
-
-    SRM_CONNECTOR_STATE state = SRM_CONNECTOR_STATE_UNINITIALIZED;
-    bool connected = false;
-
-    char *name = nullptr;
-    char *manufacturer = nullptr;
-    char *model = nullptr;
-    char *serial = nullptr;
 
     int updateEncoders();
     int updateName();
@@ -44,10 +21,6 @@ public:
     int getBestConfiguration(SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane);
 
     SRMConnectorMode *findPreferredMode();
-
-    SRMConnectorInterface *interface = nullptr;
-    void *interfaceData = nullptr;
-    std::thread *renderThread = nullptr;
 
     static void initRenderer(SRMConnector *connector, Int32 *initResult);
     gbm_surface *connectorGBMSurface = nullptr;
@@ -67,12 +40,9 @@ public:
     GLuint dumbRendererFBO;
     GLuint dumbRenderbuffer;
 
-    gbm_bo *cursorBO = nullptr;
     bool repaintRequested = false;
     std::mutex renderMutex;
     std::condition_variable renderConditionVariable;
-    bool pendingPageFlip = false;
-    drmEventContext drmEventCtx;
     drm_mode_create_dumb dumbBuffers[2];
     UInt8 *dumbMaps[2];
 
@@ -88,19 +58,83 @@ public:
         int(*pageFlip)(SRMConnector*connector);
     }rendererInterface;
 
-    struct SRMConnectorPropIDs
-    {
-        UInt32
-        CRTC_ID,
-        DPMS,
-        EDID,
-        PATH,
-        link_status,
-        non_desktop,
-        panel_orientation,
-        subconnector,
-        vrr_capable;
-    } propIDs;
+
 };
+*/
+
+struct SRMConnectorRenderInterface
+{
+    UInt8(*initialize)(SRMConnector *connector);
+    UInt8(*render)(SRMConnector *connector);
+    UInt8(*flipPage)(SRMConnector *connector);
+    void (*uninitialize)(SRMConnector *connector);
+};
+
+struct SRMConnectorPropIDs
+{
+    UInt32
+    CRTC_ID,
+    DPMS,
+    EDID,
+    PATH,
+    link_status,
+    non_desktop,
+    panel_orientation,
+    subconnector,
+    vrr_capable;
+};
+
+struct SRMConnectorStruct
+{
+    UInt32 id;
+    UInt32 nameID; // Used to name the connector e.g HDMI-A-<0>
+    UInt32 type;
+    SRMDevice *device;
+    SRMListItem *deviceLink;
+    struct SRMConnectorPropIDs propIDs;
+    SRMList *encoders, *modes;
+    UInt32 mmWidth, mmHeight;
+    SRMConnectorMode *preferredMode, *currentMode;
+    SRMEncoder *currentEncoder;
+    SRMCrtc *currentCrtc;
+    SRMPlane *currentPrimaryPlane, *currentCursorPlane;
+    SRM_CONNECTOR_STATE state;
+
+    // Used to
+    Int8 renderInitResult;
+    UInt8 connected;
+    char *name, *manufacturer, *model, *serial;
+
+    // Cursor
+    struct gbm_bo *cursorBO;
+
+    // Interface for OpenGL events
+    SRMConnectorInterface *interface;
+    void *interfaceData;
+    pthread_t renderThread;
+
+    // Render common
+    drmEventContext drmEventCtx;
+    UInt8 pendingPageFlip;
+    pthread_cond_t repaintCond;
+    pthread_mutex_t repaintMutex;
+    UInt8 repaintRequested;
+
+    // Render specific
+    struct SRMConnectorRenderInterface renderInterface;
+    void *renderData;
+
+
+};
+
+SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id);
+UInt8 srmConnectorUpdateProperties(SRMConnector *connector);
+UInt8 srmConnectorUpdateNames(SRMConnector *connector);
+UInt8 srmConnectorUpdateEncoders(SRMConnector *connector);
+UInt8 srmConnectorUpdateModes(SRMConnector *connector);
+SRMConnectorMode *srmConnectorFindPreferredMode(SRMConnector *connector);
+UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane);
+void *srmConnectorRenderThread(void *conn);
+void srmConnectorDestroy(SRMConnector *connector);
 
 #endif // SRMCONNECTORPRIVATE_H

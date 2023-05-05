@@ -4,6 +4,64 @@
 #include <SRMDevice.h>
 #include <gbm.h>
 #include <EGL/egl.h>
+#include <pthread.h>
+
+struct SRMDeviceStruct
+{
+    SRMCore *core;
+
+    // All GPUs are enabled by default
+    UInt8 enabled;
+
+    // Renderer device could be itself or another if PIRME IMPORT not supported
+    SRMDevice *rendererDevice;
+
+    // Prevent multiple threads calling drmModeHandleEvent
+    pthread_mutex_t pageFlipMutex;
+
+    Int32 fd;
+
+    SRMListItem *coreLink;
+
+    char *name;
+
+    struct gbm_device *gbm;
+
+    EGLDisplay eglDisplay;
+    EGLContext eglSharedContext;
+
+    UInt8 clientCapStereo3D;
+    UInt8 clientCapUniversalPlanes;
+    UInt8 clientCapAtomic;
+    UInt8 clientCapAspectRatio;
+    UInt8 clientCapWritebackConnectors;
+
+    UInt8 capDumbBuffer;
+    UInt8 capPrimeImport;
+    UInt8 capPrimeExport;
+    UInt8 capAddFb2Modifiers;
+
+    SRMList *crtcs;
+    SRMList *encoders;
+    SRMList *planes;
+    SRMList *connectors;
+
+};
+
+SRMDevice *srmDeviceCreate(SRMCore *core, const char *name);
+void srmDeviceDestroy(SRMDevice *device);
+UInt8 srmDeviceInitializeGBM(SRMDevice *device);
+UInt8 srmDeviceInitializeEGL(SRMDevice *device);
+UInt8 srmDeviceUpdateClientCaps(SRMDevice *device);
+UInt8 srmDeviceUpdateCaps(SRMDevice *device);
+
+UInt8 srmDeviceUpdateCrtcs(SRMDevice *device);
+UInt8 srmDeviceUpdateEncoders(SRMDevice *device);
+UInt8 srmDeviceUpdatePlanes(SRMDevice *device);
+UInt8 srmDeviceUpdateConnectors(SRMDevice *device);
+
+
+/*
 #include <mutex>
 
 using namespace SRM;
@@ -14,63 +72,25 @@ public:
     SRMDevicePrivate(SRMDevice *device);
     ~SRMDevicePrivate() = default;
 
-    SRMCore *core = nullptr;
-    SRMDevice *device = nullptr;
 
     // GBM
-    int initializeGBM();
     void uninitializeGBM();
-    gbm_device *gbm = nullptr;
 
     // EGL
-    int initializeEGL();
     void uninitializeEGL();
-    EGLDisplay eglDisplay = EGL_NO_DISPLAY;
-    EGLContext eglSharedContext = EGL_NO_CONTEXT;
 
-    // Client caps
-    int updateClientCaps();
-    bool clientCapStereo3D = false;
-    bool clientCapUniversalPlanes = false;
-    bool clientCapAtomic = false;
-    bool clientCapAspectRatio = false;
-    bool clientCapWritebackConnectors = false;
-
-    // Caps
-    int updateCaps();
-    bool capDumbBuffer = false;
-    bool capPrimeImport = false;
-    bool capPrimeExport = false;
-    bool capAddFb2Modifiers = false;
-
-    // Crtcs
-    int updateCrtcs();
-    std::list<SRMCrtc*>crtcs;
 
     // Encoders
     int updateEncoders();
-    std::list<SRMEncoder*>encoders;
 
     // Planes
     int updatePlanes();
-    std::list<SRMPlane*>planes;
 
     // Connectors
     int updateConnectors();
-    std::list<SRMConnector*>connectors;
 
-    // All GPUs are enabled by default
-    bool enabled = true;
 
-    // Renderer device could be itself or another if PIRME IMPORT not supported
-    SRMDevice *rendererDevice = nullptr;
-
-    // Page flipping mutex
-    std::mutex pageFlipMutex;
-
-    int fd = -1;
-    std::list<SRMDevice*>::iterator coreLink;
-    char *name = nullptr;
 };
+*/
 
 #endif // SRMDEVICEPRIVATE_H

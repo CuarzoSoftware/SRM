@@ -1,7 +1,5 @@
 TEMPLATE = lib
-
 CONFIG -= qt
-CONFIG += c++11
 
 DESTDIR = $$PWD/../../build
 
@@ -18,41 +16,56 @@ unix {
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
+    SRMBuffer.h \
     SRMConnector.h \
     SRMConnectorMode.h \
     SRMCore.h \
     SRMCrtc.h \
     SRMDevice.h \
     SRMEncoder.h \
+    SRMList.h \
     SRMListener.h \
     SRMLog.h \
-    SRMNamespaces.h \
     SRMPlane.h \
+    SRMTypes.h \
+    private/SRMBufferPrivate.h \
     private/SRMConnectorModePrivate.h \
     private/SRMConnectorPrivate.h \
     private/SRMCorePrivate.h \
     private/SRMCrtcPrivate.h \
     private/SRMDevicePrivate.h \
     private/SRMEncoderPrivate.h \
+    private/SRMListPrivate.h \
     private/SRMListenerPrivate.h \
-    private/SRMPlanePrivate.h
+    private/SRMPlanePrivate.h \
+    private/modes/SRMRenderModeCommon.h \
+    private/modes/SRMRenderModeItself.h
+
 
 SOURCES += \
-    SRMConnector.cpp \
-    SRMConnectorMode.cpp \
-    SRMCore.cpp \
-    SRMCrtc.cpp \
-    SRMDevice.cpp \
-    SRMEncoder.cpp \
-    SRMListener.cpp \
-    SRMLog.cpp \
-    SRMNamespaces.cpp \
-    SRMPlane.cpp \
-    private/SRMConnectorModePrivate.cpp \
-    private/SRMConnectorPrivate.cpp \
-    private/SRMCorePrivate.cpp \
-    private/SRMCrtcPrivate.cpp \
-    private/SRMDevicePrivate.cpp \
-    private/SRMEncoderPrivate.cpp \
-    private/SRMPlanePrivate.cpp \
-    private/SRMRenderPrivate.cpp
+    SRMBuffer.c \
+    SRMConnector.c \
+    SRMConnectorMode.c \
+    SRMCore.c \
+    SRMCrtc.c \
+    SRMDevice.c \
+    SRMEncoder.c \
+    SRMList.c \
+    SRMListener.c \
+    SRMLog.c \
+    SRMPlane.c \
+    SRMTypes.c \
+    private/SRMBufferPrivate.c \
+    private/SRMConnectorModePrivate.c \
+    private/SRMConnectorPrivate.c \
+    private/SRMCorePrivate.c \
+    private/SRMCrtcPrivate.c \
+    private/SRMDevicePrivate.c \
+    private/SRMEncoderPrivate.c \
+    private/SRMListPrivate.c \
+    private/SRMListenerPrivate.c \
+    private/SRMPlanePrivate.c \
+    private/modes/SRMRenderModeCommon.c \
+    private/modes/SRMRenderModeItself.c \
+    private/modes/SRMRenderPrivate.c
+

@@ -1,8 +1,7 @@
 #include <SRMLog.h>
-#include <cstdlib>
-#include <cstring>
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
@@ -17,9 +16,8 @@
 
 static int level = 0;
 
-using namespace SRM;
 
-void SRMLog::init()
+void SRMLogInit()
 {
     char *env = getenv("SRM_DEBUG");
 
@@ -30,7 +28,7 @@ void SRMLog::init()
 }
 
 
-void SRMLog::fatal(const char *format, ...)
+void SRMFatal(const char *format, ...)
 {
     if(level >= 1)
     {
@@ -43,7 +41,7 @@ void SRMLog::fatal(const char *format, ...)
     }
 }
 
-void SRMLog::error(const char *format, ...)
+void SRMError(const char *format, ...)
 {
     if(level >= 2)
     {
@@ -56,7 +54,7 @@ void SRMLog::error(const char *format, ...)
     }
 }
 
-void SRMLog::warning(const char *format, ...)
+void SRMWarning(const char *format, ...)
 {
     if(level >= 3)
     {
@@ -69,7 +67,7 @@ void SRMLog::warning(const char *format, ...)
     }
 }
 
-void SRMLog::debug(const char *format, ...)
+void SRMDebug(const char *format, ...)
 {
     if(level >= 4)
     {
@@ -82,7 +80,7 @@ void SRMLog::debug(const char *format, ...)
     }
 }
 
-void SRMLog::log(const char *format, ...)
+void SRMLog(const char *format, ...)
 {
     va_list args;
     va_start(args, format);

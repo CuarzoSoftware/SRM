@@ -3,18 +3,18 @@
 
 #include <SRMEncoder.h>
 
-class SRM::SRMEncoder::SRMEncoderPrivate
+struct SRMEncoderStruct
 {
-public:
-    SRMEncoderPrivate(SRMDevice *device, UInt32 id, SRMEncoder *encoder);
-    ~SRMEncoderPrivate() = default;
-    int updateCrtcs();
-    SRMDevice *device;
-    SRMEncoder *encoder;
-    SRMConnector *currentConnector = nullptr;
     UInt32 id;
-    std::list<SRMCrtc*>crtcs;
-    std::list<SRMEncoder*>::iterator deviceLink;
+    SRMDevice *device;
+    SRMListItem *deviceLink;
+    SRMConnector *currentConnector;
+    SRMList *crtcs;
 };
+
+SRMEncoder *srmEncoderCreate(SRMDevice *device, UInt32 id);
+void srmEncoderDestroy(SRMEncoder *encoder);
+UInt8 srmEncoderUpdateCrtcs(SRMEncoder *encoder);
+
 
 #endif // SRMENCODERPRIVATE_H

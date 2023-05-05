@@ -20,5 +20,5 @@ INCLUDEPATH += ../../lib/ /usr/include/libdrm
 QMAKE_LFLAGS += -Wl,-rpath=.
 
 SOURCES += \
-    main.cpp
+    main.c
 

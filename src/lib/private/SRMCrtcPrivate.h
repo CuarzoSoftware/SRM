@@ -3,27 +3,27 @@
 
 #include <SRMCrtc.h>
 
-class SRM::SRMCrtc::SRMCrtcPrivate
+struct SRMCrtcPropIDs
 {
-public:
-    SRMCrtcPrivate(SRMCrtc *crtc);
-    ~SRMCrtcPrivate() = default;
-    UInt32 id;
-    SRMDevice *device = nullptr;
-    SRMCrtc *crtc = nullptr;
-    SRMConnector *currentConnector = nullptr;
-    std::list<SRMCrtc*>::iterator deviceLink;
-    int updateProperties();
-
-    struct SRMCrtcPropIDs
-    {
-        UInt32
-        ACTIVE,
-        GAMMA_LUT,
-        GAMMA_LUT_SIZE,
-        MODE_ID,
-        VRR_ENABLED;
-    } propIDs;
+    UInt32
+    ACTIVE,
+    GAMMA_LUT,
+    GAMMA_LUT_SIZE,
+    MODE_ID,
+    VRR_ENABLED;
 };
+
+struct SRMCrtcStruct
+{
+    UInt32 id;
+    SRMDevice *device;
+    SRMListItem *deviceLink;
+    SRMConnector *currentConnector;
+    struct SRMCrtcPropIDs propIDs;
+};
+
+SRMCrtc *srmCrtcCreate(SRMDevice *device, UInt32 id);
+void srmCrtcDestroy(SRMCrtc *crtc);
+UInt8 srmCrtcUpdateProperties(SRMCrtc *crtc);
 
 #endif // SRMCRTCPRIVATE_H

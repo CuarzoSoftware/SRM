@@ -1,14 +1,12 @@
-TARGET = srm-display-info
+TARGET = srm-test-lists
 
 TEMPLATE = app
-CONFIG += console
+CONFIG += console c99
 CONFIG -= qt
 
 DESTDIR = $$PWD/../../../build
-
+INCLUDEPATH += $$PWD/../../lib
 LIBS += -L$$PWD/../../../build -lSRM
-INCLUDEPATH += ../../lib/ /usr/include/libdrm
-
 
 QMAKE_LFLAGS += -Wl,-rpath=.
 

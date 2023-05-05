@@ -1,11 +1,9 @@
 sources = run_command('find', '.', '-type', 'f', '-name', '*[.c,.h]').stdout().strip().split('\n')
 
 executable(
-    'srm-all-connectors',
+    'srm-tests-lists',
     sources : sources,
     dependencies : [
         srm_dep,
-        glesv2_dep,
     ],
-    install : true, 
-    install_dir : EXAMPLES_PATH)
+    install : false)

@@ -1,12 +1,11 @@
 project(
     'SRM',
-    'c','cpp', 
+    'c', 
     version : '0.1.0',
     meson_version: '>= 0.56.0',
 	  default_options: [
 		'warning_level=2',
-		'buildtype=debug',
-		'cpp_std=c++11',
+		'buildtype=debug'
 	]
 )
 
@@ -14,7 +13,7 @@ LIBRARY_PATH = '/usr/lib'
 INCLUDES_PATH = '/usr/include/SRM'
 EXAMPLES_PATH = '/usr/bin'
  
-cpp = meson.get_compiler('cpp')
+c = meson.get_compiler('c')
 
 include_paths = [
     include_directories('./src/lib')
@@ -65,17 +64,17 @@ install_headers(headers_classes, install_dir : INCLUDES_PATH)
 install_headers(headers_classes_private, install_dir : INCLUDES_PATH+'/private')
 # install_headers(headers_other, install_dir : INCLUDES_PATH+'/other')
 
-egl_dep             = cpp.find_library('EGL', dirs: library_paths, required: true)
-glesv2_dep          = cpp.find_library('GLESv2', dirs: library_paths, required: true)
-udev_dep            = cpp.find_library('udev', dirs: library_paths, required: true)
-pthread_dep         = cpp.find_library('pthread', dirs: library_paths, required: true)
-drm_dep             = cpp.find_library('drm', dirs: library_paths, required: true)
-gbm_dep             = cpp.find_library('gbm', dirs: library_paths, required: true)
-display_info_dep    = cpp.find_library('display-info', dirs: library_paths, required: true)
+egl_dep             = c.find_library('EGL', dirs: library_paths, required: true)
+glesv2_dep          = c.find_library('GLESv2', dirs: library_paths, required: true)
+udev_dep            = c.find_library('udev', dirs: library_paths, required: true)
+pthread_dep         = c.find_library('pthread', dirs: library_paths, required: true)
+drm_dep             = c.find_library('drm', dirs: library_paths, required: true)
+gbm_dep             = c.find_library('gbm', dirs: library_paths, required: true)
+display_info_dep    = c.find_library('display-info', dirs: library_paths, required: true)
 
 SRM = library(
     'SRM',
-    sources : run_command('find', './src/lib', '-type', 'f', '-name', '*[.cpp,.c]').stdout().strip().split('\n'),
+    sources : run_command('find', './src/lib', '-type', 'f', '-name', '*[.c]').stdout().strip().split('\n'),
     include_directories : include_paths,
     dependencies : [
         display_info_dep,
@@ -95,7 +94,11 @@ srm_dep = declare_dependency(
     link_with : SRM)
 
 if get_option('build_examples')
-    subdir('src/examples/srm-display-info')
-    subdir('src/examples/srm-all-connectors')
+    #subdir('src/examples/srm-display-info')
+    #subdir('src/examples/srm-all-connectors')
+endif
+
+if get_option('build_tests')
+    subdir('src/tests/srm-tests-list')
 endif
 

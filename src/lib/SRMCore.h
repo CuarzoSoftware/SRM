@@ -1,33 +1,34 @@
 #ifndef SRMCORE_H
 #define SRMCORE_H
 
-#include <SRMNamespaces.h>
+#include <SRMTypes.h>
 
-class SRM::SRMCore
-{
-public:
-    static SRMCore *createSRM(SRMInterface *interface, void *userdata = nullptr);
-    ~SRMCore();
+SRMCore *srmCoreCreate(SRMInterface *interface, void *userData);
+SRMList *srmCoreGetDevices(SRMCore *core);
+SRMDevice *srmCoreGetAllocatorDevice(SRMCore *core);
+Int32 srmCoreGetMonitorFD(SRMCore *core);
+Int32 srmCoreProccessMonitor(SRMCore *core, Int32 msTimeout);
+SRMListener *srmCoreAddDeviceCreatedEventListener(SRMCore *core, void(*callback)(SRMListener*, SRMDevice*), void *userData);
+SRMListener *srmCoreAddDeviceRemovedEventListener(SRMCore *core, void(*callback)(SRMListener*, SRMDevice*), void *userData);
+SRMListener *srmCoreAddConnectorPluggedEventListener(SRMCore *core, void(*callback)(SRMListener*, SRMConnector*), void *userData);
+SRMListener *srmCoreAddConnectorUnpluggedEventListener(SRMCore *core, void(*callback)(SRMListener*, SRMConnector*), void *userData);
+void srmCoreDestroy(SRMCore *core);
 
-    // List of GPUs
-    std::list<SRMDevice*>&devices() const;
+/*
+SRMCore *createSRM(SRMInterface *interface, void *userData);
 
-    // Register to udev monitor events (GPU and Connectors hotplug events)
-    SRMListener *addDeviceCreatedListener(void(*callback)(SRMListener*, SRMDevice*), void *userdata = nullptr);
-    SRMListener *addDeviceRemovedListener(void(*callback)(SRMListener*, SRMDevice*), void *userdata = nullptr);
-    SRMListener *addConnectorPluggedListener(void(*callback)(SRMListener*, SRMConnector*), void *userdata = nullptr);
-    SRMListener *addConnectorUnpluggedListener(void(*callback)(SRMListener*, SRMConnector*), void *userdata = nullptr);
-    int monitorFd() const;
-    int processMonitor(int msTimeout);
+// List of GPUs
+std::list<SRMDevice*>&devices() const;
 
-    SRMDevice *allocatorDevice() const;
+// Register to udev monitor events (GPU and Connectors hotplug events)
+SRMListener *addDeviceCreatedListener(void(*callback)(SRMListener*, SRMDevice*), void *userdata = nullptr);
+SRMListener *addDeviceRemovedListener(void(*callback)(SRMListener*, SRMDevice*), void *userdata = nullptr);
+SRMListener *addConnectorPluggedListener(void(*callback)(SRMListener*, SRMConnector*), void *userdata = nullptr);
+SRMListener *addConnectorUnpluggedListener(void(*callback)(SRMListener*, SRMConnector*), void *userdata = nullptr);
+int monitorFd() const;
+int processMonitor(int msTimeout);
 
-    class SRMCorePrivate;
-    SRMCorePrivate *imp() const;
-
-private:
-    SRMCore();
-    SRMCorePrivate *m_imp = nullptr;
-};
+SRMDevice *allocatorDevice() const;
+*/
 
 #endif // SRMCORE_H

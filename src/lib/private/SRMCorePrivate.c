@@ -236,6 +236,8 @@ int srmCoreUpdateBestConfiguration(SRMCore *core)
         return 0;
     }
 
+    eglMakeCurrent(bestAllocatorDevice->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, bestAllocatorDevice->eglSharedContext);
+
     /*
     if (allocatorDevice && allocatorDevice != bestAllocatorDevice)
     {

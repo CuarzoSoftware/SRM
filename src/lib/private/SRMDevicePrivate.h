@@ -52,6 +52,7 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name);
 void srmDeviceDestroy(SRMDevice *device);
 UInt8 srmDeviceInitializeGBM(SRMDevice *device);
 UInt8 srmDeviceInitializeEGL(SRMDevice *device);
+UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device);
 UInt8 srmDeviceUpdateClientCaps(SRMDevice *device);
 UInt8 srmDeviceUpdateCaps(SRMDevice *device);
 

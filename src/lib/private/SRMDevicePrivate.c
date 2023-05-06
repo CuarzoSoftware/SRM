@@ -4,6 +4,8 @@
 #include <private/SRMEncoderPrivate.h>
 #include <private/SRMPlanePrivate.h>
 #include <private/SRMConnectorPrivate.h>
+#include <private/SRMBufferPrivate.h>
+
 
 #include <SRMList.h>
 #include <SRMLog.h>
@@ -65,6 +67,9 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
         goto fail;
 
     if (!srmDeviceInitializeEGL(device))
+        goto fail;
+
+    if (!srmDeviceInitializeEGLSharedContext(device))
         goto fail;
 
     if (!srmDeviceUpdateClientCaps(device))
@@ -166,7 +171,7 @@ UInt8 srmDeviceUpdateCaps(SRMDevice *device)
 
         if (bo)
         {
-            int dma = gbm_bo_get_fd(bo);
+            int dma = srmBufferGetDMAFDFromBO(device, bo);
 
             if (dma != -1)
             {
@@ -302,6 +307,18 @@ UInt8 srmDeviceUpdateConnectors(SRMDevice *device)
         SRMError("No connector found for device %s.", device->name);
         return 0;
     }
+
+    return 1;
+}
+
+UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
+{
+    EGLint contextAttribs[] = {
+        EGL_CONTEXT_CLIENT_VERSION, 2,
+        EGL_NONE
+    };
+
+    device->eglSharedContext = eglCreateContext(device->eglDisplay, 0, EGL_NO_CONTEXT, contextAttribs);
 
     return 1;
 }

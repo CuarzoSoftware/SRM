@@ -16,10 +16,11 @@ struct SRMBufferStruct
 {
     SRMCore *core;
     struct gbm_bo *allocatorBO;
-    UInt32 allocatorBOStride;
-    void *allocatorBOMapData;
-    UInt8 *allocatorBOMap;
+    Int32 dmaFD;
+    UInt8 *dmaMap;
     SRMList *textures;
 };
+
+Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo);
 
 #endif // SRMBUFFERPRIVATE_H

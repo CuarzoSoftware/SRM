@@ -12,6 +12,7 @@
 #include <SRMLog.h>
 #include <SRMList.h>
 
+#include <stdio.h>
 #include <xf86drmMode.h>
 #include <libdisplay-info/edid.h>
 #include <libdisplay-info/info.h>
@@ -433,7 +434,11 @@ void *srmConnectorRenderThread(void *conn)
     connector->drmEventCtx.sequence_handler = NULL;
 
     srmRenderModeCommonCreateCursor(connector);
-    srmRenderModeItselfSetInterface(connector);
+
+    if (srmDeviceGetRenderMode(connector->device) == SRM_RENDER_MODE_ITSELF)
+        srmRenderModeItselfSetInterface(connector);
+    else
+        goto fail;
 
     if (!connector->renderInterface.initialize(connector))
         goto fail;

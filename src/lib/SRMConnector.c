@@ -137,7 +137,56 @@ UInt8 srmConnectorSetMode(SRMConnector *connector, SRMConnectorMode *mode)
 {
     if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
     {
-        /* TODO */
+        if (connector->currentMode == mode)
+            return 1;
+
+        SRMConnectorMode *modeBackup = connector->currentMode;
+
+        connector->targetMode = mode;
+        connector->state = SRM_CONNECTOR_STATE_CHANGING_MODE;
+        srmConnectorUnlockRenderThread(connector);
+
+        while (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
+        {
+            usleep(200);
+        }
+
+        if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
+        {
+            return 1;
+        }
+        else // REVERTING MODE CHANGE
+        {
+            connector->targetMode = modeBackup;
+            connector->state = SRM_CONNECTOR_STATE_CHANGING_MODE;
+            srmConnectorUnlockRenderThread(connector);
+            while (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
+            {
+                usleep(200);
+            }
+            return 0;
+        }
+    }
+
+    else if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED)
+    {
+        connector->currentMode = mode;
+        return 1;
+    }
+
+    // Wait for intermediate states to finish
+    else if (connector->state == SRM_CONNECTOR_STATE_INITIALIZING ||
+        connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING ||
+        connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
+    {
+        while (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING ||
+               connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING ||
+               connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
+        {
+            usleep(200);
+        }
+
+        return srmConnectorSetMode(connector, mode);
     }
 
     return 1;
@@ -194,6 +243,8 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
     if (connector->renderInitResult != 1)
         goto fail;
 
+    connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
+
     return 1;
 
 fail:
@@ -219,18 +270,18 @@ fail:
 
 UInt8 srmConnectorRepaint(SRMConnector *connector)
 {
-    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
-        return 0;
-
-    if (!connector->repaintRequested)
+    if (connector->state == SRM_CONNECTOR_STATE_INITIALIZING ||
+        connector->state == SRM_CONNECTOR_STATE_INITIALIZED ||
+        connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
     {
-        pthread_mutex_lock(&connector->repaintMutex);
-        connector->repaintRequested = 1;
-        pthread_cond_signal(&connector->repaintCond);
-        pthread_mutex_unlock(&connector->repaintMutex);
+
+        if (!connector->repaintRequested)
+            srmConnectorUnlockRenderThread(connector);
+
+        return 1;
     }
 
-    return 1;
+    return 0;
 }
 
 void srmConnectorUninitialize(SRMConnector *connector)
@@ -255,10 +306,7 @@ void srmConnectorUninitialize(SRMConnector *connector)
 
     // Unitialize
     connector->state = SRM_CONNECTOR_STATE_UNINITIALIZING;
-    pthread_mutex_lock(&connector->repaintMutex);
-    connector->repaintRequested = 1;
-    pthread_cond_signal(&connector->repaintCond);
-    pthread_mutex_unlock(&connector->repaintMutex);
+    srmConnectorUnlockRenderThread(connector);
 
     while (connector->state != SRM_CONNECTOR_STATE_UNINITIALIZED)
         usleep(20000);

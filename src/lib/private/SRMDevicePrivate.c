@@ -320,5 +320,11 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 
     device->eglSharedContext = eglCreateContext(device->eglDisplay, 0, EGL_NO_CONTEXT, contextAttribs);
 
+    if (device->eglSharedContext == EGL_NO_CONTEXT)
+    {
+        SRMError("Failed to create shared EGL context for device %s.", device->name);
+        return 0;
+    }
+
     return 1;
 }

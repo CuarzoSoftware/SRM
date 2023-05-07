@@ -450,8 +450,31 @@ void *srmConnectorRenderThread(void *conn)
     {
         if (!srmRenderModeCommonWaitRepaintRequest(connector))
             break;
-        connector->renderInterface.render(connector);
-        connector->renderInterface.flipPage(connector);
+
+        if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
+        {
+            connector->renderInterface.render(connector);
+            connector->renderInterface.flipPage(connector);
+        }
+        else if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
+        {
+            if (connector->renderInterface.updateMode(connector))
+            {
+                connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
+                SRMDebug("Mode success.");
+            }
+            else
+            {
+                connector->state = SRM_CONNECTOR_STATE_REVERTING_MODE;
+                SRMDebug("Mode fail.");
+            }
+        }
+        else if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING)
+        {
+            connector->renderInterface.uninitialize(connector);
+            connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
+            break;
+        }
     }
 
     return NULL;
@@ -461,4 +484,12 @@ void *srmConnectorRenderThread(void *conn)
     pthread_cond_destroy(&connector->repaintCond);
     connector->renderInitResult = -1;
     return NULL;
+}
+
+void srmConnectorUnlockRenderThread(SRMConnector *connector)
+{
+    pthread_mutex_lock(&connector->repaintMutex);
+    connector->repaintRequested = 1;
+    pthread_cond_signal(&connector->repaintCond);
+    pthread_mutex_unlock(&connector->repaintMutex);
 }

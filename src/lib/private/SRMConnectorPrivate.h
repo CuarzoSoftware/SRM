@@ -67,6 +67,7 @@ struct SRMConnectorRenderInterface
     UInt8(*initialize)(SRMConnector *connector);
     UInt8(*render)(SRMConnector *connector);
     UInt8(*flipPage)(SRMConnector *connector);
+    UInt8(*updateMode)(SRMConnector *connector);
     void (*uninitialize)(SRMConnector *connector);
 };
 
@@ -94,7 +95,9 @@ struct SRMConnectorStruct
     struct SRMConnectorPropIDs propIDs;
     SRMList *encoders, *modes;
     UInt32 mmWidth, mmHeight;
-    SRMConnectorMode *preferredMode, *currentMode;
+    SRMConnectorMode *preferredMode, *currentMode,
+    *targetMode; // This one is used while changing mode
+
     SRMEncoder *currentEncoder;
     SRMCrtc *currentCrtc;
     SRMPlane *currentPrimaryPlane, *currentCursorPlane;
@@ -135,6 +138,7 @@ UInt8 srmConnectorUpdateModes(SRMConnector *connector);
 SRMConnectorMode *srmConnectorFindPreferredMode(SRMConnector *connector);
 UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane);
 void *srmConnectorRenderThread(void *conn);
+void srmConnectorUnlockRenderThread(SRMConnector *connector);
 void srmConnectorDestroy(SRMConnector *connector);
 
 #endif // SRMCONNECTORPRIVATE_H

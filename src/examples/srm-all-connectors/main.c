@@ -206,6 +206,8 @@ static void resizeGL(SRMConnector *connector, void *userData)
                h);
 
     srmConnectorRepaint(connector);
+
+    SRMLog("RESIZE GL");
 }
 
 static void uninitializeGL(SRMConnector *connector, void *userData)
@@ -300,6 +302,18 @@ int main(void)
                 }
 
                 SRMDebug("Initialized connector %s.", srmConnectorGetModel(connector));
+
+                if (strcmp(srmGetConnectorTypeString(srmConnectorGetType(connector)), "HDMI-A") == 0)
+                {
+                    srmListForeachRev(modeIt, srmConnectorGetModes(connector))
+                    {
+                        usleep(10000000);
+                        SRMConnectorMode *mode = srmListItemGetData(modeIt);
+                        srmConnectorSetMode(connector, mode);
+                        SRMWarning("Set mode: %dx%d@%d.", srmConnectorModeGetWidth(mode), srmConnectorModeGetHeight(mode), srmConnectorModeGetRefreshRate(mode));
+                    }
+                }
+
             }
         }
     }

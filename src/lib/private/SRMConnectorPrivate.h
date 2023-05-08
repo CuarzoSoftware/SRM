@@ -132,9 +132,16 @@ struct SRMConnectorStruct
 
 SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id);
 UInt8 srmConnectorUpdateProperties(SRMConnector *connector);
+
 UInt8 srmConnectorUpdateNames(SRMConnector *connector);
+void srmConnectorDestroyNames(SRMConnector *connector);
+
 UInt8 srmConnectorUpdateEncoders(SRMConnector *connector);
+void srmConnectorDestroyEncoders(SRMConnector *connector);
+
 UInt8 srmConnectorUpdateModes(SRMConnector *connector);
+void srmConnectorDestroyModes(SRMConnector *connector);
+
 SRMConnectorMode *srmConnectorFindPreferredMode(SRMConnector *connector);
 UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane);
 void *srmConnectorRenderThread(void *conn);

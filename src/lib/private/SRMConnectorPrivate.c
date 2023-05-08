@@ -21,6 +21,23 @@
 #include <errno.h>
 #include <stdlib.h>
 
+SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
+{
+    SRMConnector *connector = calloc(1, sizeof(SRMConnector));
+    connector->id = id;
+    connector->device = device;
+    connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
+
+    srmConnectorUpdateProperties(connector);
+
+    // This is called after its device is added to the core devices list
+    // srmConnectorUpdateNames(connector);
+
+    srmConnectorUpdateEncoders(connector);
+    srmConnectorUpdateModes(connector);
+
+    return connector;
+}
 
 // Recursively find a free id to add at the end of the name (e.g HDMI-A-0)
 // so that connectors of the same type have unique names
@@ -48,27 +65,6 @@ UInt32 srmConnectorGetFreeNameID(SRMConnector *connector, UInt32 id)
 
     // Got a free ID
     return id;
-}
-
-SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
-{
-    SRMConnector *connector = calloc(1, sizeof(SRMConnector));
-    connector->id = id;
-    connector->device = device;
-    connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
-
-    srmConnectorUpdateProperties(connector);
-
-    // This is called after its device is added to the core devices list
-    // srmConnectorUpdateNames(connector);
-
-    connector->encoders = srmListCreate();
-    srmConnectorUpdateEncoders(connector);
-
-    connector->modes = srmListCreate();
-    srmConnectorUpdateModes(connector);
-
-    return connector;
 }
 
 UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
@@ -136,24 +132,8 @@ UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
 }
 
 UInt8 srmConnectorUpdateNames(SRMConnector *connector)
-{
-    if (connector->name)
-    {
-        free(connector->name);
-        connector->name = NULL;
-    }
-
-    if (connector->manufacturer)
-    {
-        free(connector->manufacturer);
-        connector->manufacturer = NULL;
-    }
-
-    if (connector->model)
-    {
-        free(connector->model);
-        connector->model = NULL;
-    }
+{  
+    srmConnectorDestroyNames(connector);
 
     // Search a free name ID for the connector type
     connector->nameID = srmConnectorGetFreeNameID(connector, 0);
@@ -234,8 +214,32 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
     return 1;
 }
 
+void srmConnectorDestroyNames(SRMConnector *connector)
+{
+    if (connector->name)
+    {
+        free(connector->name);
+        connector->name = NULL;
+    }
+
+    if (connector->manufacturer)
+    {
+        free(connector->manufacturer);
+        connector->manufacturer = NULL;
+    }
+
+    if (connector->model)
+    {
+        free(connector->model);
+        connector->model = NULL;
+    }
+}
+
 UInt8 srmConnectorUpdateEncoders(SRMConnector *connector)
 {
+    srmConnectorDestroyEncoders(connector);
+    connector->encoders = srmListCreate();
+
     drmModeConnector *connectorRes = drmModeGetConnector(connector->device->fd, connector->id);
 
     if (!connectorRes)
@@ -260,8 +264,20 @@ UInt8 srmConnectorUpdateEncoders(SRMConnector *connector)
     return 1;
 }
 
+void srmConnectorDestroyEncoders(SRMConnector *connector)
+{
+    if (connector->encoders)
+    {
+        srmListDestoy(connector->encoders);
+        connector->encoders = NULL;
+    }
+}
+
 UInt8 srmConnectorUpdateModes(SRMConnector *connector)
 {
+    srmConnectorDestroyModes(connector);
+    connector->modes = srmListCreate();
+
     drmModeConnector *connectorRes = drmModeGetConnector(connector->device->fd, connector->id);
 
     if (!connectorRes)
@@ -281,13 +297,27 @@ UInt8 srmConnectorUpdateModes(SRMConnector *connector)
 
     connector->preferredMode = srmConnectorFindPreferredMode(connector);
 
-    // If there is no current mode, set the preferred as default
-    if (!connector->currentMode)
-        connector->currentMode = connector->preferredMode;
+    // Set the preferred as default
+    connector->currentMode = connector->preferredMode;
 
     drmModeFreeConnector(connectorRes);
 
     return 1;
+}
+
+void srmConnectorDestroyModes(SRMConnector *connector)
+{
+    if (connector->modes)
+    {
+        while (!srmListIsEmpty(connector->modes))
+        {
+            SRMConnectorMode *mode = srmListItemGetData(srmListGetBack(connector->modes));
+            srmConnectorModeDestroy(mode);
+        }
+
+        srmListDestoy(connector->modes);
+        connector->modes = NULL;
+    }
 }
 
 SRMConnectorMode *srmConnectorFindPreferredMode(SRMConnector *connector)
@@ -403,6 +433,11 @@ UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bes
 void srmConnectorDestroy(SRMConnector *connector)
 {
     srmConnectorUninitialize(connector);
+    srmConnectorDestroyNames(connector);
+    srmConnectorDestroyEncoders(connector);
+    srmConnectorDestroyModes(connector);
+    srmListRemoveItem(connector->device->connectors, connector->deviceLink);
+    free(connector);
 }
 
 void *srmConnectorRenderThread(void *conn)
@@ -493,3 +528,6 @@ void srmConnectorUnlockRenderThread(SRMConnector *connector)
     pthread_cond_signal(&connector->repaintCond);
     pthread_mutex_unlock(&connector->repaintMutex);
 }
+
+
+

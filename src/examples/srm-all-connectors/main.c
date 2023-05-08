@@ -224,36 +224,55 @@ static SRMConnectorInterface connectorInterface =
     .uninitializeGL = &uninitializeGL
 };
 
+static void initConnector(SRMConnector *connector)
+{
+    float *phase = malloc(sizeof(float));
 
-void deviceCreatedEventHandler(SRMListener *listener, SRMDevice *device)
+    if (!srmConnectorInitialize(connector, &connectorInterface, phase))
+    {
+        free(phase);
+        SRMError("Failed to initialize device %s connector %d.",
+                 srmDeviceGetName(srmConnectorGetDevice(connector)),
+                 srmConnectorGetID(connector));
+    }
+
+    SRMDebug("Initialized connector %s.", srmConnectorGetModel(connector));
+}
+
+static void deviceCreatedEventHandler(SRMListener *listener, SRMDevice *device)
 {
     SRM_UNUSED(listener);
 
     SRMDebug("DRM device (GPU) created: %s.", srmDeviceGetName(device));
 }
 
-void deviceRemovedEventHandler(SRMListener *listener, SRMDevice *device)
+static void deviceRemovedEventHandler(SRMListener *listener, SRMDevice *device)
 {
     SRM_UNUSED(listener);
 
     SRMDebug("DRM device (GPU) removed: %s.", srmDeviceGetName(device));
 }
 
-void connectorPluggedEventHandler(SRMListener *listener, SRMConnector *connector)
+static void connectorPluggedEventHandler(SRMListener *listener, SRMConnector *connector)
 {
-    /*
-    SRMDebug("DRM connector plugged (%d): %s.",
-                  connector->id(),
-                  connector->model());
-                  */
+    SRM_UNUSED(listener);
+
+    SRMDebug("DRM connector PLUGGED (%d): %s.",
+                  srmConnectorGetID(connector),
+                  srmConnectorGetModel(connector));
+
+    initConnector(connector);
 }
 
-void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *connector)
+static void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *connector)
 {
-    /*
-    SRMLog::debug("DRM connector unplugged (%d): %s.",
-                  connector->id(),
-                  connector->model());*/
+    SRM_UNUSED(listener);
+
+    SRMDebug("DRM connector UNPLUGGED (%d): %s.",
+                  srmConnectorGetID(connector),
+                  srmConnectorGetModel(connector));
+
+    /* The connnector is automatically uninitialized after this event */
 }
 
 int main(void)
@@ -290,31 +309,7 @@ int main(void)
             SRMConnector *connector = srmListItemGetData(connectorIt);
 
             if (srmConnectorIsConnected(connector) && srmConnectorGetmmWidth(connector) != 0)
-            {
-                float *phase = malloc(sizeof(float));
-
-                if (!srmConnectorInitialize(connector, &connectorInterface, phase))
-                {
-                    free(phase);
-                    SRMError("Failed to initialize device %s connector %d.",
-                             srmDeviceGetName(device),
-                             srmConnectorGetID(connector));
-                }
-
-                SRMDebug("Initialized connector %s.", srmConnectorGetModel(connector));
-
-                if (strcmp(srmGetConnectorTypeString(srmConnectorGetType(connector)), "HDMI-A") == 0)
-                {
-                    srmListForeachRev(modeIt, srmConnectorGetModes(connector))
-                    {
-                        usleep(10000000);
-                        SRMConnectorMode *mode = srmListItemGetData(modeIt);
-                        srmConnectorSetMode(connector, mode);
-                        SRMWarning("Set mode: %dx%d@%d.", srmConnectorModeGetWidth(mode), srmConnectorModeGetHeight(mode), srmConnectorModeGetRefreshRate(mode));
-                    }
-                }
-
-            }
+                initConnector(connector);
         }
     }
 

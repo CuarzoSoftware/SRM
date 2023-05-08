@@ -1,4 +1,8 @@
 #include <private/SRMConnectorModePrivate.h>
+#include <private/SRMConnectorPrivate.h>
+
+#include <SRMList.h>
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -12,5 +16,6 @@ SRMConnectorMode *srmConnectorModeCreate(SRMConnector *connector, drmModeModeInf
 
 void srmConnectorModeDestroy(SRMConnectorMode *connectorMode)
 {
+    srmListRemoveItem(connectorMode->connector->modes, connectorMode->connectorLink);
     free(connectorMode);
 }

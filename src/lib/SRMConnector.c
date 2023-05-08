@@ -287,15 +287,12 @@ UInt8 srmConnectorRepaint(SRMConnector *connector)
 void srmConnectorUninitialize(SRMConnector *connector)
 {
     // Wait for those states to change
-    if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE ||
-        connector->state == SRM_CONNECTOR_STATE_INITIALIZING)
+    while (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE ||
+           connector->state == SRM_CONNECTOR_STATE_INITIALIZING)
     {
-        while (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE ||
-               connector->state == SRM_CONNECTOR_STATE_INITIALIZING)
-        {
-            usleep(20000);
-        }
+        usleep(20000);
     }
+
 
     // Nothing to do
     if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED ||
@@ -311,11 +308,23 @@ void srmConnectorUninitialize(SRMConnector *connector)
     while (connector->state != SRM_CONNECTOR_STATE_UNINITIALIZED)
         usleep(20000);
 
-    connector->currentCrtc->currentConnector = NULL;
-    connector->currentCrtc = NULL;
-    connector->currentEncoder->currentConnector = NULL;
-    connector->currentPrimaryPlane->currentConnector = NULL;
-    connector->currentPrimaryPlane = NULL;
+    if (connector->currentCrtc)
+    {
+        connector->currentCrtc->currentConnector = NULL;
+        connector->currentCrtc = NULL;
+    }
+
+    if (connector->currentEncoder)
+    {
+        connector->currentEncoder->currentConnector = NULL;
+        connector->currentEncoder = NULL;
+    }
+
+    if (connector->currentPrimaryPlane)
+    {
+        connector->currentPrimaryPlane->currentConnector = NULL;
+        connector->currentPrimaryPlane = NULL;
+    }
 
     if (connector->currentCursorPlane)
     {
@@ -332,6 +341,9 @@ void srmConnectorUninitialize(SRMConnector *connector)
 
     pthread_mutex_destroy(&connector->repaintMutex);
     pthread_cond_destroy(&connector->repaintCond);
+
+    connector->interfaceData = NULL;
+    connector->interface = NULL;
 
     /* TODO */
 

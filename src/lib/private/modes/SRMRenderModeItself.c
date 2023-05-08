@@ -98,6 +98,10 @@ static UInt8 createGBMSurfaces(SRMConnector *connector)
         return 0;
     }
 
+    SRMDebug("Created GBM surface %dx%d (ITSELF MODE).",
+             connector->currentMode->info.hdisplay,
+             connector->currentMode->info.vdisplay);
+
     return 1;
 }
 
@@ -115,9 +119,9 @@ static void destroyGBMSurfaces(SRMConnector *connector)
                 data->connectorBOs[i] = NULL;
             }
         }
+
         gbm_surface_destroy(data->connectorGBMSurface);
         data->connectorGBMSurface = NULL;
-
     }
 }
 

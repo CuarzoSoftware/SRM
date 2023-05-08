@@ -1,6 +1,8 @@
 #include <private/SRMCorePrivate.h>
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMListenerPrivate.h>
+#include <private/SRMConnectorPrivate.h>
+
 #include <SRMLog.h>
 
 #include <xf86drmMode.h>
@@ -28,33 +30,8 @@ SRMCore::~SRMCore()
     delete m_imp;
 }
 
-
-
-SRMListener *SRMCore::addDeviceCreatedListener(void (*callback)(SRMListener *, SRMDevice *), void *userdata)
-{
-    return new SRMListener(&imp()->deviceCreatedListeners, (void*)callback, userdata);
-}
-
-SRMListener *SRMCore::addDeviceRemovedListener(void (*callback)(SRMListener *, SRMDevice *), void *userdata)
-{
-    return new SRMListener(&imp()->deviceRemovedListeners, (void*)callback, userdata);
-}
-
-SRMListener *SRMCore::addConnectorPluggedListener(void (*callback)(SRMListener *, SRMConnector *), void *userdata)
-{
-    return new SRMListener(&imp()->connectorPluggedListeners, (void*)callback, userdata);
-}
-
-SRMListener *SRMCore::addConnectorUnpluggedListener(void (*callback)(SRMListener *, SRMConnector *), void *userdata)
-{
-    return new SRMListener(&imp()->connectorUnpluggedListeners, (void*)callback, userdata);
-}
-
-SRMCore::SRMCorePrivate *SRMCore::imp() const
-{
-    return m_imp;
-}
 */
+
 SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
 {
     SRMLogInit();
@@ -160,53 +137,86 @@ Int32 srmCoreProccessMonitor(SRMCore *core, Int32 msTimeout)
 
             if (devnode && strncmp(devnode, "/dev/dri/card", 13) == 0)
             {
+                // Find the device
+                SRMDevice *device = NULL;
+
+                SRMListForeach(deviceIt, core->devices)
+                {
+                    SRMDevice *dev = srmListItemGetData(deviceIt);
+
+                    if (strcmp(dev->name, devnode) == 0)
+                    {
+                        device = dev;
+                        break;
+                    }
+                }
+
+                if (!device)
+                {
+                    /* TODO: Handle GPU hotplugging */
+                    goto unref;
+                }
+
                 // Possible connector hotplug event
                 if (strcmp(action, "change") == 0)
                 {
-                    int card_fd = -1;
-
-                    card_fd = open(devnode, O_RDONLY | O_CLOEXEC);
-
-                    if (card_fd < 0)
+                    // Check connector states
+                    SRMListForeach(connectorIt, device->connectors)
                     {
-                        SRMError("Failed to open device %s.", devnode);
-                        goto unref;
-                    }
+                        SRMConnector *connector = srmListItemGetData(connectorIt);
+                        drmModeConnector *connectorRes = drmModeGetConnector(device->fd, connector->id);
 
-                    drmModeRes *res = drmModeGetResources(card_fd);
-
-                    if (res)
-                    {
-                        for (int i = 0; i < res->count_connectors; i++)
+                        if (!connectorRes)
                         {
-                            drmModeConnector *conn = drmModeGetConnector(card_fd, res->connectors[i]);
-                            if (conn)
+                            SRMError("Failed to get device %s connector %d resources in hotplug event.", connector->device->name, connector->id);
+                            continue;
+                        }
+
+                        UInt8 connected = connectorRes->connection == DRM_MODE_CONNECTED;
+
+                        // Connector changed state
+                        if (connector->connected != connected)
+                        {
+                            // Plugged event
+                            if (connected)
                             {
-                                if (conn->connection == DRM_MODE_CONNECTED)
-                                {
-                                    /*
-                                    printf("Connector %d connected\n", conn->connector_id);
+                                srmConnectorUpdateProperties(connector);
+                                srmConnectorUpdateNames(connector);
+                                srmConnectorUpdateEncoders(connector);
+                                srmConnectorUpdateModes(connector);
 
-                                    for (SRMListener *listener : imp()->connectorPluggedListeners)
-                                    {
-                                        void (*callback)(SRMListener *, SRMConnector *) = (void(*)(SRMListener *, SRMConnector *))listener->callback();
-                                        callback(listener, nullptr);
-                                    }
-                                    */
-                                }
-                                else
+                                // Notify listeners
+                                SRMListForeach(listenerIt, core->connectorPluggedListeners)
                                 {
-                                    // printf("Connector %d disconnected\n", conn->connector_id);
+                                    SRMListener *listener = srmListItemGetData(listenerIt);
+                                    void (*callback)(SRMListener *, SRMConnector *) = (void(*)(SRMListener *, SRMConnector *))listener->callback;
+                                    callback(listener, connector);
+                                }
+                            }
+
+                            // Unplugged event
+                            else
+                            {
+                                // Notify listeners
+                                SRMListForeach(listenerIt, core->connectorUnpluggedListeners)
+                                {
+                                    SRMListener *listener = srmListItemGetData(listenerIt);
+                                    void (*callback)(SRMListener *, SRMConnector *) = (void(*)(SRMListener *, SRMConnector *))listener->callback;
+                                    callback(listener, connector);
                                 }
 
-                                drmModeFreeConnector(conn);
+                                // Uninitialize after notify so users can for example backup some data
+                                srmConnectorUninitialize(connector);
+
+                                srmConnectorUpdateProperties(connector);
+                                srmConnectorUpdateNames(connector);
+                                srmConnectorUpdateEncoders(connector);
+                                srmConnectorUpdateModes(connector);
                             }
                         }
 
-                        drmModeFreeResources(res);
+                        drmModeFreeConnector(connectorRes);
                     }
-
-                    close(card_fd);
                 }
 
                 // GPU added

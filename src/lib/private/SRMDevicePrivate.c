@@ -17,24 +17,6 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-/*
-
-void SRMDevice::SRMDevicePrivate::uninitializeGBM()
-{
-    if (gbm)
-        gbm_device_destroy(gbm);
-}
-
-
-
-void SRMDevice::SRMDevicePrivate::uninitializeEGL()
-{
-    if (eglDisplay != EGL_NO_DISPLAY)
-        eglTerminate(eglDisplay);
-}
-
-*/
-
 SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
 {
     SRMDevice *device = calloc(1, sizeof(SRMDevice));
@@ -45,6 +27,7 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
 
     device->core = core;
     device->enabled = 1;
+    device->eglDevice = EGL_NO_DEVICE_EXT;
 
 
     device->fd = core->interface->openRestricted(name,
@@ -67,6 +50,12 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
         goto fail;
 
     if (!srmDeviceInitializeEGL(device))
+        goto fail;
+
+    if (!srmDeviceUpdateEGLExtensions(device))
+        goto fail;
+
+    if (!srmDeviceUpdateEGLFunctions(device))
         goto fail;
 
     if (!srmDeviceInitializeEGLSharedContext(device))
@@ -132,15 +121,147 @@ UInt8 srmDeviceInitializeEGL(SRMDevice *device)
         return 0;
     }
 
-    if (!eglInitialize(device->eglDisplay, NULL, NULL))
+    EGLint minor, major;
+
+    if (!eglInitialize(device->eglDisplay, &minor, &major))
     {
         SRMError("Failed to initialize EGL display for device %s.", device->name);
         device->eglDisplay = EGL_NO_DISPLAY;
         return 0;
     }
 
+    SRMDebug("[%s] EGL version: %d.%d.", device->name, minor, major);
+
+    const char *vendor = eglQueryString(device->eglDisplay, EGL_VENDOR);
+    SRMDebug("[%s] EGL vendor: %s.", device->name, vendor ? vendor : "Unknown");
+
     return 1;
 }
+
+UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
+{
+    const char *extensions = eglQueryString(device->eglDisplay, EGL_EXTENSIONS);
+
+    if (!extensions)
+    {
+        SRMError("Failed to query EGL display extensions for device %s.", device->name);
+        return 0;
+    }
+
+    device->eglExtensions.KHR_image_base = srmEGLHasExtension(extensions, "EGL_KHR_image_base");
+    device->eglExtensions.KHR_image = srmEGLHasExtension(extensions, "EGL_KHR_image");
+    device->eglExtensions.EXT_image_dma_buf_import = srmEGLHasExtension(extensions, "EGL_EXT_image_dma_buf_import");
+    device->eglExtensions.EXT_image_dma_buf_import_modifiers = srmEGLHasExtension(extensions, "EGL_EXT_image_dma_buf_import_modifiers");
+    device->eglExtensions.EXT_create_context_robustness = srmEGLHasExtension(extensions, "EGL_EXT_create_context_robustness");
+
+    /* TODO: Which of the above are mandatory ? */
+
+    const char *deviceExtensions = NULL, *driverName = NULL;
+
+    if (device->core->eglExtensions.EXT_device_query)
+    {
+        EGLAttrib deviceAttrib;
+
+        if (!device->core->eglFunctions.eglQueryDisplayAttribEXT(device->eglDisplay, EGL_DEVICE_EXT, &deviceAttrib))
+        {
+            SRMError("eglQueryDisplayAttribEXT(EGL_DEVICE_EXT) failed for device %s.", device->name);
+            goto skipDeviceQuery;
+        }
+
+        device->eglDevice = (EGLDeviceEXT)deviceAttrib;
+
+        deviceExtensions = device->core->eglFunctions.eglQueryDeviceStringEXT(device->eglDevice, EGL_EXTENSIONS);
+
+        if (!deviceExtensions)
+        {
+            SRMError("eglQueryDeviceStringEXT(EGL_EXTENSIONS) failed for device %s.", device->name);
+            goto skipDeviceQuery;
+        }
+
+        device->eglExtensions.MESA_device_software = srmEGLHasExtension(deviceExtensions, "EGL_MESA_device_software");
+
+#ifdef EGL_DRIVER_NAME_EXT
+        device->eglExtensions.EXT_device_persistent_id = srmEGLHasExtension(deviceExtensions, "EGL_EXT_device_persistent_id");
+
+        if (device->eglExtensions.EXT_device_persistent_id)
+            driverName = device->core->eglFunctions.eglQueryDeviceStringEXT(device->eglDevice, EGL_DRIVER_NAME_EXT);
+#endif
+
+        device->eglExtensions.EXT_device_drm = srmEGLHasExtension(deviceExtensions, "EGL_EXT_device_drm");
+        device->eglExtensions.EXT_device_drm_render_node = srmEGLHasExtension(deviceExtensions, "EGL_EXT_device_drm_render_node");
+    }
+
+    skipDeviceQuery:
+
+    device->eglExtensions.KHR_no_config_context = srmEGLHasExtension(extensions, "EGL_KHR_no_config_context");
+    device->eglExtensions.MESA_configless_context = srmEGLHasExtension(extensions, "EGL_MESA_configless_context");
+    device->eglExtensions.KHR_surfaceless_context = srmEGLHasExtension(extensions, "EGL_KHR_surfaceless_context");
+    device->eglExtensions.IMG_context_priority = srmEGLHasExtension(extensions, "EGL_IMG_context_priority");
+
+    SRMDebug("[%s] EGL driver name: %s.", device->name, driverName ? driverName : "Unknown");
+
+    return 1;
+}
+
+UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
+{
+    if (device->eglExtensions.KHR_image_base || device->eglExtensions.KHR_image)
+    {
+        device->eglFunctions.eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC) eglGetProcAddress("eglCreateImageKHR");
+        device->eglFunctions.eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC) eglGetProcAddress("eglDestroyImageKHR");
+        device->eglFunctions.glEGLImageTargetTexture2DOES = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC) eglGetProcAddress("glEGLImageTargetTexture2DOES");
+
+    }
+
+    if (device->eglExtensions.EXT_image_dma_buf_import_modifiers)
+    {
+        device->eglFunctions.eglQueryDmaBufFormatsEXT = (PFNEGLQUERYDMABUFFORMATSEXTPROC) eglGetProcAddress("eglQueryDmaBufFormatsEXT");
+        device->eglFunctions.eglQueryDmaBufModifiersEXT = (PFNEGLQUERYDMABUFMODIFIERSEXTPROC) eglGetProcAddress("eglQueryDmaBufModifiersEXT");
+    }
+
+    return 1;
+}
+
+
+UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
+{
+    size_t atti = 0;
+    device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_CLIENT_VERSION;
+    device->eglSharedContextAttribs[atti++] = 2;
+
+    if (device->eglExtensions.IMG_context_priority)
+    {
+        device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_PRIORITY_LEVEL_IMG;
+        device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_PRIORITY_HIGH_IMG;
+    }
+
+    if (device->eglExtensions.EXT_create_context_robustness) {
+        device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT;
+        device->eglSharedContextAttribs[atti++] = EGL_LOSE_CONTEXT_ON_RESET_EXT;
+    }
+
+    device->eglSharedContextAttribs[atti++] = EGL_NONE;
+
+    device->eglSharedContext = eglCreateContext(device->eglDisplay, 0, EGL_NO_CONTEXT, device->eglSharedContextAttribs);
+
+    if (device->eglSharedContext == EGL_NO_CONTEXT)
+    {
+        SRMError("Failed to create shared EGL context for device %s.", device->name);
+        return 0;
+    }
+
+    if (device->eglExtensions.IMG_context_priority)
+    {
+        EGLint priority = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
+
+        eglQueryContext(device->eglDisplay, device->eglSharedContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &priority);
+
+        SRMDebug("[%s] using %s priority EGL context.", device->name, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
+    }
+
+    return 1;
+}
+
 
 UInt8 srmDeviceUpdateClientCaps(SRMDevice *device)
 {
@@ -311,20 +432,3 @@ UInt8 srmDeviceUpdateConnectors(SRMDevice *device)
     return 1;
 }
 
-UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
-{
-    EGLint contextAttribs[] = {
-        EGL_CONTEXT_CLIENT_VERSION, 2,
-        EGL_NONE
-    };
-
-    device->eglSharedContext = eglCreateContext(device->eglDisplay, 0, EGL_NO_CONTEXT, contextAttribs);
-
-    if (device->eglSharedContext == EGL_NO_CONTEXT)
-    {
-        SRMError("Failed to create shared EGL context for device %s.", device->name);
-        return 0;
-    }
-
-    return 1;
-}

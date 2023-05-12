@@ -11,12 +11,6 @@
 #include <sys/poll.h>
 #include <stdlib.h>
 
-static const EGLint eglContextAttribs[] =
-{
-    EGL_CONTEXT_CLIENT_VERSION, 2,
-    EGL_NONE
-};
-
 static const EGLint eglConfigAttribs[] =
 {
     EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
@@ -157,7 +151,7 @@ static UInt8 createEGLContext(SRMConnector *connector)
                                                  data->connectorEGLConfig,
                                                  // It is EGL_NO_CONTEXT if no context was previously created in this device
                                                  connector->device->eglSharedContext,
-                                                 eglContextAttribs);
+                                                 connector->device->eglSharedContextAttribs);
 
     if (data->connectorEGLContext == EGL_NO_CONTEXT)
     {
@@ -438,7 +432,10 @@ static void uninitialize(SRMConnector *connector)
                            0,
                            NULL);
 
-        eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, connector->device->eglSharedContext);
+        /*
+         * TODO: Check if this line should be called, since the EGL log says error when calling it.
+         * eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, connector->device->eglSharedContext);
+         */
 
         destroyEGLSurfaces(connector);
         destroyEGLContext(connector);

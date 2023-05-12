@@ -16,21 +16,6 @@
 
 #include <SRMList.h>
 
-/*
-
-SRMCore::~SRMCore()
-{
-    while(!devices().empty())
-    {
-        SRMDevice *device = devices().back();
-        delete device;
-        imp()->devices.pop_back();
-    }
-
-    delete m_imp;
-}
-
-*/
 
 SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
 {
@@ -38,6 +23,12 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
     SRMCore *core = calloc(1, sizeof(SRMCore));
     core->interface = interface;
     core->interfaceUserData = userData;
+
+    if (!srmCoreUpdateEGLExtensions(core))
+        goto fail;
+
+    if (!srmCoreUpdateEGLFunctions(core))
+        goto fail;
 
     if (!srmCoreCreateUdev(core))
         goto fail;
@@ -185,6 +176,13 @@ Int32 srmCoreProccessMonitor(SRMCore *core, Int32 msTimeout)
                                 srmConnectorUpdateEncoders(connector);
                                 srmConnectorUpdateModes(connector);
 
+                                SRMDebug("[%s] Connector (%d) %s, %s, %s plugged.",
+                                         connector->device->name,
+                                         connector->id,
+                                         connector->name,
+                                         connector->model,
+                                         connector->manufacturer);
+
                                 // Notify listeners
                                 SRMListForeach(listenerIt, core->connectorPluggedListeners)
                                 {
@@ -197,6 +195,13 @@ Int32 srmCoreProccessMonitor(SRMCore *core, Int32 msTimeout)
                             // Unplugged event
                             else
                             {
+                                SRMDebug("[%s] Connector (%d) %s, %s, %s unplugged.",
+                                         connector->device->name,
+                                         connector->id,
+                                         connector->name,
+                                         connector->model,
+                                         connector->manufacturer);
+
                                 // Notify listeners
                                 SRMListForeach(listenerIt, core->connectorUnpluggedListeners)
                                 {
@@ -264,4 +269,14 @@ SRMListener *srmCoreAddConnectorPluggedEventListener(SRMCore *core, void (*callb
 SRMListener *srmCoreAddConnectorUnpluggedEventListener(SRMCore *core, void (*callback)(SRMListener *, SRMConnector *), void *userData)
 {
     return srmListenerCreate(core->connectorUnpluggedListeners, callback, userData);
+}
+
+const SRMEGLCoreExtensions *srmCoreGetEGLExtensions(SRMCore *core)
+{
+    return &core->eglExtensions;
+}
+
+const SRMEGLCoreFunctions *srmCoreGetEGLFunctions(SRMCore *core)
+{
+    return &core->eglFunctions;
 }

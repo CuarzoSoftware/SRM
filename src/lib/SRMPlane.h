@@ -3,6 +3,7 @@
 
 #include <SRMTypes.h>
 
+
 UInt32 srmPlaneGetID(SRMPlane *plane);
 SRMDevice *srmPlaneGetDevice(SRMPlane *plane);
 SRMList *srmPlaneGetCrtcs(SRMPlane *plane);

@@ -2,6 +2,8 @@
 #define SRMCOREPRIVATE_H
 
 #include <SRMCore.h>
+#include <SRMEGL.h>
+
 #include <libudev.h>
 #include <sys/poll.h>
 
@@ -22,22 +24,18 @@ struct SRMCoreStruct
     SRMList *connectorUnpluggedListeners;
 
     SRMDevice *allocatorDevice;
+
+    SRMEGLCoreExtensions eglExtensions;
+    SRMEGLCoreFunctions eglFunctions;
 };
 
-int srmCoreCreateUdev(SRMCore *core);
-int srmCoreEnumerateDevices(SRMCore *core);
-int srmCoreInitMonitor(SRMCore *core);
+UInt8 srmCoreUpdateEGLExtensions(SRMCore *core);
+UInt8 srmCoreUpdateEGLFunctions(SRMCore *core);
+UInt8 srmCoreCreateUdev(SRMCore *core);
+UInt8 srmCoreEnumerateDevices(SRMCore *core);
+UInt8 srmCoreInitMonitor(SRMCore *core);
 SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core);
 void srmCoreAssignRendererDevices(SRMCore *core);
-int srmCoreUpdateBestConfiguration(SRMCore *core);
-
-/*
-
-// Config
-void updateBestConfiguration();
-SRMDevice *findBestAllocatorDevice();
-void assignRendererDevices();
-*/
-
+UInt8 srmCoreUpdateBestConfiguration(SRMCore *core);
 
 #endif // SRMCOREPRIVATE_H

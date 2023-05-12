@@ -1,10 +1,58 @@
 #include <private/SRMCorePrivate.h>
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMConnectorPrivate.h>
+
 #include <SRMLog.h>
 #include <SRMList.h>
 
-int srmCoreCreateUdev(SRMCore *core)
+#include <stdlib.h>
+
+UInt8 srmCoreUpdateEGLExtensions(SRMCore *core)
+{
+    if (eglBindAPI(EGL_OPENGL_ES_API) == EGL_FALSE)
+    {
+        SRMFatal("Failed to bind to the OpenGL ES API.");
+        return 0;
+    }
+
+    const char *extensions = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
+
+    if (!extensions)
+    {
+        SRMFatal("Failed to query core EGL extensions.");
+        return 0;
+    }
+
+    core->eglExtensions.EXT_platform_base = srmEGLHasExtension(extensions, "EGL_EXT_platform_base");
+
+    if (!core->eglExtensions.EXT_platform_base)
+    {
+        SRMFatal("EGL_EXT_platform_base not supported.");
+        return 0;
+    }
+
+    core->eglExtensions.KHR_platform_gbm = srmEGLHasExtension(extensions, "EGL_KHR_platform_gbm");
+    core->eglExtensions.MESA_platform_gbm = srmEGLHasExtension(extensions, "EGL_MESA_platform_gbm");
+
+    if (!core->eglExtensions.KHR_platform_gbm && !core->eglExtensions.MESA_platform_gbm)
+    {
+        SRMFatal("EGL_KHR_platform_gbm not supported.");
+        return 0;
+    }
+
+    core->eglExtensions.EXT_platform_device = srmEGLHasExtension(extensions, "EGL_EXT_platform_device");
+    core->eglExtensions.KHR_display_reference = srmEGLHasExtension(extensions, "EGL_KHR_display_reference");
+    core->eglExtensions.EXT_device_base = srmEGLHasExtension(extensions, "EGL_EXT_device_base");
+    core->eglExtensions.EXT_device_enumeration = srmEGLHasExtension(extensions, "EGL_EXT_device_enumeration");
+    core->eglExtensions.EXT_device_query = srmEGLHasExtension(extensions, "EGL_EXT_device_query");
+    core->eglExtensions.KHR_debug = srmEGLHasExtension(extensions, "EGL_KHR_debug");
+
+
+    return 1;
+}
+
+
+UInt8 srmCoreCreateUdev(SRMCore *core)
 {
     core->udev = udev_new();
 
@@ -17,7 +65,7 @@ int srmCoreCreateUdev(SRMCore *core)
     return 1;
 }
 
-int srmCoreEnumerateDevices(SRMCore *core)
+UInt8 srmCoreEnumerateDevices(SRMCore *core)
 {
     struct udev_enumerate *enumerate;
     struct udev_list_entry *devices, *dev_list_entry;
@@ -67,7 +115,7 @@ int srmCoreEnumerateDevices(SRMCore *core)
     return 1;
 }
 
-int srmCoreInitMonitor(SRMCore *core)
+UInt8 srmCoreInitMonitor(SRMCore *core)
 {
     core->monitor = udev_monitor_new_from_netlink(core->udev, "udev");
 
@@ -226,7 +274,7 @@ void srmCoreAssignRendererDevices(SRMCore *core)
     }
 }
 
-int srmCoreUpdateBestConfiguration(SRMCore *core)
+UInt8 srmCoreUpdateBestConfiguration(SRMCore *core)
 {
     SRMDevice *bestAllocatorDevice = srmCoreFindBestAllocatorDevice(core);
 
@@ -252,5 +300,69 @@ int srmCoreUpdateBestConfiguration(SRMCore *core)
     return 1;
 }
 
+static void srmEGLLog(EGLenum error, const char *command, EGLint type, EGLLabelKHR thread, EGLLabelKHR obj, const char *msg)
+{
+    SRM_UNUSED(thread);
+    SRM_UNUSED(obj);
 
+    static const char *format = "[EGL] command: %s, error: %s (0x%x), message: \"%s\".";
 
+    switch (type)
+    {
+        case EGL_DEBUG_MSG_CRITICAL_KHR:
+            SRMFatal(format, command, srmEGLGetErrorString(error), error, msg);
+            break;
+        case EGL_DEBUG_MSG_ERROR_KHR:
+            SRMError(format, command, srmEGLGetErrorString(error), error, msg);
+            break;
+        case EGL_DEBUG_MSG_WARN_KHR:
+            SRMWarning(format, command, srmEGLGetErrorString(error), error, msg);
+            break;
+        case EGL_DEBUG_MSG_INFO_KHR:
+            SRMDebug(format, command, srmEGLGetErrorString(error), error, msg);
+            break;
+        default:
+            SRMDebug(format, command, srmEGLGetErrorString(error), error, msg);
+            break;
+    }
+
+}
+
+UInt8 srmCoreUpdateEGLFunctions(SRMCore *core)
+{
+    core->eglFunctions.eglGetPlatformDisplayEXT = (PFNEGLGETPLATFORMDISPLAYEXTPROC) eglGetProcAddress("eglGetPlatformDisplayEXT");
+
+    if (core->eglExtensions.EXT_device_base || core->eglExtensions.EXT_device_enumeration)
+        core->eglFunctions.eglQueryDevicesEXT = (PFNEGLQUERYDEVICESEXTPROC) eglGetProcAddress("eglQueryDevicesEXT");
+
+    if (core->eglExtensions.EXT_device_base || core->eglExtensions.EXT_device_query)
+    {
+        core->eglExtensions.EXT_device_query = 1;
+        core->eglFunctions.eglQueryDeviceStringEXT = (PFNEGLQUERYDEVICESTRINGEXTPROC) eglGetProcAddress("eglQueryDeviceStringEXT");
+        core->eglFunctions.eglQueryDisplayAttribEXT = (PFNEGLQUERYDISPLAYATTRIBEXTPROC) eglGetProcAddress("eglQueryDisplayAttribEXT");
+    }
+
+    if (core->eglExtensions.KHR_debug)
+    {
+        core->eglFunctions.eglDebugMessageControlKHR = (PFNEGLDEBUGMESSAGECONTROLKHRPROC) eglGetProcAddress("eglDebugMessageControlKHR");
+
+        UInt32 level = 0;
+        const char *env = getenv("SRM_EGL_DEBUG");
+
+        if (env)
+            level = atoi(env);
+
+        EGLAttrib debugAttribs[] =
+        {
+            EGL_DEBUG_MSG_CRITICAL_KHR, level > 0 ? EGL_TRUE : EGL_FALSE,
+            EGL_DEBUG_MSG_ERROR_KHR,    level > 1 ? EGL_TRUE : EGL_FALSE,
+            EGL_DEBUG_MSG_WARN_KHR,     level > 2 ? EGL_TRUE : EGL_FALSE,
+            EGL_DEBUG_MSG_INFO_KHR,     level > 3 ? EGL_TRUE : EGL_FALSE,
+            EGL_NONE,
+        };
+
+        core->eglFunctions.eglDebugMessageControlKHR(srmEGLLog, debugAttribs);
+    }
+
+    return 1;
+}

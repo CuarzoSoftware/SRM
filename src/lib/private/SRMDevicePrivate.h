@@ -2,6 +2,7 @@
 #define SRMDEVICEPRIVATE_H
 
 #include <SRMDevice.h>
+#include <SRMEGL.h>
 #include <gbm.h>
 #include <EGL/egl.h>
 #include <pthread.h>
@@ -27,8 +28,12 @@ struct SRMDeviceStruct
 
     struct gbm_device *gbm;
 
+    EGLDeviceEXT eglDevice;
     EGLDisplay eglDisplay;
     EGLContext eglSharedContext;
+    EGLint eglSharedContextAttribs[7];
+    SRMEGLDeviceExtensions eglExtensions;
+    SRMEGLDeviceFunctions eglFunctions;
 
     UInt8 clientCapStereo3D;
     UInt8 clientCapUniversalPlanes;
@@ -51,8 +56,12 @@ struct SRMDeviceStruct
 SRMDevice *srmDeviceCreate(SRMCore *core, const char *name);
 void srmDeviceDestroy(SRMDevice *device);
 UInt8 srmDeviceInitializeGBM(SRMDevice *device);
+
 UInt8 srmDeviceInitializeEGL(SRMDevice *device);
+UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device);
+UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device);
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device);
+
 UInt8 srmDeviceUpdateClientCaps(SRMDevice *device);
 UInt8 srmDeviceUpdateCaps(SRMDevice *device);
 

@@ -28,7 +28,7 @@ struct SRMPlaneStruct
     SRMDevice *device;
     SRMListItem *deviceLink;
     SRMConnector *currentConnector;
-    SRMList *crtcs;
+    SRMList *crtcs, *inFormats;
     SRM_PLANE_TYPE type;
     struct SRMPlanePropIDs propIDs;
 };
@@ -37,5 +37,7 @@ SRMPlane *srmPlaneCreate(SRMDevice *device, UInt32 id);
 void srmPlaneDestroy(SRMPlane *plane);
 UInt8 srmPlaneUpdateProperties(SRMPlane *plane);
 UInt8 srmPlaneUpdateCrtcs(SRMPlane *plane);
+void srmPlaneUpdateInFormats(SRMPlane *plane, UInt64 blobID);
+void srmPlaneDestroyInFormats(SRMPlane *plane);
 
 #endif // SRMPLANEPRIVATE_H

@@ -22,6 +22,7 @@ HEADERS += \
     SRMCore.h \
     SRMCrtc.h \
     SRMDevice.h \
+    SRMEGL.h \
     SRMEncoder.h \
     SRMList.h \
     SRMListener.h \
@@ -49,6 +50,7 @@ SOURCES += \
     SRMCore.c \
     SRMCrtc.c \
     SRMDevice.c \
+    SRMEGL.c \
     SRMEncoder.c \
     SRMList.c \
     SRMListener.c \

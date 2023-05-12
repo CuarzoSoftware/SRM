@@ -245,6 +245,13 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
 
     connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
 
+    SRMDebug("[%s] Connector (%d) %s, %s, %s initialized.",
+             connector->device->name,
+             connector->id,
+             connector->name,
+             connector->model,
+             connector->manufacturer);
+
     return 1;
 
 fail:
@@ -344,6 +351,13 @@ void srmConnectorUninitialize(SRMConnector *connector)
 
     connector->interfaceData = NULL;
     connector->interface = NULL;
+
+    SRMDebug("[%s] Connector (%d) %s, %s, %s uninitialized.",
+             connector->device->name,
+             connector->id,
+             connector->name,
+             connector->model,
+             connector->manufacturer);
 
     /* TODO */
 

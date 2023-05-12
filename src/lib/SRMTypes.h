@@ -1,7 +1,11 @@
 #ifndef SRMTYPES_H
 #define SRMTYPES_H
 
-/* #define SRM_CONFIG_TESTS 1 */
+/* ENV VARS
+ *
+ * SRM_DEBUG = [0,1,2,3,4]
+ * SRM_EGL_DEBUG = [0,1,2,3,4]
+ */
 
 #include <stdint.h>
 #include <drm/drm_fourcc.h>
@@ -47,6 +51,25 @@ typedef struct SRMListenerStruct SRMListener;
 
 struct SRMBufferStruct;
 typedef struct SRMBufferStruct SRMBuffer;
+
+struct SRMEGLCoreExtensionsStruct;
+typedef struct SRMEGLCoreExtensionsStruct SRMEGLCoreExtensions;
+
+struct SRMEGLCoreFunctionsStruct;
+typedef struct SRMEGLCoreFunctionsStruct SRMEGLCoreFunctions;
+
+struct SRMEGLDeviceExtensionsStruct;
+typedef struct SRMEGLDeviceExtensionsStruct SRMEGLDeviceExtensions;
+
+struct SRMEGLDeviceFunctionsStruct;
+typedef struct SRMEGLDeviceFunctionsStruct SRMEGLDeviceFunctions;
+
+struct SRMFormatStruct
+{
+    UInt32 format;
+    UInt64 modifier;
+};
+typedef struct SRMFormatStruct SRMFormat;
 
 struct SRMInterfaceStruct
 {

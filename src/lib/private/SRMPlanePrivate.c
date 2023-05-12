@@ -4,7 +4,11 @@
 #include <SRMList.h>
 #include <SRMLog.h>
 
+#include <drm/drm.h>
+#include <drm/drm_mode.h>
+#include <xf86drm.h>
 #include <xf86drmMode.h>
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -32,6 +36,8 @@ void srmPlaneDestroy(SRMPlane *plane)
 {
     if (plane->crtcs)
         srmListDestoy(plane->crtcs);
+
+    srmPlaneDestroyInFormats(plane);
 
     free(plane);
 }
@@ -64,7 +70,10 @@ UInt8 srmPlaneUpdateProperties(SRMPlane *plane)
         else if (strcmp(prop->name, "FB_DAMAGE_CLIPS") == 0)
             plane->propIDs.FB_DAMAGE_CLIPS = prop->prop_id;
         else if (strcmp(prop->name, "IN_FORMATS") == 0)
+        {
             plane->propIDs.IN_FORMATS = prop->prop_id;
+            srmPlaneUpdateInFormats(plane, props->prop_values[i]);
+        }
         else if (strcmp(prop->name, "CRTC_ID") == 0)
             plane->propIDs.CRTC_ID = prop->prop_id;
         else if (strcmp(prop->name, "CRTC_X") == 0)
@@ -133,3 +142,45 @@ UInt8 srmPlaneUpdateCrtcs(SRMPlane *plane)
     return 1;
 }
 
+
+void srmPlaneUpdateInFormats(SRMPlane *plane, UInt64 blobID)
+{
+    if (plane->device->capAddFb2Modifiers)
+    {
+        drmModePropertyBlobRes *blob = drmModeGetPropertyBlob(plane->device->fd, blobID);
+
+        if (blob)
+        {
+            srmPlaneDestroyInFormats(plane);
+            plane->inFormats = srmListCreate();
+
+            drmModeFormatModifierIterator iter = {0};
+
+            while (drmModeFormatModifierBlobIterNext(blob, &iter))
+            {
+                SRMFormat *format = malloc(sizeof(SRMFormat));
+                format->format = iter.fmt;
+                format->modifier = iter.mod;
+                srmListAppendData(plane->inFormats, format);
+            }
+
+            drmModeFreePropertyBlob(blob);
+        }
+    }
+}
+
+void srmPlaneDestroyInFormats(SRMPlane *plane)
+{
+    if (plane->inFormats)
+    {
+        while (!srmListIsEmpty(plane->inFormats))
+        {
+            SRMFormat *format = srmListItemGetData(srmListGetBack(plane->inFormats));
+            free(format);
+            srmListPopBack(plane->inFormats);
+        }
+
+        srmListDestoy(plane->inFormats);
+        plane->inFormats = NULL;
+    }
+}

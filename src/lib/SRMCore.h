@@ -12,23 +12,10 @@ SRMListener *srmCoreAddDeviceCreatedEventListener(SRMCore *core, void(*callback)
 SRMListener *srmCoreAddDeviceRemovedEventListener(SRMCore *core, void(*callback)(SRMListener*, SRMDevice*), void *userData);
 SRMListener *srmCoreAddConnectorPluggedEventListener(SRMCore *core, void(*callback)(SRMListener*, SRMConnector*), void *userData);
 SRMListener *srmCoreAddConnectorUnpluggedEventListener(SRMCore *core, void(*callback)(SRMListener*, SRMConnector*), void *userData);
+
+const SRMEGLCoreExtensions *srmCoreGetEGLExtensions(SRMCore *core);
+const SRMEGLCoreFunctions *srmCoreGetEGLFunctions(SRMCore *core);
+
 void srmCoreDestroy(SRMCore *core);
-
-/*
-SRMCore *createSRM(SRMInterface *interface, void *userData);
-
-// List of GPUs
-std::list<SRMDevice*>&devices() const;
-
-// Register to udev monitor events (GPU and Connectors hotplug events)
-SRMListener *addDeviceCreatedListener(void(*callback)(SRMListener*, SRMDevice*), void *userdata = nullptr);
-SRMListener *addDeviceRemovedListener(void(*callback)(SRMListener*, SRMDevice*), void *userdata = nullptr);
-SRMListener *addConnectorPluggedListener(void(*callback)(SRMListener*, SRMConnector*), void *userdata = nullptr);
-SRMListener *addConnectorUnpluggedListener(void(*callback)(SRMListener*, SRMConnector*), void *userdata = nullptr);
-int monitorFd() const;
-int processMonitor(int msTimeout);
-
-SRMDevice *allocatorDevice() const;
-*/
 
 #endif // SRMCORE_H

@@ -256,7 +256,7 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 
         eglQueryContext(device->eglDisplay, device->eglSharedContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &priority);
 
-        SRMDebug("[%s] using %s priority EGL context.", device->name, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
+        SRMDebug("[%s] Using %s priority EGL context.", device->name, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
     }
 
     return 1;

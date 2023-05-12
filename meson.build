@@ -95,10 +95,10 @@ srm_dep = declare_dependency(
 
 if get_option('build_examples')
     #subdir('src/examples/srm-display-info')
-    #subdir('src/examples/srm-all-connectors')
+    subdir('src/examples/srm-all-connectors')
 endif
 
 if get_option('build_tests')
-    subdir('src/tests/srm-tests-list')
+    #subdir('src/tests/srm-tests-list')
 endif
 

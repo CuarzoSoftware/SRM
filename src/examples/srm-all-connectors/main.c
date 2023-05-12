@@ -28,9 +28,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <sys/time.h>
 
-static UInt8 cursor[64*64*4];
+/* Hardware cursor pixels */
+static UInt8 cursorPixels[64*64*4];
 
+/* Background texture pixels */
 static UInt8 bufferPixels[3*2*4] =
 {
     255, 0, 0, 255,     // Red
@@ -41,9 +44,10 @@ static UInt8 bufferPixels[3*2*4] =
     0, 255, 255, 255,   // Cyan
 };
 
+/* Background texture shared among all GPUs */
 static SRMBuffer *buffer;
 
-// Square (left for vertex, right for fragment)
+/* Square vertices (left for vertex shader, right for fragment shader) */
 static GLfloat square[16] =
 {  //  VERTEX       FRAGMENT
     -1.0f, -1.0f,   0.f, 1.f, // TL
@@ -52,6 +56,34 @@ static GLfloat square[16] =
      1.0f, -1.0f,   1.f, 1.f  // TR
 };
 
+static const char *vertexShaderSource = "attribute vec4 position; varying vec2 v_texcoord; void main() { gl_Position = vec4(position.xy, 0.0, 1.0); v_texcoord = position.zw; }";
+static const char *fragmentShaderSource = "precision mediump float; uniform sampler2D tex; varying vec2 v_texcoord; void main() { gl_FragColor = texture2D(tex, v_texcoord); }";
+
+struct ConnectorUserData
+{
+    GLuint vertexShader;
+    GLuint fragmentShader;
+    GLuint program;
+
+    // Used to animate the cursor and white line
+    float phase;
+
+    // Current screen mode dimensions
+    UInt32 w, h;
+
+    // Count FPS
+    UInt64 framesCount, msStart, sec;
+};
+
+
+UInt64 getMilliseconds()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return ((UInt64)tv.tv_sec * 1000) + ((UInt64)tv.tv_usec / 1000);
+}
+
+/* Opens a DRM device */
 static int openRestricted(const char *path, int flags, void *userData)
 {
     SRM_UNUSED(userData);
@@ -60,10 +92,10 @@ static int openRestricted(const char *path, int flags, void *userData)
     return open(path, flags);
 }
 
+/* Closes a DRM device */
 static void closeRestricted(int fd, void *userData)
 {
     SRM_UNUSED(userData);
-
     close(fd);
 }
 
@@ -80,51 +112,55 @@ static void drawColorSquares(UInt32 w, UInt32 h)
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
-static void setupShaders(SRMConnector *connector)
+static void setupShaders(SRMConnector *connector, void *userData)
 {
-    const char *vertex_shader_source = "attribute vec4 position; varying vec2 v_texcoord; void main() { gl_Position = vec4(position.xy, 0.0, 1.0); v_texcoord = position.zw; }";
-    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
-    glCompileShader(vertex_shader);
+    struct ConnectorUserData *data = userData;
+
+    data->vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(data->vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(data->vertexShader);
 
     // Check for vertex shader compilation errors
     GLint success = 0;
     GLchar infoLog[512];
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
+    glGetShaderiv(data->vertexShader, GL_COMPILE_STATUS, &success);
 
     if (!success)
     {
-        glGetShaderInfoLog(vertex_shader, 512, NULL, infoLog);
+        glGetShaderInfoLog(data->vertexShader, 512, NULL, infoLog);
         SRMError("Vertex shader compilation error: %s.", infoLog);
     }
 
-    const char *fragment_shader_source = "precision mediump float; uniform sampler2D tex; varying vec2 v_texcoord; void main() { gl_FragColor = texture2D(tex, v_texcoord); }";
-    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment_shader, 1, &fragment_shader_source, NULL);
-    glCompileShader(fragment_shader);
+    data->fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(data->fragmentShader, 1, &fragmentShaderSource, NULL);
+    glCompileShader(data->fragmentShader);
 
     success = 0;
-    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
+    glGetShaderiv(data->fragmentShader, GL_COMPILE_STATUS, &success);
     if (!success)
     {
-        glGetShaderInfoLog(fragment_shader, 512, NULL, infoLog);
+        glGetShaderInfoLog(data->fragmentShader, 512, NULL, infoLog);
         SRMError("Fragment shader compilation error: %s.", infoLog);
     }
 
-    GLuint program = glCreateProgram();
-    glAttachShader(program, vertex_shader);
-    glAttachShader(program, fragment_shader);
-    glLinkProgram(program);
-    glUseProgram(program);
+    data->program = glCreateProgram();
+    glAttachShader(data->program, data->vertexShader);
+    glAttachShader(data->program, data->fragmentShader);
+    glLinkProgram(data->program);
+    glUseProgram(data->program);
 
     // Bind vPosition to attribute 0
-    glBindAttribLocation(program, 0, "position");
+    glBindAttribLocation(data->program, 0, "position");
 
     // Load the vertex data
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, square);
 
     // Enables the vertex array
     glEnableVertexAttribArray(0);
+
+    /* Calling srmBufferGetTextureID() returns a GL texture ID for a specific device.
+     * In this case, we want one for the device that do the rendering for this connector
+     * (connector->device->rendererDevice) */
 
     if (buffer)
     {
@@ -135,85 +171,113 @@ static void setupShaders(SRMConnector *connector)
 
 }
 
-static void initializeGL(SRMConnector *connector, void *data)
+static void initializeGL(SRMConnector *connector, void *userData)
 {
-    setupShaders(connector);
+    struct ConnectorUserData *data = userData;
 
     SRMConnectorMode *mode = srmConnectorGetCurrentMode(connector);
-    UInt32 w = srmConnectorModeGetWidth(mode);
-    UInt32 h = srmConnectorModeGetHeight(mode);
+    data->w = srmConnectorModeGetWidth(mode);
+    data->h = srmConnectorModeGetHeight(mode);
+
+    setupShaders(connector, userData);
 
     glEnable(GL_SCISSOR_TEST);
     glDisable(GL_DEPTH_BUFFER_BIT);
-    glViewport(0, 0, w, h);
+    glViewport(0, 0, data->w, data->h);
 
     // Draw color squares
-    drawColorSquares(w, h);
+    drawColorSquares(data->w, data->h);
 
-    // Create a gray cursor
-    memset(cursor, 200, sizeof(cursor));
-    srmConnectorSetCursor(connector, cursor);
+    // Set the pixels of the HW cursor
+    srmConnectorSetCursor(connector, cursorPixels);
 
-    float *phase = (float*)data;
-    *phase = 0;
-
+    // Schedule a repaint
     srmConnectorRepaint(connector);
+
+    data->msStart = getMilliseconds();
 }
 
 static void paintGL(SRMConnector *connector, void *userData)
 {
-    SRMConnectorMode *mode = srmConnectorGetCurrentMode(connector);
-    UInt32 w = srmConnectorModeGetWidth(mode);
-    UInt32 h = srmConnectorModeGetHeight(mode);
+    struct ConnectorUserData *data = userData;
 
-    float *phase = (float*)userData;
-    float cosine = cosf(*phase);
-    float sine = sinf(*phase);
+    float cosine = cosf(data->phase);
+    float sine = sinf(data->phase);
 
     // Draw color squares
-    drawColorSquares(w, h);
+    drawColorSquares(data->w, data->h);
 
     // Moving black vertical line
-    glScissor((w-5)*(1.f+cosine)/2, 0, 10, h);
+    glScissor((data->w-5)*(1.f+cosine)/2, 0, 10, data->h);
     glClearColor(1.f, 1.f, 1.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Update cursor pos
-    Int32 x = ((w - 64)/2)*(1 + cosine);
-    Int32 y = ((h - 64)/2)*(1 + sine);
+    Int32 x = ((data->w - 64)/2)*(1 + cosine);
+    Int32 y = ((data->h - 64)/2)*(1 + sine);
     srmConnectorSetCursorPos(connector, x, y);
 
     // Increase phase
-    *phase += 0.015f;
+    data->phase += 0.015f;
 
-    if (*phase >= 2*M_PI)
-        *phase -= 2*M_PI;
+    if (data->phase >= 2*M_PI)
+        data->phase -= 2*M_PI;
 
     srmConnectorRepaint(connector);
+
+    data->framesCount++;
+    UInt64 msDiff = getMilliseconds() - data->msStart;
+    UInt64 currSec = msDiff / 1000;
+
+    if (currSec != data->sec && currSec % 5 == 0)
+    {
+        data->sec = currSec;
+        SRMLog("srm-all-connectors: Connector (%d) FPS: %d.",
+               srmConnectorGetID(connector),
+               (data->framesCount * 1000) / msDiff);
+    }
 }
 
 static void resizeGL(SRMConnector *connector, void *userData)
 {
-    SRM_UNUSED(userData);
+    struct ConnectorUserData *data = userData;
 
     SRMConnectorMode *mode = srmConnectorGetCurrentMode(connector);
-    UInt32 w = srmConnectorModeGetWidth(mode);
-    UInt32 h = srmConnectorModeGetHeight(mode);
+    data->w = srmConnectorModeGetWidth(mode);
+    data->h = srmConnectorModeGetHeight(mode);
 
     glViewport(0,
                0,
-               w,
-               h);
+               data->w,
+               data->h);
 
     srmConnectorRepaint(connector);
-
-    SRMLog("RESIZE GL");
 }
 
 static void uninitializeGL(SRMConnector *connector, void *userData)
 {
     SRM_UNUSED(connector);
-    SRM_UNUSED(userData);
+
+    struct ConnectorUserData *data = userData;
+
+    if (data->program)
+    {
+        if (data->vertexShader)
+            glDetachShader(data->program, data->vertexShader);
+
+        if (data->fragmentShader)
+            glDetachShader(data->program, data->fragmentShader);
+
+        glDeleteProgram(data->program);
+    }
+
+    if (data->vertexShader)
+        glDeleteShader(data->vertexShader);
+
+    if (data->fragmentShader)
+        glDeleteShader(data->fragmentShader);
+
+    free(data);
 }
 
 static SRMConnectorInterface connectorInterface =
@@ -226,53 +290,45 @@ static SRMConnectorInterface connectorInterface =
 
 static void initConnector(SRMConnector *connector)
 {
-    float *phase = malloc(sizeof(float));
+    struct ConnectorUserData *userData = calloc(1, sizeof(struct ConnectorUserData));
 
-    if (!srmConnectorInitialize(connector, &connectorInterface, phase))
+    if (!srmConnectorInitialize(connector, &connectorInterface, userData))
     {
-        free(phase);
-        SRMError("Failed to initialize device %s connector %d.",
-                 srmDeviceGetName(srmConnectorGetDevice(connector)),
-                 srmConnectorGetID(connector));
+        /* Fails to init connector */
+
+        free(userData);
     }
 
-    SRMDebug("Initialized connector %s.", srmConnectorGetModel(connector));
+    /* Connector initialized! */
 }
 
 static void deviceCreatedEventHandler(SRMListener *listener, SRMDevice *device)
 {
     SRM_UNUSED(listener);
-
-    SRMDebug("DRM device (GPU) created: %s.", srmDeviceGetName(device));
+    SRM_UNUSED(device);
 }
 
 static void deviceRemovedEventHandler(SRMListener *listener, SRMDevice *device)
 {
     SRM_UNUSED(listener);
-
-    SRMDebug("DRM device (GPU) removed: %s.", srmDeviceGetName(device));
+    SRM_UNUSED(device);
 }
 
 static void connectorPluggedEventHandler(SRMListener *listener, SRMConnector *connector)
 {
     SRM_UNUSED(listener);
 
-    SRMDebug("DRM connector PLUGGED (%d): %s.",
-                  srmConnectorGetID(connector),
-                  srmConnectorGetModel(connector));
-
+    /* Got a new connector, let's render on it */
     initConnector(connector);
 }
 
 static void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *connector)
 {
     SRM_UNUSED(listener);
+    SRM_UNUSED(connector);
 
-    SRMDebug("DRM connector UNPLUGGED (%d): %s.",
-                  srmConnectorGetID(connector),
-                  srmConnectorGetModel(connector));
-
-    /* The connnector is automatically uninitialized after this event */
+    /* The connnector is automatically uninitialized after this event (if connected)
+     * so there is no need to call srmConnectorUninitialize() */
 }
 
 int main(void)
@@ -292,8 +348,11 @@ int main(void)
 
     if (!buffer)
     {
-        SRMWarning("Failed to create texture buffer.");
+        SRMWarning("Failed to create background texture buffer.");
     }
+
+    // Set the pixels of the cursor white
+    memset(cursorPixels, 255, sizeof(cursorPixels));
 
     // Subscribe to DRM events
     SRMListener *deviceCreatedEventListener = srmCoreAddDeviceCreatedEventListener(core, &deviceCreatedEventHandler, NULL);
@@ -316,17 +375,20 @@ int main(void)
 
     while (1)
     {
-        // Poll DRM devices/connectors hotplugging events (0 disables timeout)
+        /* Evdev monitor poll DRM devices/connectors hotplugging events (0 disables timeout).
+         * To get a pollable FD use srmCoreGetMonitorFD() */
+
         if (srmCoreProccessMonitor(core, -1) < 0)
             break;
     }
 
 
-    // Unsubscribe to DRM events
-    //
-    // These listeners are automatically destroyed when calling srmCoreDestroy()
-    // so there is no need to free them manually.
-    // This is here just to show how to unsubscribe to events on the fly.
+    /* Unsubscribe to DRM events
+     *
+     * These listeners are automatically destroyed when calling srmCoreDestroy()
+     * so there is no need to free them manually.
+     * This is here just to show how to unsubscribe to events on the fly. */
+
     srmListenerDestroy(deviceCreatedEventListener);
     srmListenerDestroy(deviceRemovedEventListener);
     srmListenerDestroy(connectorPluggedEventListener);

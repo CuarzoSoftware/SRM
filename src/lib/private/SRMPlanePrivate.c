@@ -1,6 +1,7 @@
 #include <private/SRMPlanePrivate.h>
 #include <private/SRMDevicePrivate.h>
 
+#include <SRMFormat.h>
 #include <SRMList.h>
 #include <SRMLog.h>
 
@@ -157,12 +158,7 @@ void srmPlaneUpdateInFormats(SRMPlane *plane, UInt64 blobID)
             drmModeFormatModifierIterator iter = {0};
 
             while (drmModeFormatModifierBlobIterNext(blob, &iter))
-            {
-                SRMFormat *format = malloc(sizeof(SRMFormat));
-                format->format = iter.fmt;
-                format->modifier = iter.mod;
-                srmListAppendData(plane->inFormats, format);
-            }
+                srmFormatsListAddFormat(plane->inFormats, iter.fmt, iter.mod);
 
             drmModeFreePropertyBlob(blob);
         }

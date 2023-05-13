@@ -24,6 +24,7 @@ HEADERS += \
     SRMDevice.h \
     SRMEGL.h \
     SRMEncoder.h \
+    SRMFormat.h \
     SRMList.h \
     SRMListener.h \
     SRMLog.h \
@@ -52,6 +53,7 @@ SOURCES += \
     SRMDevice.c \
     SRMEGL.c \
     SRMEncoder.c \
+    SRMFormat.c \
     SRMList.c \
     SRMListener.c \
     SRMLog.c \

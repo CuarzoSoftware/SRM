@@ -33,5 +33,8 @@ SRMList *srmDeviceGetEncoders(SRMDevice *device);
 SRMList *srmDeviceGetPlanes(SRMDevice *device);
 SRMList *srmDeviceGetConnectors(SRMDevice *device);
 
+SRMList *srmDeviceGetDMATextureFormats(SRMDevice *device);
+SRMList *srmDeviceGetDMARenderFormats(SRMDevice *device);
+
 
 #endif // SRMDEVICE_H

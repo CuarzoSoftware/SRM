@@ -6,52 +6,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-/*
-
-SRMDevice::~SRMDevice()
-{
-    if (imp()->name)
-        delete[] imp()->name;
-
-    if (imp()->fd >= 0)
-        core()->imp()->interface->closeRestricted(imp()->fd, core()->imp()->userdata);
-
-    delete m_imp;
-}
-
-
-std::list<SRMCrtc *> &SRMDevice::crtcs() const
-{
-    return imp()->crtcs;
-}
-
-std::list<SRMEncoder *> &SRMDevice::encoders() const
-{
-    return imp()->encoders;
-}
-
-std::list<SRMPlane *> &SRMDevice::planes() const
-{
-    return imp()->planes;
-}
-
-std::list<SRMConnector *> &SRMDevice::connectors() const
-{
-    return imp()->connectors;
-}
-
-SRMDevice::SRMDevice(SRMCore *core, const char *path)
-{
-    m_imp = new SRMDevicePrivate(this);
-    m_imp->core = core;
-
-    int len = strlen(path);
-    imp()->name = new char[len+1];
-    memcpy(imp()->name, path, len);
-    imp()->name[len] = '\0';
-}
-
-*/
 
 const char *srmDeviceGetName(SRMDevice *device)
 {
@@ -173,4 +127,14 @@ SRMList *srmDeviceGetPlanes(SRMDevice *device)
 SRMList *srmDeviceGetConnectors(SRMDevice *device)
 {
     return device->connectors;
+}
+
+SRMList *srmDeviceGetDMATextureFormats(SRMDevice *device)
+{
+    return device->dmaTextureFormats;
+}
+
+SRMList *srmDeviceGetDMARenderFormats(SRMDevice *device)
+{
+    return device->dmaRenderFormats;
 }

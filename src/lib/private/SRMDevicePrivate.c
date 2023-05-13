@@ -6,7 +6,7 @@
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMBufferPrivate.h>
 
-
+#include <SRMFormat.h>
 #include <SRMList.h>
 #include <SRMLog.h>
 #include <stdlib.h>
@@ -57,6 +57,8 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
 
     if (!srmDeviceUpdateEGLFunctions(device))
         goto fail;
+
+    srmDeviceUpdateDMAFormats(device);
 
     if (!srmDeviceInitializeEGLSharedContext(device))
         goto fail;
@@ -210,7 +212,6 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
         device->eglFunctions.eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC) eglGetProcAddress("eglCreateImageKHR");
         device->eglFunctions.eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC) eglGetProcAddress("eglDestroyImageKHR");
         device->eglFunctions.glEGLImageTargetTexture2DOES = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC) eglGetProcAddress("glEGLImageTargetTexture2DOES");
-
     }
 
     if (device->eglExtensions.EXT_image_dma_buf_import_modifiers)
@@ -222,6 +223,166 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
     return 1;
 }
 
+UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
+{
+    srmDeviceDestroyDMAFormats(device);
+
+    device->dmaRenderFormats = srmListCreate();
+    device->dmaTextureFormats = srmListCreate();
+
+    if (!device->eglExtensions.EXT_image_dma_buf_import)
+    {
+        SRMDebug("[%s] No EGL DMA formats (EXT_image_dma_buf_import not avaliable).", device->name);
+        return 0;
+    }
+
+    EGLint formatsCount = 0;
+
+    EGLint fallbackFormats[] =
+    {
+        DRM_FORMAT_ARGB8888,
+        DRM_FORMAT_XRGB8888,
+    };
+
+    EGLint *formats = NULL;
+    UInt8 allExternalOnly = 1;
+
+    if (device->eglExtensions.EXT_image_dma_buf_import_modifiers)
+    {
+        if (!device->eglFunctions.eglQueryDmaBufFormatsEXT(device->eglDisplay, 0, NULL, &formatsCount))
+        {
+            SRMError("[%s] Failed to query the number of EGL DMA formats, using fallback formats.", device->name);
+            goto fallback;
+        }
+
+        if (formatsCount <= 0)
+        {
+            SRMError("[%s] No EGL DMA formats.", device->name);
+            return 0;
+        }
+
+        formats = calloc(formatsCount, sizeof(formats[0]));
+
+        if (!device->eglFunctions.eglQueryDmaBufFormatsEXT(device->eglDisplay, formatsCount, formats, &formatsCount))
+        {
+            SRMError("[%s] Failed to query EGL DMA formats.", device->name);
+            free(formats);
+            return 0;
+        }
+    }
+    else
+    {
+        fallback:
+        formatsCount = sizeof(fallbackFormats)/sizeof(fallbackFormats[0]);
+        formats = malloc(sizeof(fallbackFormats));
+        memcpy(formats, fallbackFormats, sizeof(fallbackFormats));
+    }
+
+
+    for (Int32 i = 0; i < formatsCount; i++)
+    {
+        EGLint modifiersCount = 0;
+        UInt64 *modifiers = NULL;
+        EGLBoolean *externalOnly = NULL;
+
+        // Get the format modifiers
+        if (device->eglExtensions.EXT_image_dma_buf_import_modifiers)
+        {
+            if (!device->eglFunctions.eglQueryDmaBufModifiersEXT(device->eglDisplay, formats[i], 0, NULL, NULL, &modifiersCount))
+                modifiersCount = 0;
+
+            if (modifiersCount <= 0)
+            {
+                modifiersCount = 0;
+                goto skipModifiers;
+            }
+
+            modifiers = calloc(modifiersCount, sizeof(UInt64));
+            externalOnly = calloc(modifiersCount, sizeof(EGLBoolean));
+
+            if (!device->eglFunctions.eglQueryDmaBufModifiersEXT(device->eglDisplay,
+                                                                 formats[i],
+                                                                 modifiersCount,
+                                                                 modifiers,
+                                                                 externalOnly,
+                                                                 &modifiersCount))
+            {
+                    modifiersCount = 0;
+                    free(modifiers);
+                    free(externalOnly);
+                    modifiers = NULL;
+                    externalOnly = NULL;
+                    return -1;
+            }
+
+        }
+
+        skipModifiers:
+
+
+        for (Int32 j = 0; j < modifiersCount; j++)
+        {
+            srmFormatsListAddFormat(device->dmaTextureFormats, formats[i], modifiers[j]);
+
+            if (!externalOnly[j])
+            {
+                srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], modifiers[j]);
+                allExternalOnly = 0;
+            }
+        }
+
+        // EGL always supports implicit modifiers. If at least one modifier supports rendering,
+        // assume the implicit modifier supports rendering too.
+
+        srmFormatsListAddFormat(device->dmaTextureFormats, formats[i], DRM_FORMAT_MOD_INVALID);
+        if (modifiersCount == 0 || !allExternalOnly)
+            srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], DRM_FORMAT_MOD_INVALID);
+
+
+        if (modifiersCount == 0)
+        {
+            // Asume the linear layout is supported if the driver doesn't
+            // explicitly say otherwise
+            srmFormatsListAddFormat(device->dmaTextureFormats, formats[i], DRM_FORMAT_MOD_LINEAR);
+            srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], DRM_FORMAT_MOD_LINEAR);
+        }
+
+        SRMWarning(drmGetFormatName(formats[i]));
+
+        if (modifiers)
+            free(modifiers);
+
+        if (externalOnly)
+            free(externalOnly);
+    }
+
+    free(formats);
+
+
+
+    return 1;
+}
+
+void srmDeviceDestroyDMAFormats(SRMDevice *device)
+{
+    if (device->dmaRenderFormats)
+    {
+        while (!srmListIsEmpty(device->dmaRenderFormats))
+            free(srmListPopBack(device->dmaRenderFormats));
+
+        srmListDestoy(device->dmaRenderFormats);
+        device->dmaRenderFormats = NULL;
+    }
+
+    if (device->dmaTextureFormats)
+    {
+        while (!srmListIsEmpty(device->dmaTextureFormats))
+            free(srmListPopBack(device->dmaTextureFormats));
+
+        srmListDestoy(device->dmaTextureFormats);
+        device->dmaTextureFormats = NULL;
+    }
+}
 
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 {
@@ -431,4 +592,8 @@ UInt8 srmDeviceUpdateConnectors(SRMDevice *device)
 
     return 1;
 }
+
+
+
+
 

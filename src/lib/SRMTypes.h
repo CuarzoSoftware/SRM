@@ -64,11 +64,7 @@ typedef struct SRMEGLDeviceExtensionsStruct SRMEGLDeviceExtensions;
 struct SRMEGLDeviceFunctionsStruct;
 typedef struct SRMEGLDeviceFunctionsStruct SRMEGLDeviceFunctions;
 
-struct SRMFormatStruct
-{
-    UInt32 format;
-    UInt64 modifier;
-};
+struct SRMFormatStruct;
 typedef struct SRMFormatStruct SRMFormat;
 
 struct SRMInterfaceStruct

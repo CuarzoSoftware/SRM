@@ -33,6 +33,12 @@ Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
     return prime_handle.fd;
 
     fail:
+
+    prime_handle.fd = gbm_bo_get_fd(bo);
+
+    if (prime_handle.fd >= 0)
+        return prime_handle.fd;
+
     SRMError("Error: Failed to get file descriptor for handle %u: %s", prime_handle.handle, strerror(errno));
     return -1;
 }

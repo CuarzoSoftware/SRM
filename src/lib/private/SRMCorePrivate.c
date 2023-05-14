@@ -358,14 +358,14 @@ void srmCoreUpdateSharedDMATextureFormats(SRMCore *core)
         {
             SRMFormat *fmt = srmListItemGetData(fmtIt);
 
+            SRMListItem *next = srmListItemGetNext(fmtIt);
+
             /* Do not use implicit modifiers since their meaning change in each GPU */
             if (fmt->modifier == DRM_FORMAT_MOD_INVALID)
             {
-                SRMListItem *next = srmListItemGetNext(fmtIt);
                 free(fmt);
                 srmListRemoveItem(core->sharedDMATextureFormats, fmtIt);
-                fmtIt = next;
-                continue;
+                goto setNext;
             }
 
             UInt8 isSupported = 0;
@@ -384,13 +384,12 @@ void srmCoreUpdateSharedDMATextureFormats(SRMCore *core)
 
             if (!isSupported)
             {
-                SRMListItem *next = srmListItemGetNext(fmtIt);
                 free(fmt);
                 srmListRemoveItem(core->sharedDMATextureFormats, fmtIt);
-                fmtIt = next;
-                continue;
             }
 
+            setNext:
+            fmtIt = next;
         }
     }
 

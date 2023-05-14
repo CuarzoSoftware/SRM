@@ -17,6 +17,7 @@ struct SRMCoreStruct
     struct pollfd monitorFd;
 
     SRMList *devices;
+    SRMList *sharedDMATextureFormats;
 
     SRMList *deviceCreatedListeners;
     SRMList *deviceRemovedListeners;
@@ -37,5 +38,9 @@ UInt8 srmCoreInitMonitor(SRMCore *core);
 SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core);
 void srmCoreAssignRendererDevices(SRMCore *core);
 UInt8 srmCoreUpdateBestConfiguration(SRMCore *core);
+
+/* Intersects the compatible DMA formats of the allocator GPU
+ * and all other rendering GPUs*/
+void srmCoreUpdateSharedDMATextureFormats(SRMCore *core);
 
 #endif // SRMCOREPRIVATE_H

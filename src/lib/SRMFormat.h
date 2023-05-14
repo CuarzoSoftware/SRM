@@ -10,5 +10,7 @@ struct SRMFormatStruct
 };
 
 SRMListItem *srmFormatsListAddFormat(SRMList *formatsList, UInt32 format, UInt64 modifier);
+SRMList *srmFormatsListCopy(SRMList *formatsList);
+void srmFormatsListDestroy(SRMList **formatsList);
 
 #endif // SRMFORMAT_H

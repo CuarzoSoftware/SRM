@@ -88,3 +88,8 @@ void SRMLog(const char *format, ...)
     va_end(args);
     printf(BRELN);
 }
+
+Int32 SRMLogGetLevel()
+{
+    return level;
+}

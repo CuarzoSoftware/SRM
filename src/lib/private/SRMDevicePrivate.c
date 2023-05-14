@@ -347,8 +347,6 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
             srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], DRM_FORMAT_MOD_LINEAR);
         }
 
-        SRMWarning(drmGetFormatName(formats[i]));
-
         if (modifiers)
             free(modifiers);
 
@@ -358,30 +356,13 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
 
     free(formats);
 
-
-
     return 1;
 }
 
 void srmDeviceDestroyDMAFormats(SRMDevice *device)
 {
-    if (device->dmaRenderFormats)
-    {
-        while (!srmListIsEmpty(device->dmaRenderFormats))
-            free(srmListPopBack(device->dmaRenderFormats));
-
-        srmListDestoy(device->dmaRenderFormats);
-        device->dmaRenderFormats = NULL;
-    }
-
-    if (device->dmaTextureFormats)
-    {
-        while (!srmListIsEmpty(device->dmaTextureFormats))
-            free(srmListPopBack(device->dmaTextureFormats));
-
-        srmListDestoy(device->dmaTextureFormats);
-        device->dmaTextureFormats = NULL;
-    }
+    srmFormatsListDestroy(&device->dmaRenderFormats);
+    srmFormatsListDestroy(&device->dmaTextureFormats);
 }
 
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)

@@ -29,6 +29,8 @@
 
 void SRMLogInit();
 
+Int32 SRMLogGetLevel();
+
 /// Prints general messages independent of the value of **SRM_DEBUG**.
 void SRMLog(const char *format, ...);
 

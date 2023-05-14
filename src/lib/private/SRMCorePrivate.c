@@ -2,9 +2,11 @@
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMConnectorPrivate.h>
 
+#include <SRMFormat.h>
 #include <SRMLog.h>
 #include <SRMList.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 
 UInt8 srmCoreUpdateEGLExtensions(SRMCore *core)
@@ -157,6 +159,27 @@ UInt8 srmCoreInitMonitor(SRMCore *core)
 
 }
 
+UInt32 dmaFormatsHaveInCommon(SRMList *formatsA, SRMList *formatsB)
+{
+    SRMListForeach(fmtI, formatsA)
+    {
+        SRMFormat *fmtA = srmListItemGetData(fmtI);
+
+        if (fmtA->modifier == DRM_FORMAT_MOD_INVALID)
+            continue;
+
+        SRMListForeach(fmtJ, formatsB)
+        {
+            SRMFormat *fmtB = srmListItemGetData(fmtJ);
+
+            if (fmtA->format == fmtB->format && fmtA->modifier == fmtB->modifier)
+                return 1;
+        }
+    }
+
+    return 0;
+}
+
 SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
 {
     SRMDevice *bestAllocatorDev = NULL;
@@ -179,8 +202,11 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
                 continue;
 
             // GPU can render
-            if (srmDeviceGetCapPrimeExport(allocDev) && srmDeviceGetCapPrimeImport(otherDev))
+            if (srmDeviceGetCapPrimeExport(allocDev) &&
+                    srmDeviceGetCapPrimeImport(otherDev) &&
+                    dmaFormatsHaveInCommon(allocDev->dmaTextureFormats, otherDev->dmaTextureFormats))
             {
+
                 currentScore += 100;
                 continue;
             }
@@ -296,8 +322,108 @@ UInt8 srmCoreUpdateBestConfiguration(SRMCore *core)
     core->allocatorDevice = bestAllocatorDevice;
 
     srmCoreAssignRendererDevices(core);
+    srmCoreUpdateSharedDMATextureFormats(core);
 
     return 1;
+}
+
+void srmCoreUpdateSharedDMATextureFormats(SRMCore *core)
+{
+    srmFormatsListDestroy(&core->sharedDMATextureFormats);
+
+    core->sharedDMATextureFormats = srmFormatsListCopy(core->allocatorDevice->dmaTextureFormats);
+
+    /* If only 1 GPU, we allow implicit modifiers */
+    if (srmListGetLength(core->devices) == 1)
+        goto printFormats;
+
+    SRMListForeach(devIt, core->devices)
+    {
+        SRMDevice *dev = srmListItemGetData(devIt);
+
+        if (dev == core->allocatorDevice || !srmDeviceIsRenderer(dev))
+            continue;
+
+        SRMListItem *fmtIt = srmListGetFront(core->sharedDMATextureFormats);
+
+        if (!fmtIt)
+        {
+            /* TODO: No formats in common could only happen in setups with 3 or more GPUs */
+            return;
+        }
+
+        SRMDebug("[core] Supported shared formats:");
+
+        while (fmtIt)
+        {
+            SRMFormat *fmt = srmListItemGetData(fmtIt);
+
+            /* Do not use implicit modifiers since their meaning change in each GPU */
+            if (fmt->modifier == DRM_FORMAT_MOD_INVALID)
+            {
+                SRMListItem *next = srmListItemGetNext(fmtIt);
+                free(fmt);
+                srmListRemoveItem(core->sharedDMATextureFormats, fmtIt);
+                fmtIt = next;
+                continue;
+            }
+
+            UInt8 isSupported = 0;
+
+            /* Check if if the device support it as well */
+            SRMListForeach(devFmtIt, dev->dmaRenderFormats)
+            {
+                SRMFormat *devFmt = srmListItemGetData(devFmtIt);
+
+                if (fmt->format == devFmt->format && fmt->modifier == devFmt->modifier)
+                {
+                    isSupported = 1;
+                    break;
+                }
+            }
+
+            if (!isSupported)
+            {
+                SRMListItem *next = srmListItemGetNext(fmtIt);
+                free(fmt);
+                srmListRemoveItem(core->sharedDMATextureFormats, fmtIt);
+                fmtIt = next;
+                continue;
+            }
+
+        }
+    }
+
+    printFormats:
+
+
+    if (SRMLogGetLevel() > 3)
+    {
+        SRMDebug("[core] Supported shared DMA formats:");
+        UInt32 prevFmt = 0;
+        SRMListForeach(fmtIt, core->sharedDMATextureFormats)
+        {
+            SRMFormat *fmt = srmListItemGetData(fmtIt);
+
+            if (fmtIt == srmListGetFront(core->sharedDMATextureFormats))
+            {
+                printf("  Format %s\t[%s", drmGetFormatName(fmt->format), drmGetFormatModifierName(fmt->modifier));
+                goto next;
+            }
+
+            if (prevFmt == fmt->format)
+                printf(", %s", drmGetFormatModifierName(fmt->modifier));
+            else
+            {
+                printf("]\n  Format %s\t[%s", drmGetFormatName(fmt->format), drmGetFormatModifierName(fmt->modifier));
+            }
+
+            next:
+            prevFmt = fmt->format;
+
+        }
+        printf("]\n");
+    }
 }
 
 static void srmEGLLog(EGLenum error, const char *command, EGLint type, EGLLabelKHR thread, EGLLabelKHR obj, const char *msg)
@@ -366,3 +492,5 @@ UInt8 srmCoreUpdateEGLFunctions(SRMCore *core)
 
     return 1;
 }
+
+

@@ -9,29 +9,51 @@ project(
 	]
 )
 
-LIBRARY_PATH = '/usr/lib'
-INCLUDES_PATH = '/usr/include/SRM'
-EXAMPLES_PATH = '/usr/bin'
- 
+little_endian = target_machine.endian() == 'little'
+big_endian = target_machine.endian() == 'big'
+
+add_project_arguments([
+        '-DSRM_LITTLE_ENDIAN=@0@'.format(little_endian.to_int()),
+        '-DSRM_BIG_ENDIAN=@0@'.format(big_endian.to_int()),
+], language: 'c')
+
 c = meson.get_compiler('c')
 
-include_paths = [
-    include_directories('./src/lib')
-]
+# ------------ INSTALL CONFIG ------------
 
-include_paths_sys = [
+# Install directories
+library_install_dir = '/usr/lib'
+headers_install_dir = '/usr/include/SRM'
+examples_install_dir = '/usr/bin'
+
+# Public and private API headers
+api_headers = ['/lib', '/lib/private', '/lib/private/modes']
+
+foreach subdir : api_headers
+    install_headers(run_command('find', '.' + subdir, '-type', 'f', '-name', '*.h', '-maxdepth', '1').stdout().strip().split('\n'), 
+        install_dir : headers_install_dir + subdir)
+endforeach
+
+# ------------ SETUP INCLUDE PATHS ------------
+
+include_paths = []
+
+include_paths_str = [
+    './lib',
     '/usr/local/include',
     '/usr/include/drm',
-    '/usr/include/libdrm',
+    '/usr/include/libdrm'
 ]
 
-foreach p : include_paths_sys
+foreach p : include_paths_str
     if run_command('[', '-d', p, ']').returncode() == 0
       include_paths += [include_directories(p)]
     endif
 endforeach
 
-library_paths_all = [
+# ------------ DEPENDENCIES ------------
+
+library_paths_str = [
     '/lib',
     '/lib64',
     '/usr/lib',
@@ -47,22 +69,11 @@ library_paths_all = [
 
 library_paths = []
 
-foreach p : library_paths_all
+foreach p : library_paths_str
     if run_command('[', '-d', p, ']').returncode() == 0
       library_paths += p
     endif
 endforeach
-
-# All headers
-headers = run_command('find', './src/lib', '-type', 'f', '-name', '*.h').stdout().strip().split('\n')
-
-# Public and private API headers
-headers_classes = run_command('find', './src/lib', '-type', 'f', '-name', '*.h', '-maxdepth', '1').stdout().strip().split('\n')
-headers_classes_private = run_command('find', './src/lib/private', '-type', 'f', '-name', '*.h', '-maxdepth', '1').stdout().strip().split('\n')
-# headers_other = run_command('find', './lib/other', '-type', 'f', '-name', '*.h', '-maxdepth', '1').stdout().strip().split('\n')
-install_headers(headers_classes, install_dir : INCLUDES_PATH)
-install_headers(headers_classes_private, install_dir : INCLUDES_PATH+'/private')
-# install_headers(headers_other, install_dir : INCLUDES_PATH+'/other')
 
 egl_dep             = c.find_library('EGL', dirs: library_paths, required: true)
 glesv2_dep          = c.find_library('GLESv2', dirs: library_paths, required: true)
@@ -72,9 +83,15 @@ drm_dep             = c.find_library('drm', dirs: library_paths, required: true)
 gbm_dep             = c.find_library('gbm', dirs: library_paths, required: true)
 display_info_dep    = c.find_library('display-info', dirs: library_paths, required: true)
 
+
+# ------------ SOURCE CODE FILES ------------
+
+headers = run_command('find', './lib', '-type', 'f', '-name', '*.h').stdout().strip().split('\n')
+sources = run_command('find', './lib', '-type', 'f', '-name', '*.c').stdout().strip().split('\n')
+
 SRM = library(
     'SRM',
-    sources : run_command('find', './src/lib', '-type', 'f', '-name', '*[.c]').stdout().strip().split('\n'),
+    sources : sources,
     include_directories : include_paths,
     dependencies : [
         display_info_dep,
@@ -86,7 +103,7 @@ SRM = library(
         gbm_dep
     ],
     install : true, 
-    install_dir : LIBRARY_PATH)
+    install_dir : library_install_dir)
 
 srm_dep = declare_dependency(
     dependencies: [], 
@@ -94,11 +111,14 @@ srm_dep = declare_dependency(
     link_with : SRM)
 
 if get_option('build_examples')
-    #subdir('src/examples/srm-display-info')
-    subdir('src/examples/srm-all-connectors')
+
+    m_dep = c.find_library('m', dirs: library_paths, required: true)
+
+    subdir('examples/srm-display-info')
+    subdir('examples/srm-all-connectors')
 endif
 
 if get_option('build_tests')
-    #subdir('src/tests/srm-tests-list')
+    subdir('tests/srm-test-lists')
 endif
 

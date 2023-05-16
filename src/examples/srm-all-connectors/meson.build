@@ -1,7 +1,5 @@
 sources = run_command('find', '.', '-type', 'f', '-name', '*[.c,.h]').stdout().strip().split('\n')
 
-m_dep = c.find_library('m', dirs: library_paths, required: true)
-
 executable(
     'srm-all-connectors',
     sources : sources,
@@ -11,4 +9,4 @@ executable(
         m_dep
     ],
     install : true, 
-    install_dir : EXAMPLES_PATH)
+    install_dir : examples_install_dir)

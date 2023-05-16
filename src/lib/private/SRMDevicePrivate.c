@@ -5,6 +5,7 @@
 #include <private/SRMPlanePrivate.h>
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMBufferPrivate.h>
+#include <private/modes/SRMRenderModeCommon.h>
 
 #include <SRMFormat.h>
 #include <SRMList.h>
@@ -384,7 +385,7 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 
     device->eglSharedContextAttribs[atti++] = EGL_NONE;
 
-    device->eglSharedContext = eglCreateContext(device->eglDisplay, 0, EGL_NO_CONTEXT, device->eglSharedContextAttribs);
+    device->eglSharedContext = eglCreateContext(device->eglDisplay, NULL, EGL_NO_CONTEXT, device->eglSharedContextAttribs);
 
     if (device->eglSharedContext == EGL_NO_CONTEXT)
     {

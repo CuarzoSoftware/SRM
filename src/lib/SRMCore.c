@@ -280,3 +280,8 @@ const SRMEGLCoreFunctions *srmCoreGetEGLFunctions(SRMCore *core)
 {
     return &core->eglFunctions;
 }
+
+SRMList *srmCoreGetSharedDMATextureFormats(SRMCore *core)
+{
+    return core->sharedDMATextureFormats;
+}

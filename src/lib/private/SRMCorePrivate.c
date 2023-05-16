@@ -53,7 +53,6 @@ UInt8 srmCoreUpdateEGLExtensions(SRMCore *core)
     return 1;
 }
 
-
 UInt8 srmCoreCreateUdev(SRMCore *core)
 {
     core->udev = udev_new();
@@ -310,7 +309,10 @@ UInt8 srmCoreUpdateBestConfiguration(SRMCore *core)
         return 0;
     }
 
-    eglMakeCurrent(bestAllocatorDevice->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, bestAllocatorDevice->eglSharedContext);
+    eglMakeCurrent(bestAllocatorDevice->eglDisplay,
+                   EGL_NO_SURFACE,
+                   EGL_NO_SURFACE,
+                   bestAllocatorDevice->eglSharedContext);
 
     /*
     if (allocatorDevice && allocatorDevice != bestAllocatorDevice)

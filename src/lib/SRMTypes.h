@@ -67,6 +67,9 @@ typedef struct SRMEGLDeviceFunctionsStruct SRMEGLDeviceFunctions;
 struct SRMFormatStruct;
 typedef struct SRMFormatStruct SRMFormat;
 
+struct SRMGLFormatStruct;
+typedef struct SRMGLFormatStruct SRMGLFormat;
+
 struct SRMInterfaceStruct
 {
     int (*openRestricted)(const char *path, int flags, void *data);
@@ -115,15 +118,8 @@ enum SRM_CONNECTOR_STATE_ENUM
 };
 typedef enum SRM_CONNECTOR_STATE_ENUM SRM_CONNECTOR_STATE;
 
-enum SRM_BUFFER_FORMAT_ENUM
-{
-    SRM_BUFFER_FORMAT_XBGR8888 = DRM_FORMAT_XBGR8888,
-    SRM_BUFFER_FORMAT_ABGR8888 = DRM_FORMAT_ABGR8888,
-    SRM_BUFFER_FORMAT_XRGB8888 = DRM_FORMAT_XRGB8888,
-    SRM_BUFFER_FORMAT_ARGB8888 = DRM_FORMAT_ARGB8888
-};
-typedef enum SRM_BUFFER_FORMAT_ENUM SRM_BUFFER_FORMAT;
-
+typedef UInt32 SRM_BUFFER_FORMAT;
+typedef UInt64 SRM_BUFFER_MODIFIER;
 
 const char *srmGetConnectorStateString(SRM_CONNECTOR_STATE state);
 const char *srmGetConnectorTypeString(UInt32 type);

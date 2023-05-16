@@ -27,7 +27,6 @@ struct SRMDeviceStruct
     char *name;
 
     struct gbm_device *gbm;
-
     EGLDeviceEXT eglDevice;
     EGLDisplay eglDisplay;
     EGLContext eglSharedContext;

@@ -34,7 +34,7 @@
 static UInt8 cursorPixels[64*64*4];
 
 /* Background texture pixels */
-static UInt8 bufferPixels[3*2*4] =
+static UInt8 bufferPixels[] =
 {
     255, 0, 0, 255,     // Red
     0, 255, 0, 255,     // Green
@@ -344,7 +344,12 @@ int main(void)
         return 1;
     }
 
-    buffer = srmBufferCreateFromCPU(core, 3, 2, bufferPixels, SRM_BUFFER_FORMAT_ABGR8888);
+    buffer = srmBufferCreateFromCPU(core, 3, 2, bufferPixels, DRM_FORMAT_RGB565);
+
+    srmBufferDestroy(buffer);
+
+    buffer = srmBufferCreateFromCPU(core, 3, 2, bufferPixels, DRM_FORMAT_XBGR8888);
+
 
     if (!buffer)
     {

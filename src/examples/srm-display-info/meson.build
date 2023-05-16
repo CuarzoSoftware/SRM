@@ -7,4 +7,4 @@ executable(
         srm_dep
     ],
     install : true, 
-    install_dir : EXAMPLES_PATH)
+    install_dir : examples_install_dir)

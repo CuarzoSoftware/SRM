@@ -11,9 +11,6 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core,
                                   SRM_BUFFER_FORMAT format);
 
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
-
-GLint srmBufferFormatToGles(SRM_BUFFER_FORMAT format);
-
 void srmBufferDestroy(SRMBuffer *buffer);
 
 

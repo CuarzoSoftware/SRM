@@ -1,7 +1,11 @@
 #ifndef SRMCRTCPRIVATE_H
 #define SRMCRTCPRIVATE_H
 
-#include <SRMCrtc.h>
+#include "../SRMCrtc.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct SRMCrtcPropIDs
 {
@@ -25,5 +29,9 @@ struct SRMCrtcStruct
 SRMCrtc *srmCrtcCreate(SRMDevice *device, UInt32 id);
 void srmCrtcDestroy(SRMCrtc *crtc);
 UInt8 srmCrtcUpdateProperties(SRMCrtc *crtc);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMCRTCPRIVATE_H

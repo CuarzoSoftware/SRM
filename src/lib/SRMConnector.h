@@ -1,7 +1,14 @@
 #ifndef SRMCONNECTOR_H
 #define SRMCONNECTOR_H
 
-#include <SRMTypes.h>
+#include "SRMTypes.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void srmConnectorSetUserData(SRMConnector *connector, void *userData);
+void *srmConnectorGetUserData(SRMConnector *connector);
 
 SRMDevice *srmConnectorGetDevice(SRMConnector *connector);
 UInt32 srmConnectorGetID(SRMConnector *connector);
@@ -38,5 +45,10 @@ UInt8 srmConnectorSetMode(SRMConnector *connector, SRMConnectorMode *mode);
 UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *interface, void *userData);
 UInt8 srmConnectorRepaint(SRMConnector *connector);
 void srmConnectorUninitialize(SRMConnector *connector);
+UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMCONNECTOR_H

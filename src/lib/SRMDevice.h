@@ -1,7 +1,11 @@
 #ifndef SRMDEVICE_H
 #define SRMDEVICE_H
 
-#include <SRMTypes.h>
+#include "SRMTypes.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 SRMCore *srmDeviceGetCore(SRMDevice *device);
 const char *srmDeviceGetName(SRMDevice *device);
@@ -36,5 +40,8 @@ SRMList *srmDeviceGetConnectors(SRMDevice *device);
 SRMList *srmDeviceGetDMATextureFormats(SRMDevice *device);
 SRMList *srmDeviceGetDMARenderFormats(SRMDevice *device);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMDEVICE_H

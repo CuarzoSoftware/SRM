@@ -1,7 +1,11 @@
 #ifndef SRMLOG_H
 #define SRMLOG_H
 
-#include <SRMTypes.h>
+#include "SRMTypes.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*!
  * @brief Debugging information
@@ -46,5 +50,8 @@ void SRMWarning(const char *format, ...);
 /// Debugging messages. **SRM_DEBUG** >= 4.
 void SRMDebug(const char *format, ...);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMLOG_H

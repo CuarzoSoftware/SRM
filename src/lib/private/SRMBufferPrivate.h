@@ -1,10 +1,14 @@
 #ifndef SRMBUFFERPRIVATE_H
 #define SRMBUFFERPRIVATE_H
 
-#include <SRMBuffer.h>
+#include "../SRMBuffer.h"
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <gbm.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct SRMBufferTexture
 {
@@ -32,5 +36,9 @@ struct SRMBufferStruct
 };
 
 Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMBUFFERPRIVATE_H

@@ -1,11 +1,15 @@
 #ifndef SRMDEVICEPRIVATE_H
 #define SRMDEVICEPRIVATE_H
 
-#include <SRMDevice.h>
-#include <SRMEGL.h>
+#include "../SRMDevice.h"
+#include "../SRMEGL.h"
 #include <gbm.h>
 #include <EGL/egl.h>
 #include <pthread.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct SRMDeviceStruct
 {
@@ -72,37 +76,8 @@ UInt8 srmDeviceUpdateEncoders(SRMDevice *device);
 UInt8 srmDeviceUpdatePlanes(SRMDevice *device);
 UInt8 srmDeviceUpdateConnectors(SRMDevice *device);
 
-
-/*
-#include <mutex>
-
-using namespace SRM;
-
-class SRMDevice::SRMDevicePrivate
-{
-public:
-    SRMDevicePrivate(SRMDevice *device);
-    ~SRMDevicePrivate() = default;
-
-
-    // GBM
-    void uninitializeGBM();
-
-    // EGL
-    void uninitializeEGL();
-
-
-    // Encoders
-    int updateEncoders();
-
-    // Planes
-    int updatePlanes();
-
-    // Connectors
-    int updateConnectors();
-
-
-};
-*/
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMDEVICEPRIVATE_H

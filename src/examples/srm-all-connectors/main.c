@@ -3,9 +3,9 @@
  *
  * Auth: Eduardo Hopperdietzel
  *
- * Desc: This example renders to all
- *       avaliable connectors at a time
- *       for a few seconds.
+ * Desc: This example displays a white hardware cursor,
+ *       a moving white line and a background texture to all
+ *       avaliable connectors at a time until CTRL+C is pressed.
  */
 
 #include <SRMCore.h>
@@ -224,18 +224,6 @@ static void paintGL(SRMConnector *connector, void *userData)
         data->phase -= 2*M_PI;
 
     srmConnectorRepaint(connector);
-
-    data->framesCount++;
-    UInt64 msDiff = getMilliseconds() - data->msStart;
-    UInt64 currSec = msDiff / 1000;
-
-    if (currSec != data->sec && currSec % 5 == 0)
-    {
-        data->sec = currSec;
-        SRMLog("srm-all-connectors: Connector (%d) FPS: %d.",
-               srmConnectorGetID(connector),
-               (data->framesCount * 1000) / msDiff);
-    }
 }
 
 static void resizeGL(SRMConnector *connector, void *userData)
@@ -252,6 +240,23 @@ static void resizeGL(SRMConnector *connector, void *userData)
                data->h);
 
     srmConnectorRepaint(connector);
+}
+
+static void pageFlipped(SRMConnector *connector, void *userData)
+{
+    struct ConnectorUserData *data = userData;
+
+    data->framesCount++;
+    UInt64 msDiff = getMilliseconds() - data->msStart;
+    UInt64 currSec = msDiff / 1000;
+
+    if (currSec != data->sec && currSec % 5 == 0)
+    {
+        data->sec = currSec;
+        SRMLog("srm-all-connectors: Connector (%d) FPS: %d.",
+               srmConnectorGetID(connector),
+               (data->framesCount * 1000) / msDiff);
+    }
 }
 
 static void uninitializeGL(SRMConnector *connector, void *userData)
@@ -285,6 +290,7 @@ static SRMConnectorInterface connectorInterface =
     .initializeGL = &initializeGL,
     .paintGL = &paintGL,
     .resizeGL = &resizeGL,
+    .pageFlipped = &pageFlipped,
     .uninitializeGL = &uninitializeGL
 };
 
@@ -344,12 +350,7 @@ int main(void)
         return 1;
     }
 
-    buffer = srmBufferCreateFromCPU(core, 3, 2, bufferPixels, DRM_FORMAT_RGB565);
-
-    srmBufferDestroy(buffer);
-
     buffer = srmBufferCreateFromCPU(core, 3, 2, bufferPixels, DRM_FORMAT_XBGR8888);
-
 
     if (!buffer)
     {

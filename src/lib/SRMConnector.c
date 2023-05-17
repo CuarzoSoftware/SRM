@@ -8,6 +8,15 @@
 #include <gbm.h>
 #include <unistd.h>
 
+void srmConnectorSetUserData(SRMConnector *connector, void *userData)
+{
+    connector->userData = userData;
+}
+
+void *srmConnectorGetUserData(SRMConnector *connector)
+{
+    return connector->userData;
+}
 
 SRMDevice *srmConnectorGetDevice(SRMConnector *connector)
 {
@@ -363,3 +372,10 @@ void srmConnectorUninitialize(SRMConnector *connector)
 
 }
 
+UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)
+{
+    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
+        return 0;
+
+    return connector->renderInterface.getCurrentBufferIndex(connector);
+}

@@ -1,7 +1,11 @@
 #ifndef SRMPLANEPRIVATE_H
 #define SRMPLANEPRIVATE_H
 
-#include <SRMPlane.h>
+#include "../SRMPlane.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct SRMPlanePropIDs
 {
@@ -39,5 +43,9 @@ UInt8 srmPlaneUpdateProperties(SRMPlane *plane);
 UInt8 srmPlaneUpdateCrtcs(SRMPlane *plane);
 void srmPlaneUpdateInFormats(SRMPlane *plane, UInt64 blobID);
 void srmPlaneDestroyInFormats(SRMPlane *plane);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMPLANEPRIVATE_H

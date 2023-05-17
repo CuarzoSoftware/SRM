@@ -1,11 +1,15 @@
 #ifndef SRMEGL_H
 #define SRMEGL_H
 
-#include <SRMTypes.h>
+#include "SRMTypes.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Common EGL extensions */
 struct SRMEGLCoreExtensionsStruct
@@ -64,5 +68,8 @@ struct SRMEGLDeviceFunctionsStruct
 const char *srmEGLGetErrorString(EGLint error);
 UInt8 srmEGLHasExtension(const char *extensions, const char *extension);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMEGL_H

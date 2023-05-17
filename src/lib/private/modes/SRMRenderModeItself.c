@@ -10,6 +10,7 @@
 
 #include <sys/poll.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 static const EGLint eglConfigAttribs[] =
 {
@@ -370,6 +371,8 @@ static UInt8 flipPage(SRMConnector *connector)
 
     gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
 
+    connector->interface->pageFlipped(connector, connector->interfaceData);
+
     return 1;
 }
 
@@ -411,6 +414,10 @@ static UInt8 initCrtc(SRMConnector *connector)
     data->currentBufferIndex = !data->currentBufferIndex;
 
     gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
+
+    connector->interface->pageFlipped(connector, connector->interfaceData);
+
+    data->currentBufferIndex = !data->currentBufferIndex;
 
     return 1;
 }
@@ -530,11 +537,18 @@ static UInt8 updateMode(SRMConnector *connector)
     }
 }
 
+static UInt32 getCurrentBufferIndex(SRMConnector *connector)
+{
+    RenderModeData *data = (RenderModeData*)connector->renderData;
+    return data->currentBufferIndex;
+}
+
 void srmRenderModeItselfSetInterface(SRMConnector *connector)
 {
     connector->renderInterface.initialize = &initialize;
     connector->renderInterface.render = &render;
     connector->renderInterface.flipPage = &flipPage;
     connector->renderInterface.updateMode = &updateMode;
+    connector->renderInterface.getCurrentBufferIndex = &getCurrentBufferIndex;
     connector->renderInterface.uninitialize = &uninitialize;
 }

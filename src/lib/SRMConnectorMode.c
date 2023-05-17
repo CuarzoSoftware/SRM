@@ -1,4 +1,5 @@
-#include <private/SRMConnectorModePrivate.h>
+#include "private/SRMConnectorModePrivate.h"
+#include "SRMConnector.h"
 
 SRMConnector *srmConnectorModeGetConnector(SRMConnectorMode *connectorMode)
 {
@@ -18,4 +19,19 @@ UInt32 srmConnectorModeGetHeight(SRMConnectorMode *connectorMode)
 UInt32 srmConnectorModeGetRefreshRate(SRMConnectorMode *connectorMode)
 {
     return connectorMode->info.vrefresh;
+}
+
+void srmConnectorModeSetUserData(SRMConnectorMode *connectorMode, void *userData)
+{
+    connectorMode->userData = userData;
+}
+
+void *srmConnectorModeGetUserData(SRMConnectorMode *connectorMode)
+{
+    return connectorMode->userData;
+}
+
+UInt8 srmConnectorModeIsPreferred(SRMConnectorMode *connectorMode)
+{
+    return connectorMode == srmConnectorGetPreferredMode(connectorMode->connector);
 }

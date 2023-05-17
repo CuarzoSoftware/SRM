@@ -1,14 +1,18 @@
 #ifndef SRMTYPES_H
 #define SRMTYPES_H
 
+#include <stdint.h>
+#include <drm/drm_fourcc.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* ENV VARS
  *
  * SRM_DEBUG = [0,1,2,3,4]
  * SRM_EGL_DEBUG = [0,1,2,3,4]
  */
-
-#include <stdint.h>
-#include <drm/drm_fourcc.h>
 
 #define SRM_UNUSED(var) (void)var
 
@@ -81,6 +85,7 @@ struct SRMConnectorInterfaceStruct
 {
     void (*initializeGL)(SRMConnector *connector, void *data);
     void (*paintGL)(SRMConnector *connector, void *data);
+    void (*pageFlipped)(SRMConnector *connector, void *data);
     void (*resizeGL)(SRMConnector *connector, void *data);
     void (*uninitializeGL)(SRMConnector *connector, void *data);
 };
@@ -123,5 +128,9 @@ typedef UInt64 SRM_BUFFER_MODIFIER;
 
 const char *srmGetConnectorStateString(SRM_CONNECTOR_STATE state);
 const char *srmGetConnectorTypeString(UInt32 type);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMTYPES_H

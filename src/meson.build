@@ -27,10 +27,10 @@ headers_install_dir = '/usr/include/SRM'
 examples_install_dir = '/usr/bin'
 
 # Public and private API headers
-api_headers = ['/lib', '/lib/private', '/lib/private/modes']
+api_headers = ['/', '/private', '/private/modes']
 
 foreach subdir : api_headers
-    install_headers(run_command('find', '.' + subdir, '-type', 'f', '-name', '*.h', '-maxdepth', '1').stdout().strip().split('\n'), 
+    install_headers(run_command('find', './lib' + subdir, '-type', 'f', '-name', '*.h', '-maxdepth', '1').stdout().strip().split('\n'),
         install_dir : headers_install_dir + subdir)
 endforeach
 

@@ -1,4 +1,4 @@
-#include <private/SRMCrtcPrivate.h>
+#include "private/SRMCrtcPrivate.h"
 
 UInt32 srmCrtcGetID(SRMCrtc *crtc)
 {

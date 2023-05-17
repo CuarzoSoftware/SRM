@@ -1,7 +1,11 @@
 #ifndef SRMLISTPRIVATE_H
 #define SRMLISTPRIVATE_H
 
-#include <SRMTypes.h>
+#include "../SRMTypes.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct SRMListItemStruct
 {
@@ -17,5 +21,9 @@ struct SRMListStruct
     SRMListItem *back;
     UInt32 count;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMLISTPRIVATE_H

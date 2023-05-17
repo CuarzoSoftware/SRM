@@ -1,7 +1,11 @@
 #ifndef SRMLIST_H
 #define SRMLIST_H
 
-#include <SRMTypes.h>
+#include "SRMTypes.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 SRMList *srmListCreate();
 void srmListClear(SRMList *list);
@@ -31,5 +35,8 @@ void srmListItemSetData(SRMListItem *item, void *data);
 #define SRMListForeach(item, list) for(SRMListItem *item = srmListGetFront(list); item != NULL; item = srmListItemGetNext(item))
 #define srmListForeachRev(item, list) for(SRMListItem *item = srmListGetBack(list); item != NULL; item = srmListItemGetPrev(item))
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMLIST_H

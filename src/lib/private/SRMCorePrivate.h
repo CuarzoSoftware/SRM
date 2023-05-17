@@ -1,11 +1,15 @@
 #ifndef SRMCOREPRIVATE_H
 #define SRMCOREPRIVATE_H
 
-#include <SRMCore.h>
-#include <SRMEGL.h>
+#include "../SRMCore.h"
+#include "../SRMEGL.h"
 
 #include <libudev.h>
 #include <sys/poll.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct SRMCoreStruct
 {
@@ -42,5 +46,9 @@ UInt8 srmCoreUpdateBestConfiguration(SRMCore *core);
 /* Intersects the compatible DMA formats of the allocator GPU
  * and all other rendering GPUs*/
 void srmCoreUpdateSharedDMATextureFormats(SRMCore *core);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMCOREPRIVATE_H

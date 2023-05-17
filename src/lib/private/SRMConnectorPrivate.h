@@ -1,66 +1,16 @@
 #ifndef SRMCONNECTORPRIVATE_H
 #define SRMCONNECTORPRIVATE_H
 
+#include "../SRMConnector.h"
+
 #include <GLES2/gl2.h>
-#include <SRMConnector.h>
 #include <gbm.h>
 #include <EGL/egl.h>
 #include <xf86drm.h>
 
-/*
-class SRM::SRMConnector::SRMConnectorPrivate
-{
-public:
-    SRMConnectorPrivate(SRMDevice *device, SRMConnector *connector, UInt32 id);
-    ~SRMConnectorPrivate() = default;
-
-    int updateEncoders();
-    int updateName();
-    int updateModes();
-    int updateProperties();
-    int getBestConfiguration(SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane);
-
-    SRMConnectorMode *findPreferredMode();
-
-    static void initRenderer(SRMConnector *connector, Int32 *initResult);
-    gbm_surface *connectorGBMSurface = nullptr;
-    gbm_surface *rendererGBMSurface = nullptr;
-    EGLConfig connectorEGLConfig;
-    EGLConfig rendererEGLConfig;
-    EGLContext connectorEGLContext = EGL_NO_CONTEXT;
-    EGLContext rendererEGLContext = EGL_NO_CONTEXT;
-    EGLSurface connectorEGLSurface = EGL_NO_SURFACE;
-    EGLSurface rendererEGLSurface = EGL_NO_SURFACE;
-    UInt32 connectorDRMFramebuffers[2];
-    UInt32 redererDRMFramebuffers[2];
-    gbm_bo *connectorBOs[2] = {nullptr, nullptr};
-    gbm_bo *rendererBOs[2] = {nullptr, nullptr};
-    UInt32 currentBufferIndex = 1;
-
-    GLuint dumbRendererFBO;
-    GLuint dumbRenderbuffer;
-
-    bool repaintRequested = false;
-    std::mutex renderMutex;
-    std::condition_variable renderConditionVariable;
-    drm_mode_create_dumb dumbBuffers[2];
-    UInt8 *dumbMaps[2];
-
-    struct SRMRendererInterface
-    {
-        int(*createGBMSurfaces)(SRMConnector*connector);
-        int(*getEGLConfiguration)(SRMConnector*connector);
-        int(*createEGLContexts)(SRMConnector*connector);
-        int(*createEGLSurfaces)(SRMConnector*connector);
-        int(*createDRMFramebuffers)(SRMConnector*connector);
-        int(*initCrtc)(SRMConnector*connector);
-        int(*render)(SRMConnector*connector);
-        int(*pageFlip)(SRMConnector*connector);
-    }rendererInterface;
-
-
-};
-*/
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct SRMConnectorRenderInterface
 {
@@ -68,6 +18,7 @@ struct SRMConnectorRenderInterface
     UInt8(*render)(SRMConnector *connector);
     UInt8(*flipPage)(SRMConnector *connector);
     UInt8(*updateMode)(SRMConnector *connector);
+    UInt32(*getCurrentBufferIndex)(SRMConnector *connector);
     void (*uninitialize)(SRMConnector *connector);
 };
 
@@ -87,6 +38,7 @@ struct SRMConnectorPropIDs
 
 struct SRMConnectorStruct
 {
+    void *userData;
     UInt32 id;
     UInt32 nameID; // Used to name the connector e.g HDMI-A-<0>
     UInt32 type;
@@ -147,5 +99,9 @@ UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bes
 void *srmConnectorRenderThread(void *conn);
 void srmConnectorUnlockRenderThread(SRMConnector *connector);
 void srmConnectorDestroy(SRMConnector *connector);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMCONNECTORPRIVATE_H

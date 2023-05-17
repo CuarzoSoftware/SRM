@@ -1,7 +1,11 @@
 #ifndef SRMCORE_H
 #define SRMCORE_H
 
-#include <SRMTypes.h>
+#include "SRMTypes.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 SRMCore *srmCoreCreate(SRMInterface *interface, void *userData);
 SRMList *srmCoreGetDevices(SRMCore *core);
@@ -20,5 +24,9 @@ const SRMEGLCoreFunctions *srmCoreGetEGLFunctions(SRMCore *core);
 SRMList *srmCoreGetSharedDMATextureFormats(SRMCore *core);
 
 void srmCoreDestroy(SRMCore *core);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SRMCORE_H

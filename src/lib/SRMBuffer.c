@@ -18,51 +18,54 @@
 #include <xf86drmMode.h>
 #include <drm_fourcc.h>
 
+#include <linux/dma-heap.h>
+#include <linux/dma-buf.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UInt8 *pixels, SRM_BUFFER_FORMAT format)
 {
-    const SRMGLFormat *glFmt;
-    SRMBuffer *buffer = calloc(1, sizeof(SRMBuffer));
-    buffer->core = core;
-    buffer->dmaFD = -1;
-    buffer->textures = srmListCreate();
+    SRMBuffer *buffer = srmBufferCreate(core);
+    buffer->src = SRM_BUFFER_SRC_CPU;
     buffer->width = width;
     buffer->height = height;
     buffer->format = format;
-    buffer->modifier = DRM_FORMAT_MOD_INVALID;
+
+    const SRMGLFormat *glFmt;
 
     buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_WRITE;
-    buffer->allocatorBO = gbm_bo_create(core->allocatorDevice->gbm, width, height, format, buffer->flags);
+    buffer->bo = gbm_bo_create(core->allocatorDevice->gbm, width, height, format, buffer->flags);
 
-    if (!buffer->allocatorBO)
+    if (!buffer->bo)
     {
         buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR;
-        buffer->allocatorBO = gbm_bo_create(core->allocatorDevice->gbm, width, height, format, buffer->flags);
+        buffer->bo = gbm_bo_create(core->allocatorDevice->gbm, width, height, format, buffer->flags);
     }
 
-    if (!buffer->allocatorBO)
+    if (!buffer->bo)
     {
-        SRMError("[%s] Failed to create buffer from CPU with GBM. Trying glTexImage2D instead.", core->allocatorDevice->name);
+        SRMWarning("[%s] Failed to create buffer from CPU with GBM. Trying glTexImage2D instead.", core->allocatorDevice->name);
         goto fallback;
     }
 
-    buffer->modifier = gbm_bo_get_modifier(buffer->allocatorBO);
-    buffer->stride = gbm_bo_get_stride(buffer->allocatorBO);
-    buffer->bpp = gbm_bo_get_bpp(buffer->allocatorBO);
+    buffer->modifier = gbm_bo_get_modifier(buffer->bo);
+    buffer->stride = gbm_bo_get_stride(buffer->bo);
+    buffer->bpp = gbm_bo_get_bpp(buffer->bo);
     UInt32 bytesPP = buffer->bpp/8;
 
-    buffer->dmaFD = srmBufferGetDMAFDFromBO(core->allocatorDevice, buffer->allocatorBO);
+    buffer->fd = srmBufferGetDMAFDFromBO(core->allocatorDevice, buffer->bo);
 
-    if (buffer->dmaFD >= 0)
+    if (buffer->fd >= 0)
     {
         // Map the DMA buffer into user space
-        buffer->dmaMap = mmap(NULL, height * buffer->stride, PROT_READ | PROT_WRITE, MAP_SHARED, buffer->dmaFD, 0);
+        buffer->map = mmap(NULL, height * buffer->stride, PROT_READ | PROT_WRITE, MAP_SHARED, buffer->fd, 0);
 
-        if (buffer->dmaMap == MAP_FAILED)
+        if (buffer->map == MAP_FAILED)
         {
-            buffer->dmaMap = mmap(NULL, height * buffer->stride, PROT_WRITE, MAP_SHARED, buffer->dmaFD, 0);
+            buffer->map = mmap(NULL, height * buffer->stride, PROT_WRITE, MAP_SHARED, buffer->fd, 0);
 
-            if (buffer->dmaMap == MAP_FAILED)
+            if (buffer->map == MAP_FAILED)
                 goto gbmMap;
         }
         goto mapWrite;
@@ -70,11 +73,8 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     gbmWrite:
 
-
-    if (gbm_bo_write(buffer->allocatorBO, pixels, width * height * bytesPP) != 0)
+    if (gbm_bo_write(buffer->bo, pixels, width * height * bytesPP) != 0)
     {
-        gbm_bo_destroy(buffer->allocatorBO);
-        buffer->allocatorBO = NULL;
         SRMWarning("[%s] gbm_bo_write failed. Trying glTexImage2D instead.", core->allocatorDevice->name);
         goto fallback;
     }
@@ -84,9 +84,12 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     gbmMap:
 
-    buffer->dmaMap = gbm_bo_map(buffer->allocatorBO, 0, 0, width, height, GBM_BO_TRANSFER_READ, &buffer->stride, &buffer->dmaMapData);
+    goto fallback;
 
-    if (!buffer->dmaMap)
+    buffer->map = gbm_bo_map(buffer->bo, 0, 0, width, height, GBM_BO_TRANSFER_READ, &buffer->stride, &buffer->mapData);
+
+
+    if (!buffer->map)
     {
         SRMWarning("[%s] Failed to map DMA FD. Tying gbm_bo_write instead.", core->allocatorDevice->name);
         goto gbmWrite;
@@ -96,9 +99,11 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     mapWrite:
 
+    goto fallback;
+
     for (UInt32 i = 0; i < height; i++)
     {
-        memcpy(&buffer->dmaMap[gbm_bo_get_offset(buffer->allocatorBO, 0) + i*buffer->stride],
+        memcpy(&buffer->map[gbm_bo_get_offset(buffer->bo, 0) + i*buffer->stride],
                &pixels[i*width*bytesPP],
                width*bytesPP);
     }
@@ -118,12 +123,14 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
     }
 
     UInt32 depth;
+
     if (srmFormatGetDepthBpp(format, &depth, &buffer->bpp))
     {
         bytesPP = buffer->bpp/8;
         buffer->stride = bytesPP*width;
     }
 
+    /*
     // Creates the texture
     struct SRMBufferTexture *texture = calloc(1, sizeof(struct SRMBufferTexture));
     texture->device = core->allocatorDevice;
@@ -161,6 +168,11 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     srmListAppendData(buffer->textures, texture);
+*/
+
+    GLuint id = srmBufferGetTextureID(core->allocatorDevice, buffer);
+
+    SRMDebug("Texture id = %d", id);
 
     glTexImage2D(GL_TEXTURE_2D,
                  0,
@@ -174,10 +186,11 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     SRMDebug("[%s] CPU buffer created using glTexImage2D.", core->allocatorDevice->name);
     glFlush();
+    /*
     eglMakeCurrent(prevDisplay,
                    prevSurfDraw,
                    prevSurfRead,
-                   prevContext);
+                   prevContext);*/
     return buffer;
 
     fail:
@@ -198,7 +211,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
             return texture->texture;
     }
 
-    if (!buffer->allocatorBO)
+    if (!buffer->bo)
     {
         SRMError("srmBufferGetTextureID error. Buffer is not shareable.");
         return 0;
@@ -210,7 +223,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 
     if (device == buffer->core->allocatorDevice)
     {
-        texture->image = eglCreateImage(device->eglDisplay, device->eglSharedContext, EGL_NATIVE_PIXMAP_KHR, buffer->allocatorBO, NULL);
+        texture->image = eglCreateImage(device->eglDisplay, device->eglSharedContext, EGL_NATIVE_PIXMAP_KHR, buffer->bo, NULL);
     }
     else
     {
@@ -228,18 +241,18 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
             return 0;
         }
 
-        if (buffer->dmaFD == -1)
-            buffer->dmaFD = srmBufferGetDMAFDFromBO(buffer->core->allocatorDevice, buffer->allocatorBO);
+        if (buffer->fd == -1)
+            buffer->fd = srmBufferGetDMAFDFromBO(buffer->core->allocatorDevice, buffer->bo);
 
         EGLAttrib image_attribs[] = {
-                                   EGL_WIDTH, gbm_bo_get_width(buffer->allocatorBO),
-                                   EGL_HEIGHT, gbm_bo_get_height(buffer->allocatorBO),
-                                   EGL_LINUX_DRM_FOURCC_EXT, gbm_bo_get_format(buffer->allocatorBO),
-                                   EGL_DMA_BUF_PLANE0_FD_EXT, buffer->dmaFD,
-                                   EGL_DMA_BUF_PLANE0_OFFSET_EXT, gbm_bo_get_offset(buffer->allocatorBO,0),
-                                   EGL_DMA_BUF_PLANE0_PITCH_EXT, gbm_bo_get_stride_for_plane(buffer->allocatorBO, 0),
-                                   EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->allocatorBO) & 0xffffffff),
-                                   EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->allocatorBO) >> 32),
+                                   EGL_WIDTH, gbm_bo_get_width(buffer->bo),
+                                   EGL_HEIGHT, gbm_bo_get_height(buffer->bo),
+                                   EGL_LINUX_DRM_FOURCC_EXT, gbm_bo_get_format(buffer->bo),
+                                   EGL_DMA_BUF_PLANE0_FD_EXT, buffer->fd,
+                                   EGL_DMA_BUF_PLANE0_OFFSET_EXT, gbm_bo_get_offset(buffer->bo, 0),
+                                   EGL_DMA_BUF_PLANE0_PITCH_EXT, gbm_bo_get_stride_for_plane(buffer->bo, 0),
+                                   EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->bo) & 0xffffffff),
+                                   EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->bo) >> 32),
                                    EGL_NONE };
 
         texture->image = eglCreateImage(device->eglDisplay, NULL, EGL_LINUX_DMA_BUF_EXT, NULL, image_attribs);
@@ -301,20 +314,20 @@ void srmBufferDestroy(SRMBuffer *buffer)
                        prevContext);
     }
 
-    if (buffer->allocatorBO)
+    if (buffer->bo)
     {
-        if (buffer->dmaMap)
+        if (buffer->map)
         {
-            if (buffer->dmaMapData)
-                gbm_bo_unmap(buffer->allocatorBO, buffer->dmaMapData);
+            if (buffer->mapData)
+                gbm_bo_unmap(buffer->bo, buffer->mapData);
             else
-                munmap(buffer->dmaMap, gbm_bo_get_height(buffer->allocatorBO)*gbm_bo_get_stride(buffer->allocatorBO));
+                munmap(buffer->map, gbm_bo_get_height(buffer->bo)*gbm_bo_get_stride(buffer->bo));
         }
 
-        if (buffer->dmaFD)
-            close(buffer->dmaFD);
+        if (buffer->fd != -1)
+            close(buffer->fd);
 
-        gbm_bo_destroy(buffer->allocatorBO);
+        gbm_bo_destroy(buffer->bo);
     }
 
     free(buffer);

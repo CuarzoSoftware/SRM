@@ -8,6 +8,18 @@
 extern "C" {
 #endif
 
+enum SRM_BUFFER_CAP
+{
+    SRM_BUFFER_CAP_READ,
+    SRM_BUFFER_CAP_WRITE,
+    SRM_BUFFER_CAP_MAP
+};
+
+enum SRM_BUFFER_SRC
+{
+    SRM_BUFFER_SRC_CPU
+};
+
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core,
                                   UInt32 width,
                                   UInt32 height,

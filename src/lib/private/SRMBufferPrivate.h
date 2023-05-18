@@ -19,22 +19,30 @@ struct SRMBufferTexture
 
 struct SRMBufferStruct
 {
-    // Props
+    // Common
+    enum SRM_BUFFER_SRC src;
     UInt32 format, width, height, bpp, stride;
     UInt64 modifier;
-
     SRMCore *core;
-    struct gbm_bo *allocatorBO;
-    GLuint textureID; // If allocation with GBM fails
-    Int32 dmaFD;
-    UInt8 *dmaMap;
-    void *dmaMapData; // Only used by gbm_bo_map
     SRMList *textures;
 
+    // GBM
+    struct gbm_bo *bo;
     enum gbm_bo_flags flags;
+    void *mapData;
 
+    // EGL
+    EGLImage image;
+
+    // Gles
+    GLuint textureID;
+
+    // DMA
+    Int32 fd;
+    void *map;
 };
 
+SRMBuffer *srmBufferCreate(SRMCore *core);
 Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo);
 
 #ifdef __cplusplus

@@ -22,6 +22,8 @@
 #include <SRMLog.h>
 
 #include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -167,6 +169,10 @@ static void setupShaders(SRMConnector *connector, void *userData)
         SRMDevice *device = srmConnectorGetDevice(connector);
         SRMDevice *rendererDevice = srmDeviceGetRendererDevice(device);
         glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(rendererDevice, buffer));
+
+        UInt8 pix[2*3*4];
+        pix[0] = 255;
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 3, 2, GL_BGRA_EXT, GL_UNSIGNED_BYTE, pix);
     }
 
 }

@@ -1,6 +1,7 @@
 #include <private/SRMBufferPrivate.h>
 #include <private/SRMDevicePrivate.h>
 
+#include <SRMList.h>
 #include <SRMLog.h>
 
 #include <fcntl.h>
@@ -8,6 +9,18 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <unistd.h>
+#include <stdlib.h>
+
+SRMBuffer *srmBufferCreate(SRMCore *core)
+{
+    SRMBuffer *buffer = calloc(1, sizeof(SRMBuffer));
+    buffer->core = core;
+    buffer->fd = -1;
+    buffer->image = EGL_NO_IMAGE;
+    buffer->textures = srmListCreate();
+    buffer->modifier = DRM_FORMAT_MOD_INVALID;
+    return buffer;
+}
 
 Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
 {
@@ -41,4 +54,6 @@ Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
 
     SRMError("Error: Failed to get file descriptor for handle %u: %s", prime_handle.handle, strerror(errno));
     return -1;
-}
+    }
+
+

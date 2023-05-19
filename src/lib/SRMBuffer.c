@@ -243,6 +243,16 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 {
+    EGLDisplay prevDisplay = eglGetCurrentDisplay();
+    EGLSurface prevSurfDraw = eglGetCurrentSurface(EGL_DRAW);
+    EGLSurface prevSurfRead = eglGetCurrentSurface(EGL_READ);
+    EGLContext prevContext = eglGetCurrentContext();
+
+    eglMakeCurrent(device->eglDisplay,
+                   EGL_NO_SURFACE,
+                   EGL_NO_SURFACE,
+                   device->eglSharedContext);
+
     // Check if already created
     struct SRMBufferTexture *texture;
     SRMListForeach(item, buffer->textures)
@@ -265,6 +275,10 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
                 srmListRemoveItem(buffer->textures, item);
                 break;
             }
+            eglMakeCurrent(prevDisplay,
+                           prevSurfDraw,
+                           prevSurfRead,
+                           prevContext);
             return texture->texture;
         }
     }
@@ -272,6 +286,10 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     if (!buffer->bo)
     {
         SRMError("srmBufferGetTextureID error. Buffer is not shareable.");
+        eglMakeCurrent(prevDisplay,
+                       prevSurfDraw,
+                       prevSurfRead,
+                       prevContext);
         return 0;
     }
 
@@ -337,6 +355,11 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 
     srmListAppendData(buffer->textures, texture);
 
+    eglMakeCurrent(prevDisplay,
+                   prevSurfDraw,
+                   prevSurfRead,
+                   prevContext);
+
     return texture->texture;
 }
 
@@ -391,7 +414,7 @@ void srmBufferDestroy(SRMBuffer *buffer)
             if (buffer->mapData)
                 gbm_bo_unmap(buffer->bo, buffer->mapData);
             else
-                munmap(buffer->map, gbm_bo_get_height(buffer->bo)*gbm_bo_get_stride(buffer->bo));
+                munmap(buffer->map, buffer->height * buffer->stride);
         }
 
         if (buffer->fd != -1)

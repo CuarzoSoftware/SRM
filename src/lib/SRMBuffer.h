@@ -24,16 +24,16 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core,
                                   UInt32 width,
                                   UInt32 height,
                                   UInt32 stride,
-                                  void *pixels,
+                                  const void *pixels,
                                   SRM_BUFFER_FORMAT format);
 
-UInt32 srmBufferWrite(SRMBuffer *buffer,
+UInt8 srmBufferWrite(SRMBuffer *buffer,
                       UInt32 stride,
                       UInt32 dstX,
                       UInt32 dstY,
                       UInt32 dstWidth,
                       UInt32 dstHeight,
-                      void *pixels);
+                      const void *pixels);
 
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
 void srmBufferDestroy(SRMBuffer *buffer);

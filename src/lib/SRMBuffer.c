@@ -25,7 +25,7 @@
 #include <fcntl.h>
 
 
-SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UInt32 stride, void *pixels, SRM_BUFFER_FORMAT format)
+SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UInt32 stride, const void *pixels, SRM_BUFFER_FORMAT format)
 {
     SRMBuffer *buffer = srmBufferCreate(core);
     buffer->src = SRM_BUFFER_SRC_CPU;
@@ -113,7 +113,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     buffer->offset = gbm_bo_get_offset(buffer->bo, 0);
 
-    UInt8 *src = pixels;
+    const UInt8 *src = pixels;
     UInt8 *dst = buffer->map;
 
     for (UInt32 i = 0; i < height; i++)
@@ -188,8 +188,8 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     glBindTexture(GL_TEXTURE_2D, texture->texture);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
@@ -330,8 +330,8 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     glBindTexture(GL_TEXTURE_2D, texture->texture);
     device->eglFunctions.glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, texture->image);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
@@ -403,14 +403,14 @@ void srmBufferDestroy(SRMBuffer *buffer)
     free(buffer);
 }
 
-UInt32 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY, UInt32 dstWidth, UInt32 dstHeight, void *pixels)
+UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY, UInt32 dstWidth, UInt32 dstHeight, const void *pixels)
 {
     if (!(buffer->caps & SRM_BUFFER_CAP_WRITE))
         goto fail;
 
     if (buffer->map)
     {
-        UInt8 *src = pixels;
+        const UInt8 *src = pixels;
         UInt8 *dst = buffer->map;
         UInt32 dstOffset = buffer->offset + dstY*buffer->stride + dstX*buffer->pixelSize;
         UInt32 srcOffset = 0;

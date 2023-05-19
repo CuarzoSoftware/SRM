@@ -76,7 +76,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
             if (buffer->map == MAP_FAILED)
             {
-                SRMWarning("[%d] Directly mapping buffer DMA fd failed. Trying gbm_bo_map.", core->allocatorDevice->name);
+                SRMWarning("[%s] Directly mapping buffer DMA fd failed. Trying gbm_bo_map.", core->allocatorDevice->name);
                 goto gbmMap;
             }
         }
@@ -280,6 +280,27 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     if (buffer->fd == -1)
         goto skipDMA;
 
+    struct gbm_import_fd_data dat =
+    {
+        .fd = buffer->fd,
+        .width = buffer->width,
+        .height = buffer->height,
+        .stride = buffer->stride,
+        .format = buffer->format
+    };
+
+    struct gbm_bo *bo = gbm_bo_import(device->gbm, GBM_BO_IMPORT_FD, &dat, GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
+
+    if (bo)
+        SRMDebug("EUREKA 1");
+
+    texture->image = eglCreateImage(device->eglDisplay, device->eglSharedContext, EGL_NATIVE_PIXMAP_KHR, bo, NULL);
+
+    if (texture->image != EGL_NO_IMAGE)
+        SRMDebug("EUREKA 2");
+
+    /*
+
     EGLAttrib image_attribs[] = {
                                EGL_WIDTH, gbm_bo_get_width(buffer->bo),
                                EGL_HEIGHT, gbm_bo_get_height(buffer->bo),
@@ -292,7 +313,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
                                EGL_NONE };
 
     texture->image = eglCreateImage(device->eglDisplay, NULL, EGL_LINUX_DMA_BUF_EXT, NULL, image_attribs);
-
+    */
     skipDMA:
 
     if (texture->image == EGL_NO_IMAGE && device == buffer->core->allocatorDevice)

@@ -254,43 +254,42 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     // Creates the texture
     texture = calloc(1, sizeof(struct SRMBufferTexture));
     texture->device = device;
+    texture->image = EGL_NO_IMAGE;
 
-    if (device == buffer->core->allocatorDevice)
+    if (!buffer->core->allocatorDevice->capPrimeExport)
+    {
+        SRMError("srmBufferGetTextureID failed. Allocator device (%s) has not the PRIME export cap.", buffer->core->allocatorDevice->name);
+        goto skipDMA;
+        return 0;
+    }
+
+    if (!device->capPrimeImport)
+    {
+        SRMError("srmBufferGetTextureID failed. Target device (%s) has not the PRIME import cap.", buffer->core->allocatorDevice->name);
+        goto skipDMA;
+    }
+
+    if (buffer->fd == -1)
+        buffer->fd = srmBufferGetDMAFDFromBO(buffer->core->allocatorDevice, buffer->bo);
+
+    EGLAttrib image_attribs[] = {
+                               EGL_WIDTH, gbm_bo_get_width(buffer->bo),
+                               EGL_HEIGHT, gbm_bo_get_height(buffer->bo),
+                               EGL_LINUX_DRM_FOURCC_EXT, gbm_bo_get_format(buffer->bo),
+                               EGL_DMA_BUF_PLANE0_FD_EXT, buffer->fd,
+                               EGL_DMA_BUF_PLANE0_OFFSET_EXT, gbm_bo_get_offset(buffer->bo, 0),
+                               EGL_DMA_BUF_PLANE0_PITCH_EXT, gbm_bo_get_stride_for_plane(buffer->bo, 0),
+                               EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->bo) & 0xffffffff),
+                               EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->bo) >> 32),
+                               EGL_NONE };
+
+    texture->image = eglCreateImage(device->eglDisplay, NULL, EGL_LINUX_DMA_BUF_EXT, NULL, image_attribs);
+
+    skipDMA:
+
+    if (texture->image == EGL_NO_IMAGE && device == buffer->core->allocatorDevice)
     {
         texture->image = eglCreateImage(device->eglDisplay, device->eglSharedContext, EGL_NATIVE_PIXMAP_KHR, buffer->bo, NULL);
-    }
-    else
-    {
-        if (!buffer->core->allocatorDevice->capPrimeExport)
-        {
-            SRMError("srmBufferGetTextureID failed. Allocator device (%s) has not the PRIME export cap.", buffer->core->allocatorDevice->name);
-            free(texture);
-            return 0;
-        }
-
-        if (!device->capPrimeImport)
-        {
-            SRMError("srmBufferGetTextureID failed. Target device (%s) has not the PRIME import cap.", buffer->core->allocatorDevice->name);
-            free(texture);
-            return 0;
-        }
-
-        if (buffer->fd == -1)
-            buffer->fd = srmBufferGetDMAFDFromBO(buffer->core->allocatorDevice, buffer->bo);
-
-        EGLAttrib image_attribs[] = {
-                                   EGL_WIDTH, gbm_bo_get_width(buffer->bo),
-                                   EGL_HEIGHT, gbm_bo_get_height(buffer->bo),
-                                   EGL_LINUX_DRM_FOURCC_EXT, gbm_bo_get_format(buffer->bo),
-                                   EGL_DMA_BUF_PLANE0_FD_EXT, buffer->fd,
-                                   EGL_DMA_BUF_PLANE0_OFFSET_EXT, gbm_bo_get_offset(buffer->bo, 0),
-                                   EGL_DMA_BUF_PLANE0_PITCH_EXT, gbm_bo_get_stride_for_plane(buffer->bo, 0),
-                                   EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->bo) & 0xffffffff),
-                                   EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->bo) >> 32),
-                                   EGL_NONE };
-
-        texture->image = eglCreateImage(device->eglDisplay, NULL, EGL_LINUX_DMA_BUF_EXT, NULL, image_attribs);
-
     }
 
     if (texture->image == EGL_NO_IMAGE)

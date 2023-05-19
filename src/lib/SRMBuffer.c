@@ -250,10 +250,13 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         {
             if (texture->updated)
             {
+                /* TODO: Some GPUs do not require EGL image recreation when the DMA buf is updated. Check with glRead or
+                 * something like that if it needs it */
+
                 glDeleteTextures(1, &texture->texture);
 
                 if (texture->image != EGL_NO_IMAGE)
-                    eglDestroyImage(texture->device, texture->image);
+                    eglDestroyImage(texture->device->eglDisplay, texture->image);
 
                 free(texture);
                 srmListRemoveItem(buffer->textures, item);
@@ -423,7 +426,7 @@ UInt32 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY
             tex->updated = 1;
         }
 
-        SRMDebug("[%s] Buffer written using mapping.", buffer->core->allocatorDevice->name);
+        /* SRMDebug("[%s] Buffer written using mapping.", buffer->core->allocatorDevice->name); */
 
         return 1;
     }
@@ -441,7 +444,7 @@ UInt32 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY
 
         glFlush();
 
-        SRMDebug("[%s] Buffer written using glTexSubImage2D.", buffer->core->allocatorDevice->name);
+        /* SRMDebug("[%s] Buffer written using glTexSubImage2D.", buffer->core->allocatorDevice->name); */
 
         return 1;
     }

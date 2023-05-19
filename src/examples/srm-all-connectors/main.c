@@ -386,7 +386,7 @@ int main(void)
         /* Evdev monitor poll DRM devices/connectors hotplugging events (-1 disables timeout).
          * To get a pollable FD use srmCoreGetMonitorFD() */
 
-        if (srmCoreProccessMonitor(core, 1000) < 0)
+        if (srmCoreProccessMonitor(core, 5) < 0)
             break;
 
         // Update the background texture every second

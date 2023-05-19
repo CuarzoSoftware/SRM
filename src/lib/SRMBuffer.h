@@ -10,9 +10,9 @@ extern "C" {
 
 enum SRM_BUFFER_CAP
 {
-    SRM_BUFFER_CAP_READ,
-    SRM_BUFFER_CAP_WRITE,
-    SRM_BUFFER_CAP_MAP
+    SRM_BUFFER_CAP_READ = 1,
+    SRM_BUFFER_CAP_WRITE = 2,
+    SRM_BUFFER_CAP_MAP = 4
 };
 
 enum SRM_BUFFER_SRC
@@ -23,8 +23,17 @@ enum SRM_BUFFER_SRC
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core,
                                   UInt32 width,
                                   UInt32 height,
-                                  UInt8 *pixels,
+                                  UInt32 stride,
+                                  void *pixels,
                                   SRM_BUFFER_FORMAT format);
+
+UInt32 srmBufferWrite(SRMBuffer *buffer,
+                      UInt32 stride,
+                      UInt32 dstX,
+                      UInt32 dstY,
+                      UInt32 dstWidth,
+                      UInt32 dstHeight,
+                      void *pixels);
 
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
 void srmBufferDestroy(SRMBuffer *buffer);

@@ -169,10 +169,6 @@ static void setupShaders(SRMConnector *connector, void *userData)
         SRMDevice *device = srmConnectorGetDevice(connector);
         SRMDevice *rendererDevice = srmDeviceGetRendererDevice(device);
         glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(rendererDevice, buffer));
-
-        UInt8 pix[2*3*4];
-        pix[0] = 255;
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 3, 2, GL_BGRA_EXT, GL_UNSIGNED_BYTE, pix);
     }
 
 }
@@ -356,7 +352,7 @@ int main(void)
         return 1;
     }
 
-    buffer = srmBufferCreateFromCPU(core, 3, 2, bufferPixels, DRM_FORMAT_XBGR8888);
+    buffer = srmBufferCreateFromCPU(core, 3, 2, 3*4, bufferPixels, DRM_FORMAT_XBGR8888);
 
     if (!buffer)
     {
@@ -387,11 +383,20 @@ int main(void)
 
     while (1)
     {
-        /* Evdev monitor poll DRM devices/connectors hotplugging events (0 disables timeout).
+        /* Evdev monitor poll DRM devices/connectors hotplugging events (-1 disables timeout).
          * To get a pollable FD use srmCoreGetMonitorFD() */
 
-        if (srmCoreProccessMonitor(core, -1) < 0)
+        if (srmCoreProccessMonitor(core, 1000) < 0)
             break;
+
+        // Update the background texture every second
+        if (buffer)
+        {
+            for (Int32 i = 0; i < (Int32)sizeof(bufferPixels);i++)
+                bufferPixels[i] = rand() % 256;
+
+            srmBufferWrite(buffer, 4*3, 0, 0, 3, 2, bufferPixels);
+        }
     }
 
 

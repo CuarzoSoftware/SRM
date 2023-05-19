@@ -16,7 +16,6 @@ SRMBuffer *srmBufferCreate(SRMCore *core)
     SRMBuffer *buffer = calloc(1, sizeof(SRMBuffer));
     buffer->core = core;
     buffer->fd = -1;
-    buffer->image = EGL_NO_IMAGE;
     buffer->textures = srmListCreate();
     buffer->modifier = DRM_FORMAT_MOD_INVALID;
     return buffer;

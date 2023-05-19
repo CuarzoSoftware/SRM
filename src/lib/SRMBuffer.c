@@ -24,16 +24,18 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UInt8 *pixels, SRM_BUFFER_FORMAT format)
+
+SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UInt32 stride, void *pixels, SRM_BUFFER_FORMAT format)
 {
     SRMBuffer *buffer = srmBufferCreate(core);
     buffer->src = SRM_BUFFER_SRC_CPU;
+    buffer->planesCount = 1;
     buffer->width = width;
     buffer->height = height;
     buffer->format = format;
-
     const SRMGLFormat *glFmt;
 
+    // Try to use linear so that can be mapped
     buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_WRITE;
     buffer->bo = gbm_bo_create(core->allocatorDevice->gbm, width, height, format, buffer->flags);
 
@@ -46,13 +48,20 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
     if (!buffer->bo)
     {
         SRMWarning("[%s] Failed to create buffer from CPU with GBM. Trying glTexImage2D instead.", core->allocatorDevice->name);
-        goto fallback;
+        goto glesOnly;
+    }
+
+    buffer->bpp = gbm_bo_get_bpp(buffer->bo);
+
+    if (buffer->bpp % 8 != 0)
+    {
+        SRMWarning("[%s] Buffer bpp must be a multiple of 8.", core->allocatorDevice->name);
+        goto glesOnly;
     }
 
     buffer->modifier = gbm_bo_get_modifier(buffer->bo);
     buffer->stride = gbm_bo_get_stride(buffer->bo);
-    buffer->bpp = gbm_bo_get_bpp(buffer->bo);
-    UInt32 bytesPP = buffer->bpp/8;
+    buffer->pixelSize = buffer->bpp/8;
 
     buffer->fd = srmBufferGetDMAFDFromBO(core->allocatorDevice, buffer->bo);
 
@@ -73,21 +82,19 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     gbmWrite:
 
-    if (gbm_bo_write(buffer->bo, pixels, width * height * bytesPP) != 0)
+    if (gbm_bo_write(buffer->bo, pixels, width * stride * buffer->pixelSize) != 0)
     {
         SRMWarning("[%s] gbm_bo_write failed. Trying glTexImage2D instead.", core->allocatorDevice->name);
-        goto fallback;
+        goto glesOnly;
     }
 
+    buffer->caps |= SRM_BUFFER_CAP_WRITE;
     SRMDebug("[%s] CPU buffer created using gbm_bo_write.", core->allocatorDevice->name);
     return buffer;
 
     gbmMap:
 
-    goto fallback;
-
     buffer->map = gbm_bo_map(buffer->bo, 0, 0, width, height, GBM_BO_TRANSFER_READ, &buffer->stride, &buffer->mapData);
-
 
     if (!buffer->map)
     {
@@ -99,18 +106,22 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     mapWrite:
 
-    goto fallback;
+    buffer->offset = gbm_bo_get_offset(buffer->bo, 0);
 
     for (UInt32 i = 0; i < height; i++)
     {
-        memcpy(&buffer->map[gbm_bo_get_offset(buffer->bo, 0) + i*buffer->stride],
-               &pixels[i*width*bytesPP],
-               width*bytesPP);
+        memcpy(&buffer->map[buffer->offset + i*buffer->stride],
+               &pixels[i*stride],
+               stride*buffer->pixelSize);
     }
+
+    buffer->caps |= SRM_BUFFER_CAP_READ | SRM_BUFFER_CAP_WRITE | SRM_BUFFER_CAP_MAP;
     SRMDebug("[%s] CPU buffer created using mapping.", core->allocatorDevice->name);
     return buffer;
 
-    fallback:
+    glesOnly:
+
+    /* In this case the texture is only avaliable for 1 GPU */
 
     glFmt = srmFormatDRMToGL(format);
 
@@ -122,15 +133,18 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
         goto fail;
     }
 
+    buffer->glType = glFmt->glType;
+    buffer->glFormat = glFmt->glFormat;
+    buffer->glInternalFormat = glFmt->glInternalFormat;
+
     UInt32 depth;
 
     if (srmFormatGetDepthBpp(format, &depth, &buffer->bpp))
     {
-        bytesPP = buffer->bpp/8;
-        buffer->stride = bytesPP*width;
+        buffer->pixelSize = buffer->bpp/8;
+        buffer->stride = buffer->pixelSize*width;
     }
 
-    /*
     // Creates the texture
     struct SRMBufferTexture *texture = calloc(1, sizeof(struct SRMBufferTexture));
     texture->device = core->allocatorDevice;
@@ -146,7 +160,12 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
                    EGL_NO_SURFACE,
                    core->allocatorDevice->eglSharedContext);
 
-    glActiveTexture(GL_TEXTURE0);
+    glGenFramebuffers(1, &buffer->framebuffer);
+
+    if (buffer->framebuffer)
+        glBindFramebuffer(GL_FRAMEBUFFER, buffer->framebuffer);
+
+
     glGenTextures(1, &texture->texture);
 
     if (!texture->texture)
@@ -159,7 +178,6 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
         goto fail;
     }
 
-    buffer->textureID = texture->texture;
     glBindTexture(GL_TEXTURE_2D, texture->texture);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -168,11 +186,8 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     srmListAppendData(buffer->textures, texture);
-*/
 
-    GLuint id = srmBufferGetTextureID(core->allocatorDevice, buffer);
-
-    SRMDebug("Texture id = %d", id);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / buffer->pixelSize);
 
     glTexImage2D(GL_TEXTURE_2D,
                  0,
@@ -184,13 +199,32 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
                  glFmt->glType,
                  pixels);
 
+    glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
+
+    if (buffer->framebuffer)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture->texture, 0);
+
     SRMDebug("[%s] CPU buffer created using glTexImage2D.", core->allocatorDevice->name);
+
     glFlush();
-    /*
+
+    if (buffer->framebuffer && glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+        buffer->caps |= SRM_BUFFER_CAP_READ;
+    else
+    {
+        glDeleteFramebuffers(1, &buffer->framebuffer);
+        buffer->framebuffer = 0;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     eglMakeCurrent(prevDisplay,
                    prevSurfDraw,
                    prevSurfRead,
-                   prevContext);*/
+                   prevContext);
+
+    buffer->caps |= SRM_BUFFER_CAP_WRITE;
+
     return buffer;
 
     fail:
@@ -291,6 +325,7 @@ void srmBufferDestroy(SRMBuffer *buffer)
         EGLSurface prevSurfRead = eglGetCurrentSurface(EGL_READ);
         EGLContext prevContext = eglGetCurrentContext();
 
+        UInt8 first = 1;
         while (!srmListIsEmpty(buffer->textures))
         {
             struct SRMBufferTexture *texture = srmListPopBack(buffer->textures);
@@ -298,6 +333,14 @@ void srmBufferDestroy(SRMBuffer *buffer)
                            EGL_NO_SURFACE,
                            EGL_NO_SURFACE,
                            texture->device->eglSharedContext);
+
+            if (first)
+            {
+                if (buffer->framebuffer)
+                    glDeleteFramebuffers(1, &buffer->framebuffer);
+
+                first = 0;
+            }
 
             if (texture->texture)
                 glDeleteTextures(1, &texture->texture);
@@ -331,4 +374,52 @@ void srmBufferDestroy(SRMBuffer *buffer)
     }
 
     free(buffer);
+}
+
+UInt32 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY, UInt32 dstWidth, UInt32 dstHeight, void *pixels)
+{
+    if (!(buffer->caps & SRM_BUFFER_CAP_WRITE))
+        goto fail;
+
+    if (buffer->map)
+    {
+        UInt32 dstOffset = buffer->offset + dstY*buffer->stride + dstX*buffer->pixelSize;
+        UInt32 srcOffset = 0;
+
+        for (UInt32 i = 0; i < dstHeight; i++)
+        {
+            memcpy(&buffer->map[dstOffset],
+                   &pixels[srcOffset],
+                   buffer->pixelSize * dstWidth);
+
+            dstOffset += buffer->stride;
+            srcOffset += stride;
+        }
+
+        SRMDebug("[%s] Buffer written using mapping.", buffer->core->allocatorDevice->name);
+
+        return 1;
+    }
+    else if (buffer->framebuffer)
+    {
+        glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(buffer->core->allocatorDevice, buffer));
+        glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / buffer->pixelSize);
+        glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, 0);
+        glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
+
+        glTexSubImage2D(GL_TEXTURE_2D, 0, dstX, dstY, dstWidth, dstHeight,
+                        buffer->glFormat, buffer->glType, pixels);
+
+        glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
+
+        glFlush();
+
+        SRMDebug("[%s] Buffer written using glTexSubImage2D.", buffer->core->allocatorDevice->name);
+
+        return 1;
+    }
+
+    fail:
+    SRMError("[%s] Buffer can not be written.", buffer->core->allocatorDevice->name);
+    return 0;
 }

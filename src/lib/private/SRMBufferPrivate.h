@@ -21,7 +21,16 @@ struct SRMBufferStruct
 {
     // Common
     enum SRM_BUFFER_SRC src;
-    UInt32 format, width, height, bpp, stride;
+
+    UInt32 caps;
+    UInt32 planesCount;
+    UInt32 format;
+    UInt32 width;
+    UInt32 height;
+    UInt32 bpp;
+    UInt32 pixelSize;
+    UInt32 stride;
+    UInt32 offset;
     UInt64 modifier;
     SRMCore *core;
     SRMList *textures;
@@ -31,15 +40,15 @@ struct SRMBufferStruct
     enum gbm_bo_flags flags;
     void *mapData;
 
-    // EGL
-    EGLImage image;
-
-    // Gles
-    GLuint textureID;
-
     // DMA
     Int32 fd;
     void *map;
+
+    // Gles
+    GLuint framebuffer;
+    GLint glInternalFormat;
+    GLint glFormat;
+    GLint glType;
 };
 
 SRMBuffer *srmBufferCreate(SRMCore *core);

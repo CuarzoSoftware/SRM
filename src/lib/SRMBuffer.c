@@ -113,11 +113,14 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     buffer->offset = gbm_bo_get_offset(buffer->bo, 0);
 
+    UInt8 *src = pixels;
+    UInt8 *dst = buffer->map;
+
     for (UInt32 i = 0; i < height; i++)
     {
-        memcpy(&buffer->map[buffer->offset + i*buffer->stride],
-               &pixels[i*stride],
-               stride*buffer->pixelSize);
+        memcpy(&dst[buffer->offset + i*buffer->stride],
+               &src[i*stride],
+               stride);
     }
 
     buffer->caps |= SRM_BUFFER_CAP_READ | SRM_BUFFER_CAP_WRITE | SRM_BUFFER_CAP_MAP;
@@ -407,13 +410,15 @@ UInt32 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY
 
     if (buffer->map)
     {
+        UInt8 *src = pixels;
+        UInt8 *dst = buffer->map;
         UInt32 dstOffset = buffer->offset + dstY*buffer->stride + dstX*buffer->pixelSize;
         UInt32 srcOffset = 0;
 
         for (UInt32 i = 0; i < dstHeight; i++)
         {
-            memcpy(&buffer->map[dstOffset],
-                   &pixels[srcOffset],
+            memcpy(&dst[dstOffset],
+                   &src[srcOffset],
                    buffer->pixelSize * dstWidth);
 
             dstOffset += buffer->stride;

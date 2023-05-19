@@ -32,22 +32,19 @@
 #include <math.h>
 #include <sys/time.h>
 
+#define BUF_WIDTH 8
+#define BUF_HEIGHT 6
+#define BUF_STRIDE 4*BUF_WIDTH
+#define BUF_SIZE BUF_STRIDE*BUF_HEIGHT
+
 /* Hardware cursor pixels */
 static UInt8 cursorPixels[64*64*4];
 
 /* Background texture pixels */
-static UInt8 bufferPixels[] =
-{
-    255, 0, 0, 255,     // Red
-    0, 255, 0, 255,     // Green
-    0, 0, 255, 255,     // Blue
-    255, 255, 0, 255,   // Yellow
-    255, 0, 255, 255,   // Pink
-    0, 255, 255, 255,   // Cyan
-};
+static UInt8 bufferPixels[BUF_SIZE];
 
 /* Background texture shared among all GPUs */
-static SRMBuffer *buffer;
+static SRMBuffer *buffer = NULL;
 
 /* Square vertices (left for vertex shader, right for fragment shader) */
 static GLfloat square[16] =
@@ -352,7 +349,7 @@ int main(void)
         return 1;
     }
 
-    buffer = srmBufferCreateFromCPU(core, 3, 2, 3*4, bufferPixels, DRM_FORMAT_XBGR8888);
+    buffer = srmBufferCreateFromCPU(core, BUF_WIDTH, BUF_HEIGHT, BUF_STRIDE, bufferPixels, DRM_FORMAT_XBGR8888);
 
     if (!buffer)
     {
@@ -386,16 +383,16 @@ int main(void)
         /* Evdev monitor poll DRM devices/connectors hotplugging events (-1 disables timeout).
          * To get a pollable FD use srmCoreGetMonitorFD() */
 
-        if (srmCoreProccessMonitor(core, 5) < 0)
+        if (srmCoreProccessMonitor(core, 1000) < 0)
             break;
 
         // Update the background texture every second
         if (buffer)
         {
-            for (Int32 i = 0; i < (Int32)sizeof(bufferPixels);i++)
+            for (Int32 i = 0; i < BUF_SIZE;i++)
                 bufferPixels[i] = rand() % 256;
 
-            srmBufferWrite(buffer, 4*3, 0, 0, 3, 2, bufferPixels);
+            srmBufferWrite(buffer, BUF_STRIDE, 0, 0, BUF_WIDTH, BUF_HEIGHT, bufferPixels);
         }
     }
 
@@ -413,6 +410,8 @@ int main(void)
 
     // Finish SRM
     srmCoreDestroy(core);
+
+    free(bufferPixels);
 
     return 0;
 }

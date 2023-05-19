@@ -24,7 +24,7 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
 
     Int32 len = strlen(name);
     device->name = malloc(len);
-    memcpy(device->name, name, len);
+    strcpy(device->name, name);
 
     device->core = core;
     device->enabled = 1;

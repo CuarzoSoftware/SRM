@@ -63,6 +63,7 @@ static const char *fragmentShaderSource = "precision mediump float; uniform samp
 
 struct ConnectorUserData
 {
+    SRMDevice *rendererDevice;
     GLuint vertexShader;
     GLuint fragmentShader;
     GLuint program;
@@ -164,14 +165,6 @@ static void setupShaders(SRMConnector *connector, void *userData)
      * In this case, we want one for the device that do the rendering for this connector
      * (connector->device->rendererDevice) */
 
-    if (buffer)
-    {
-        SRMDevice *device = srmConnectorGetDevice(connector);
-        SRMDevice *rendererDevice = srmDeviceGetRendererDevice(device);
-        SRMDebug("Connector [%s] renderer device: %s.", srmConnectorGetName(connector), srmDeviceGetName(rendererDevice));
-        glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(rendererDevice, buffer));
-    }
-
 }
 
 static void initializeGL(SRMConnector *connector, void *userData)
@@ -203,6 +196,9 @@ static void initializeGL(SRMConnector *connector, void *userData)
 static void paintGL(SRMConnector *connector, void *userData)
 {
     struct ConnectorUserData *data = userData;
+
+    if (buffer)
+        glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(data->rendererDevice, buffer));
 
     float cosine = cosf(data->phase);
     float sine = sinf(data->phase);
@@ -300,6 +296,8 @@ static SRMConnectorInterface connectorInterface =
 static void initConnector(SRMConnector *connector)
 {
     struct ConnectorUserData *userData = calloc(1, sizeof(struct ConnectorUserData));
+    SRMDevice *device = srmConnectorGetDevice(connector);
+    userData->rendererDevice = srmDeviceGetRendererDevice(device);
 
     if (!srmConnectorInitialize(connector, &connectorInterface, userData))
     {
@@ -309,6 +307,7 @@ static void initConnector(SRMConnector *connector)
     }
 
     /* Connector initialized! */
+
 }
 
 static void deviceCreatedEventHandler(SRMListener *listener, SRMDevice *device)

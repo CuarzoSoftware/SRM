@@ -15,6 +15,7 @@ struct SRMBufferTexture
     SRMDevice *device;
     EGLImage image;
     GLuint texture;
+    UInt8 updated;
 };
 
 struct SRMBufferStruct

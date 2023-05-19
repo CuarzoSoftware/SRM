@@ -75,7 +75,10 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
             buffer->map = mmap(NULL, height * buffer->stride, PROT_WRITE, MAP_SHARED, buffer->fd, 0);
 
             if (buffer->map == MAP_FAILED)
+            {
+                SRMWarning("[%d] Directly mapping buffer DMA fd failed. Trying gbm_bo_map.", core->allocatorDevice->name);
                 goto gbmMap;
+            }
         }
         goto mapWrite;
     }
@@ -101,6 +104,8 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
         SRMWarning("[%s] Failed to map DMA FD. Tying gbm_bo_write instead.", core->allocatorDevice->name);
         goto gbmWrite;
     }
+
+    SRMDebug("[%s] Buffer mapped with gbm_bo_map().", core->allocatorDevice->name);
 
     /* Only if LINEAR */
 
@@ -272,6 +277,9 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     if (buffer->fd == -1)
         buffer->fd = srmBufferGetDMAFDFromBO(buffer->core->allocatorDevice, buffer->bo);
 
+    if (buffer->fd == -1)
+        goto skipDMA;
+
     EGLAttrib image_attribs[] = {
                                EGL_WIDTH, gbm_bo_get_width(buffer->bo),
                                EGL_HEIGHT, gbm_bo_get_height(buffer->bo),
@@ -299,7 +307,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         return 0;
     }
 
-    glActiveTexture(GL_TEXTURE0);
     glGenTextures(1, &texture->texture);
     glBindTexture(GL_TEXTURE_2D, texture->texture);
     device->eglFunctions.glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, texture->image);

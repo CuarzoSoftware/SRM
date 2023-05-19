@@ -168,6 +168,7 @@ static void setupShaders(SRMConnector *connector, void *userData)
     {
         SRMDevice *device = srmConnectorGetDevice(connector);
         SRMDevice *rendererDevice = srmDeviceGetRendererDevice(device);
+        SRMDebug("Connector [%s] renderer device: %s.", srmConnectorGetName(connector), srmDeviceGetName(rendererDevice));
         glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(rendererDevice, buffer));
     }
 

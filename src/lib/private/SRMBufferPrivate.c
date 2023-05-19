@@ -42,6 +42,7 @@ Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
         goto fail;
     }
 
+    SRMDebug("[%s] Got buffer DMA fd using DRM_IOCTL_PRIME_HANDLE_TO_FD.", device->name);
     return prime_handle.fd;
 
     fail:
@@ -49,10 +50,13 @@ Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
     prime_handle.fd = gbm_bo_get_fd(bo);
 
     if (prime_handle.fd >= 0)
+    {
+        SRMDebug("[%s] Got buffer DMA fd using gbm_bo_get_fd().", device->name);
         return prime_handle.fd;
+    }
 
     SRMError("Error: Failed to get file descriptor for handle %u: %s", prime_handle.handle, strerror(errno));
     return -1;
-    }
+}
 
 

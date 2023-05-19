@@ -354,8 +354,6 @@ void srmCoreUpdateSharedDMATextureFormats(SRMCore *core)
             return;
         }
 
-        SRMDebug("[core] Supported shared formats:");
-
         while (fmtIt)
         {
             SRMFormat *fmt = srmListItemGetData(fmtIt);

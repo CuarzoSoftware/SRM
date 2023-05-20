@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+
 SRMBuffer *srmBufferCreate(SRMCore *core)
 {
     SRMBuffer *buffer = calloc(1, sizeof(SRMBuffer));
@@ -18,7 +19,7 @@ SRMBuffer *srmBufferCreate(SRMCore *core)
     buffer->fd = -1;
     buffer->textures = srmListCreate();
     buffer->modifier = DRM_FORMAT_MOD_INVALID;
-    return buffer;
+    return buffer;    
 }
 
 Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)

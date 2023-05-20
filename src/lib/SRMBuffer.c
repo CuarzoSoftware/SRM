@@ -18,12 +18,9 @@
 #include <xf86drmMode.h>
 #include <drm_fourcc.h>
 
-#include <linux/dma-heap.h>
-#include <linux/dma-buf.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <fcntl.h>
-
 
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UInt32 stride, const void *pixels, SRM_BUFFER_FORMAT format)
 {
@@ -116,12 +113,18 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
     const UInt8 *src = pixels;
     UInt8 *dst = buffer->map;
 
+    buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_WRITE;
+    ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
+
     for (UInt32 i = 0; i < height; i++)
     {
         memcpy(&dst[buffer->offset + i*buffer->stride],
                &src[i*stride],
                stride);
     }
+
+    buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
+    ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
 
     buffer->caps |= SRM_BUFFER_CAP_READ | SRM_BUFFER_CAP_WRITE | SRM_BUFFER_CAP_MAP;
     SRMDebug("[%s] CPU buffer created using mapping.", core->allocatorDevice->name);
@@ -410,6 +413,9 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         UInt32 dstOffset = buffer->offset + dstY*buffer->stride + dstX*buffer->pixelSize;
         UInt32 srcOffset = 0;
 
+        buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_WRITE;
+        ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
+
         for (UInt32 i = 0; i < dstHeight; i++)
         {
             memcpy(&dst[dstOffset],
@@ -419,6 +425,9 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
             dstOffset += buffer->stride;
             srcOffset += stride;
         }
+
+        buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
+        ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
 
         /* Disable EGL image recreation
         SRMListForeach(texIt, buffer->textures)

@@ -5,6 +5,7 @@
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <gbm.h>
+#include <linux/dma-buf.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,6 +45,7 @@ struct SRMBufferStruct
     // DMA
     Int32 fd;
     void *map;
+    struct dma_buf_sync sync;
 
     // Gles
     GLuint framebuffer;

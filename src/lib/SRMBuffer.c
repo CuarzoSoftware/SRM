@@ -420,11 +420,13 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
             srcOffset += stride;
         }
 
+        /* Disable EGL image recreation
         SRMListForeach(texIt, buffer->textures)
         {
             struct SRMBufferTexture *tex = srmListItemGetData(texIt);
             tex->updated = 1;
         }
+        */
 
         /* SRMDebug("[%s] Buffer written using mapping.", buffer->core->allocatorDevice->name); */
 

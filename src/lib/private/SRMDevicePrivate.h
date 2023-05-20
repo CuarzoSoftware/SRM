@@ -34,6 +34,7 @@ struct SRMDeviceStruct
     EGLDeviceEXT eglDevice;
     EGLDisplay eglDisplay;
     EGLContext eglSharedContext;
+    EGLContext eglDeallocatorContext;
     EGLint eglSharedContextAttribs[7];
     SRMEGLDeviceExtensions eglExtensions;
     SRMEGLDeviceFunctions eglFunctions;
@@ -67,6 +68,7 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device);
 UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device);
 void srmDeviceDestroyDMAFormats(SRMDevice *device);
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device);
+UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device);
 
 UInt8 srmDeviceUpdateClientCaps(SRMDevice *device);
 UInt8 srmDeviceUpdateCaps(SRMDevice *device);

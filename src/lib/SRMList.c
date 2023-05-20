@@ -1,6 +1,9 @@
 #include <SRMList.h>
 #include <private/SRMListPrivate.h>
 #include <stdlib.h>
+#include <pthread.h>
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 SRMList *srmListCreate()
 {
@@ -31,6 +34,7 @@ SRMListItem *srmListGetBack(SRMList *list)
 
 SRMListItem *srmListAppendData(SRMList *list, void *data)
 {
+    pthread_mutex_lock(&mutex);
     SRMListItem *item = malloc(sizeof(SRMListItem));
     item->data = data;
     item->list = list;
@@ -49,12 +53,13 @@ SRMListItem *srmListAppendData(SRMList *list, void *data)
     }
 
     list->count++;
-
+    pthread_mutex_unlock(&mutex);
     return item;
 }
 
 SRMListItem *srmListPrependData(SRMList *list, void *data)
 {
+    pthread_mutex_lock(&mutex);
     SRMListItem *item = malloc(sizeof(SRMListItem));
     item->data = data;
     item->list = list;
@@ -73,19 +78,29 @@ SRMListItem *srmListPrependData(SRMList *list, void *data)
     }
 
     list->count++;
-
+    pthread_mutex_unlock(&mutex);
     return item;
 }
 
 SRMListItem *srmListInsertData(SRMList *list, SRMListItem *prev, void *data)
 {
+    pthread_mutex_lock(&mutex);
     if (prev == list->back)
+    {
+        pthread_mutex_unlock(&mutex);
         return srmListAppendData(list, data);
+    }
     else if (prev == NULL)
+    {
+        pthread_mutex_unlock(&mutex);
         return srmListPrependData(list, data);
+    }
 
     if (prev->list != list)
+    {
+        pthread_mutex_unlock(&mutex);
         return NULL;
+    }
 
     SRMListItem *item = malloc(sizeof(SRMListItem));
     item->data = data;
@@ -97,6 +112,7 @@ SRMListItem *srmListInsertData(SRMList *list, SRMListItem *prev, void *data)
     item->next->prev = item;
 
     list->count++;
+    pthread_mutex_unlock(&mutex);
 
     return item;
 
@@ -104,8 +120,13 @@ SRMListItem *srmListInsertData(SRMList *list, SRMListItem *prev, void *data)
 
 void *srmListPopFront(SRMList *list)
 {
+    pthread_mutex_lock(&mutex);
+
     if (!list->front)
+    {
+        pthread_mutex_unlock(&mutex);
         return NULL;
+    }
 
     if (list->count == 1)
     {
@@ -114,6 +135,7 @@ void *srmListPopFront(SRMList *list)
         list->front = NULL;
         list->back = NULL;
         list->count = 0;
+        pthread_mutex_unlock(&mutex);
         return data;
     }
 
@@ -123,13 +145,21 @@ void *srmListPopFront(SRMList *list)
     list->count--;
     void *data = item->data;
     free(item);
+
+    pthread_mutex_unlock(&mutex);
+
     return data;
 }
 
 void *srmListPopBack(SRMList *list)
 {
+    pthread_mutex_lock(&mutex);
+
     if (!list->back)
+    {
+        pthread_mutex_unlock(&mutex);
         return NULL;
+    }
 
     if (list->count == 1)
     {
@@ -138,6 +168,7 @@ void *srmListPopBack(SRMList *list)
         list->front = NULL;
         list->back = NULL;
         list->count = 0;
+        pthread_mutex_unlock(&mutex);
         return data;
     }
 
@@ -147,25 +178,40 @@ void *srmListPopBack(SRMList *list)
     list->count--;
     void *data = item->data;
     free(item);
+    pthread_mutex_unlock(&mutex);
     return data;
 }
 
 
 void *srmListRemoveItem(SRMList *list, SRMListItem *item)
 {
+    pthread_mutex_lock(&mutex);
+
     if (item->list != list)
+    {
+        pthread_mutex_unlock(&mutex);
         return NULL;
+    }
 
     if (item == list->front)
+    {
+        pthread_mutex_unlock(&mutex);
         return srmListPopFront(list);
+    }
     else if (item == list->back)
+    {
+        pthread_mutex_unlock(&mutex);
         return srmListPopBack(list);
+    }
 
     item->prev->next = item->next;
     item->next->prev = item->prev;
     list->count--;
     void *data = item->data;
     free(item);
+
+    pthread_mutex_unlock(&mutex);
+
     return data;
 }
 

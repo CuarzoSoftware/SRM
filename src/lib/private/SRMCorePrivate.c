@@ -493,3 +493,109 @@ UInt8 srmCoreUpdateEGLFunctions(SRMCore *core)
 }
 
 
+void *srmCoreDeallocatorLoop(void *data)
+{
+    SRMCore *core = data;
+
+    UInt8 finish = 0;
+
+    SRMDebug("[core] Deallocator thread started.");
+
+    while (1)
+    {
+        pthread_mutex_lock(&core->deallocatorMutex);
+        pthread_cond_wait(&core->deallocatorCond, &core->deallocatorMutex);
+
+        while (!srmListIsEmpty(core->deallocatorMessages))
+        {
+            struct SRMDeallocatorThreadMessage *message = srmListPopBack(core->deallocatorMessages);
+
+            if (message->msg == SRM_DEALLOCATOR_MSG_DESTROY_BUFFER)
+            {
+
+                eglMakeCurrent(message->device->eglDisplay,
+                               EGL_NO_SURFACE,
+                               EGL_NO_SURFACE,
+                               message->device->eglDeallocatorContext);
+
+                if (message->textureID)
+                {
+                    SRMDebug("[%s] GL Texture (%d) deleted.", message->device->name, message->textureID);
+                    glDeleteTextures(1, &message->textureID);
+                }
+
+                if (message->framebufferID)
+                    glDeleteFramebuffers(1, &message->framebufferID);
+
+                core->deallocatorState = 1;
+            }
+            else if (message->msg == SRM_DEALLOCATOR_MSG_CREATE_CONTEXT)
+            {
+                message->device->eglDeallocatorContext = eglCreateContext(message->device->eglDisplay,
+                                                                          NULL,
+                                                                          message->device->eglSharedContext,
+                                                                          message->device->eglSharedContextAttribs);
+
+                if (message->device->eglDeallocatorContext == EGL_NO_CONTEXT)
+                {
+                    SRMError("Failed to create deallocator EGL context for device %s.", message->device->name);
+                    core->deallocatorState = -1;
+                    free(message);
+                    break;
+                }
+
+                core->deallocatorState = 1;
+            }
+            else
+            {
+                finish = 1;
+                core->deallocatorState = 1;
+            }
+
+            free(message);
+        }
+
+        pthread_mutex_unlock(&core->deallocatorMutex);
+
+        if (finish)
+            return NULL;
+    }
+}
+
+
+UInt8 srmCoreInitDeallocator(SRMCore *core)
+{
+    pthread_mutex_init(&core->deallocatorMutex, NULL);
+    pthread_cond_init(&core->deallocatorCond, NULL);
+    core->deallocatorMessages = srmListCreate();
+
+    if (pthread_create(&core->deallocatorThread, NULL, srmCoreDeallocatorLoop, core))
+    {
+        SRMFatal("[core] Could not start render thread for device %s connector %d.");
+        pthread_mutex_destroy(&core->deallocatorMutex);
+        pthread_cond_destroy(&core->deallocatorCond);
+        srmListDestoy(core->deallocatorMessages);
+        core->deallocatorMessages = NULL;
+        return 0;
+    }
+
+    return 1;
+}
+
+void srmCoreSendDeallocatorMessage(SRMCore *core,
+                                    enum SRM_DEALLOCATOR_MSG msg,
+                                    SRMDevice *device,
+                                    GLuint textureID,
+                                    GLuint framebufferID)
+{
+    pthread_mutex_lock(&core->deallocatorMutex);
+    core->deallocatorState = 0;
+    struct SRMDeallocatorThreadMessage *message = malloc(sizeof(struct SRMDeallocatorThreadMessage));
+    message->msg = msg;
+    message->device = device;
+    message->textureID = textureID;
+    message->framebufferID = framebufferID;
+    srmListAppendData(core->deallocatorMessages, message);
+    pthread_cond_signal(&core->deallocatorCond);
+    pthread_mutex_unlock(&core->deallocatorMutex);
+}

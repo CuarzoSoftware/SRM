@@ -64,6 +64,9 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
     if (!srmDeviceInitializeEGLSharedContext(device))
         goto fail;
 
+    if (!srmDeviceInitEGLDeallocatorContext(device))
+        goto fail;
+
     if (!srmDeviceUpdateClientCaps(device))
         goto fail;
 
@@ -575,7 +578,17 @@ UInt8 srmDeviceUpdateConnectors(SRMDevice *device)
     return 1;
 }
 
+UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device)
+{
+    srmCoreSendDeallocatorMessage(device->core, SRM_DEALLOCATOR_MSG_CREATE_CONTEXT, device, 0, 0);
 
+    while (device->core->deallocatorState == 0)
+        usleep(1000);
 
-
-
+    if (device->core->deallocatorState == -1)
+    {
+        SRMError("[%s] Failed to create deallocator EGL context.", device->name);
+        return 0;
+    }
+    return 1;
+}

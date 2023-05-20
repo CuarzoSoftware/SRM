@@ -253,10 +253,15 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         {
             if (texture->updated)
             {
+
                 /* TODO: Some GPUs do not require EGL image recreation when the DMA buf is updated. Check with glRead or
                  * something like that if it needs it */
 
-                glDeleteTextures(1, &texture->texture);
+                srmCoreSendDeallocatorMessage(device->core,
+                                              SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
+                                              device,
+                                              texture->texture,
+                                              0);
 
                 if (texture->image != EGL_NO_IMAGE)
                     eglDestroyImage(texture->device->eglDisplay, texture->image);
@@ -293,7 +298,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     {
         SRMError("srmBufferGetTextureID failed. Allocator device (%s) has not the PRIME export cap.", buffer->core->allocatorDevice->name);
         goto skipDMA;
-        return 0;
     }
 
     if (!device->capPrimeImport)
@@ -346,48 +350,33 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 
 void srmBufferDestroy(SRMBuffer *buffer)
 {
+    if (buffer->framebuffer)
+    {
+        srmCoreSendDeallocatorMessage(buffer->core,
+                                      SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
+                                      buffer->core->allocatorDevice,
+                                      0,
+                                      buffer->framebuffer);
+    }
     if (buffer->textures)
     {
-
-        EGLDisplay prevDisplay = eglGetCurrentDisplay();
-        EGLSurface prevSurfDraw = eglGetCurrentSurface(EGL_DRAW);
-        EGLSurface prevSurfRead = eglGetCurrentSurface(EGL_READ);
-        EGLContext prevContext = eglGetCurrentContext();
-
-        UInt8 first = 1;
         while (!srmListIsEmpty(buffer->textures))
         {
             struct SRMBufferTexture *texture = srmListPopBack(buffer->textures);
-            eglMakeCurrent(texture->device->eglDisplay,
-                           EGL_NO_SURFACE,
-                           EGL_NO_SURFACE,
-                           texture->device->eglSharedContext);
 
-            if (first)
-            {
-                if (buffer->framebuffer)
-                    glDeleteFramebuffers(1, &buffer->framebuffer);
-
-                first = 0;
-            }
-
-            if (texture->texture)
-                glDeleteTextures(1, &texture->texture);
+            srmCoreSendDeallocatorMessage(buffer->core,
+                                          SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
+                                          texture->device,
+                                          texture->texture,
+                                          0);
 
             if (texture->image != EGL_NO_IMAGE)
                 eglDestroyImage(texture->device->eglDisplay, texture->image);
-
-            glFlush();
 
             free(texture);
         }
 
         srmListDestoy(buffer->textures);
-
-        eglMakeCurrent(prevDisplay,
-                       prevSurfDraw,
-                       prevSurfRead,
-                       prevContext);
     }
 
     if (buffer->bo)

@@ -11,6 +11,21 @@
 extern "C" {
 #endif
 
+enum SRM_DEALLOCATOR_MSG
+{
+    SRM_DEALLOCATOR_MSG_CREATE_CONTEXT,
+    SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
+    SRM_DEALLOCATOR_MSG_STOP_THREAD
+};
+
+struct SRMDeallocatorThreadMessage
+{
+    enum SRM_DEALLOCATOR_MSG msg;
+    SRMDevice *device;
+    GLuint textureID;
+    GLuint framebufferID;
+};
+
 struct SRMCoreStruct
 {
     SRMInterface *interface;
@@ -32,8 +47,20 @@ struct SRMCoreStruct
 
     SRMEGLCoreExtensions eglExtensions;
     SRMEGLCoreFunctions eglFunctions;
+
+    pthread_t deallocatorThread;
+    SRMList *deallocatorMessages;
+    Int8 deallocatorState;
+    pthread_cond_t deallocatorCond;
+    pthread_mutex_t deallocatorMutex;
 };
 
+UInt8 srmCoreInitDeallocator(SRMCore *core);
+void srmCoreSendDeallocatorMessage(SRMCore *core,
+                                   enum SRM_DEALLOCATOR_MSG msg,
+                                   SRMDevice *device,
+                                   GLuint textureID,
+                                   GLuint framebufferID);
 UInt8 srmCoreUpdateEGLExtensions(SRMCore *core);
 UInt8 srmCoreUpdateEGLFunctions(SRMCore *core);
 UInt8 srmCoreCreateUdev(SRMCore *core);

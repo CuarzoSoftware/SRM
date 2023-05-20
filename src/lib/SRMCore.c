@@ -39,6 +39,9 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
     core->deviceRemovedListeners = srmListCreate();
     core->devices = srmListCreate();
 
+    if (!srmCoreInitDeallocator(core))
+        goto fail;
+
     if (!srmCoreEnumerateDevices(core)) // Fails if no device found
         goto fail;
 

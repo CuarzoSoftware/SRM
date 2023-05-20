@@ -243,16 +243,6 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 {
-    EGLDisplay prevDisplay = eglGetCurrentDisplay();
-    EGLSurface prevSurfDraw = eglGetCurrentSurface(EGL_DRAW);
-    EGLSurface prevSurfRead = eglGetCurrentSurface(EGL_READ);
-    EGLContext prevContext = eglGetCurrentContext();
-
-    eglMakeCurrent(device->eglDisplay,
-                   EGL_NO_SURFACE,
-                   EGL_NO_SURFACE,
-                   device->eglSharedContext);
-
     // Check if already created
     struct SRMBufferTexture *texture;
     SRMListForeach(item, buffer->textures)
@@ -275,10 +265,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
                 srmListRemoveItem(buffer->textures, item);
                 break;
             }
-            eglMakeCurrent(prevDisplay,
-                           prevSurfDraw,
-                           prevSurfRead,
-                           prevContext);
+
             return texture->texture;
         }
     }
@@ -286,10 +273,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     if (!buffer->bo)
     {
         SRMError("srmBufferGetTextureID error. Buffer is not shareable.");
-        eglMakeCurrent(prevDisplay,
-                       prevSurfDraw,
-                       prevSurfRead,
-                       prevContext);
         return 0;
     }
 
@@ -297,6 +280,14 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     texture = calloc(1, sizeof(struct SRMBufferTexture));
     texture->device = device;
     texture->image = EGL_NO_IMAGE;
+
+    if (device == buffer->core->allocatorDevice)
+    {
+        texture->image = eglCreateImage(device->eglDisplay, device->eglSharedContext, EGL_NATIVE_PIXMAP_KHR, buffer->bo, NULL);
+
+        if (texture->image != EGL_NO_IMAGE)
+            goto skipDMA;
+    }
 
     if (!buffer->core->allocatorDevice->capPrimeExport)
     {
@@ -330,19 +321,14 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 
     texture->image = eglCreateImage(device->eglDisplay, NULL, EGL_LINUX_DMA_BUF_EXT, NULL, image_attribs);
 
-    skipDMA:
-
-    if (texture->image == EGL_NO_IMAGE && device == buffer->core->allocatorDevice)
-    {
-        texture->image = eglCreateImage(device->eglDisplay, device->eglSharedContext, EGL_NATIVE_PIXMAP_KHR, buffer->bo, NULL);
-    }
-
     if (texture->image == EGL_NO_IMAGE)
     {
         SRMError("srmBufferGetTextureID error. Failed to create EGL image.");
         free(texture);
         return 0;
     }
+
+    skipDMA:
 
     glGenTextures(1, &texture->texture);
     glBindTexture(GL_TEXTURE_2D, texture->texture);
@@ -354,11 +340,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     srmListAppendData(buffer->textures, texture);
-
-    eglMakeCurrent(prevDisplay,
-                   prevSurfDraw,
-                   prevSurfRead,
-                   prevContext);
 
     return texture->texture;
 }
@@ -395,6 +376,8 @@ void srmBufferDestroy(SRMBuffer *buffer)
 
             if (texture->image != EGL_NO_IMAGE)
                 eglDestroyImage(texture->device->eglDisplay, texture->image);
+
+            glFlush();
 
             free(texture);
         }

@@ -244,6 +244,34 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
     return NULL;
 }
 
+SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
+{
+    SRMBuffer *buffer = srmBufferCreate(core);
+    buffer->src = SRM_BUFFER_SRC_WL_DRM;
+
+    buffer->bo = gbm_bo_import(core->allocatorDevice->gbm, GBM_BO_IMPORT_WL_BUFFER, wlBuffer, GBM_BO_USE_RENDERING);
+
+    if (!buffer->bo)
+    {
+        SRMDebug("[%s] Failed to create buffer from WL_DRM.", core->allocatorDevice->name);
+        goto fail;
+    }
+
+    buffer->planesCount = gbm_bo_get_plane_count(buffer->bo);
+    buffer->bpp = gbm_bo_get_bpp(buffer->bo);
+    buffer->pixelSize = buffer->bpp/8;
+    buffer->format = gbm_bo_get_format(buffer->bo);
+    buffer->width = gbm_bo_get_width(buffer->bo);
+    buffer->height = gbm_bo_get_height(buffer->bo);
+    buffer->stride = gbm_bo_get_stride(buffer->bo);
+    buffer->offset = gbm_bo_get_offset(buffer->bo, 0);
+    return buffer;
+
+    fail:
+    free(buffer);
+    return NULL;
+}
+
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 {
     // Check if already created
@@ -464,4 +492,21 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
     fail:
     SRMError("[%s] Buffer can not be written.", buffer->core->allocatorDevice->name);
     return 0;
+}
+
+
+
+SRM_BUFFER_FORMAT srmBufferGetFormat(SRMBuffer *buffer)
+{
+    return buffer->format;
+}
+
+UInt32 srmBufferGetWidth(SRMBuffer *buffer)
+{
+    return buffer->width;
+}
+
+UInt32 srmBufferGetHeight(SRMBuffer *buffer)
+{
+    return buffer->height;
 }

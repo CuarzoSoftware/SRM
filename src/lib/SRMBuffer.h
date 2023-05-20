@@ -17,7 +17,8 @@ enum SRM_BUFFER_CAP
 
 enum SRM_BUFFER_SRC
 {
-    SRM_BUFFER_SRC_CPU
+    SRM_BUFFER_SRC_CPU,
+    SRM_BUFFER_SRC_WL_DRM
 };
 
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core,
@@ -27,6 +28,8 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core,
                                   const void *pixels,
                                   SRM_BUFFER_FORMAT format);
 
+SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer);
+
 UInt8 srmBufferWrite(SRMBuffer *buffer,
                       UInt32 stride,
                       UInt32 dstX,
@@ -34,6 +37,10 @@ UInt8 srmBufferWrite(SRMBuffer *buffer,
                       UInt32 dstWidth,
                       UInt32 dstHeight,
                       const void *pixels);
+
+SRM_BUFFER_FORMAT srmBufferGetFormat(SRMBuffer *buffer);
+UInt32 srmBufferGetWidth(SRMBuffer *buffer);
+UInt32 srmBufferGetHeight(SRMBuffer *buffer);
 
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
 void srmBufferDestroy(SRMBuffer *buffer);

@@ -3,6 +3,8 @@
 
 #include "SRMTypes.h"
 
+#include <EGL/egl.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -39,6 +41,8 @@ SRMList *srmDeviceGetConnectors(SRMDevice *device);
 
 SRMList *srmDeviceGetDMATextureFormats(SRMDevice *device);
 SRMList *srmDeviceGetDMARenderFormats(SRMDevice *device);
+
+EGLDisplay *srmDeviceGetEGLDisplay(SRMDevice *device);
 
 #ifdef __cplusplus
 }

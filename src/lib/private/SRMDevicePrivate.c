@@ -405,6 +405,9 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
         SRMDebug("[%s] Using %s priority EGL context.", device->name, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
     }
 
+    eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
+    eglBindAPI(EGL_OPENGL_ES_API);
+
     return 1;
 }
 

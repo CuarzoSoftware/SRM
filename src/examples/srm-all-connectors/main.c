@@ -32,8 +32,8 @@
 #include <math.h>
 #include <sys/time.h>
 
-#define BUF_WIDTH 8
-#define BUF_HEIGHT 6
+#define BUF_WIDTH 64
+#define BUF_HEIGHT 64
 #define BUF_STRIDE 4*BUF_WIDTH
 #define BUF_SIZE BUF_STRIDE*BUF_HEIGHT
 

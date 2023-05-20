@@ -429,6 +429,7 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
         ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
 
+
         /* Disable EGL image recreation
         SRMListForeach(texIt, buffer->textures)
         {

@@ -7,6 +7,7 @@
 extern "C" {
 #endif
 
+void *srmCoreGetUserData(SRMCore *core);
 SRMCore *srmCoreCreate(SRMInterface *interface, void *userData);
 SRMList *srmCoreGetDevices(SRMCore *core);
 SRMDevice *srmCoreGetAllocatorDevice(SRMCore *core);

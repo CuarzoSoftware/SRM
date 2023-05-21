@@ -288,3 +288,8 @@ SRMList *srmCoreGetSharedDMATextureFormats(SRMCore *core)
 {
     return core->sharedDMATextureFormats;
 }
+
+void *srmCoreGetUserData(SRMCore *core)
+{
+    return core->interfaceUserData;
+}

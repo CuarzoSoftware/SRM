@@ -531,6 +531,8 @@ void *srmCoreDeallocatorLoop(void *data)
                     eglDestroyImage(message->device->eglDisplay, message->image);
 
                 core->deallocatorState = 1;
+
+
             }
             else if (message->msg == SRM_DEALLOCATOR_MSG_CREATE_CONTEXT)
             {

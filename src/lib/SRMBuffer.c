@@ -388,7 +388,10 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
                                EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->bo) >> 32),
                                EGL_NONE };
 
+    EGLSync fence = eglCreateSync(device->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
     texture->image = eglCreateImage(device->eglDisplay, NULL, EGL_LINUX_DMA_BUF_EXT, NULL, image_attribs);
+    eglWaitSync(device->eglDisplay, fence, 0);
+    eglDestroySync(device->eglDisplay, fence);
 
     if (texture->image == EGL_NO_IMAGE)
     {
@@ -437,12 +440,20 @@ void srmBufferDestroy(SRMBuffer *buffer)
         {
             struct SRMBufferTexture *texture = srmListPopBack(buffer->textures);
 
+            EGLSync fence = eglCreateSync(texture->device->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
+
             srmCoreSendDeallocatorMessage(buffer->core,
                                           SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
                                           texture->device,
                                           texture->texture,
                                           0,
                                           texture->image);
+
+            while (!srmListIsEmpty(buffer->core->deallocatorMessages))
+                usleep(100);
+
+            eglWaitSync(texture->device->eglDisplay, fence, 0);
+            eglDestroySync(texture->device->eglDisplay, fence);
 
             free(texture);
         }

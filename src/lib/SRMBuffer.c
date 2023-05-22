@@ -325,10 +325,9 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
                                               SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
                                               device,
                                               texture->texture,
-                                              0);
+                                              0,
+                                              texture->image);
 
-                if (texture->image != EGL_NO_IMAGE)
-                    eglDestroyImage(texture->device->eglDisplay, texture->image);
 
                 free(texture);
                 srmListRemoveItem(buffer->textures, item);
@@ -425,7 +424,8 @@ void srmBufferDestroy(SRMBuffer *buffer)
                                       SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
                                       buffer->core->allocatorDevice,
                                       0,
-                                      buffer->framebuffer);
+                                      buffer->framebuffer,
+                                      EGL_NO_IMAGE);
     }
 
     buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
@@ -441,10 +441,8 @@ void srmBufferDestroy(SRMBuffer *buffer)
                                           SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
                                           texture->device,
                                           texture->texture,
-                                          0);
-
-            if (texture->image != EGL_NO_IMAGE)
-                eglDestroyImage(texture->device->eglDisplay, texture->image);
+                                          0,
+                                          texture->image);
 
             free(texture);
         }

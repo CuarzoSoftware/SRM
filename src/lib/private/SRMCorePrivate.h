@@ -24,6 +24,7 @@ struct SRMDeallocatorThreadMessage
     SRMDevice *device;
     GLuint textureID;
     GLuint framebufferID;
+    EGLImage image;
 };
 
 struct SRMCoreStruct
@@ -60,7 +61,7 @@ void srmCoreSendDeallocatorMessage(SRMCore *core,
                                    enum SRM_DEALLOCATOR_MSG msg,
                                    SRMDevice *device,
                                    GLuint textureID,
-                                   GLuint framebufferID);
+                                   GLuint framebufferID, EGLImage image);
 UInt8 srmCoreUpdateEGLExtensions(SRMCore *core);
 UInt8 srmCoreUpdateEGLFunctions(SRMCore *core);
 UInt8 srmCoreCreateUdev(SRMCore *core);

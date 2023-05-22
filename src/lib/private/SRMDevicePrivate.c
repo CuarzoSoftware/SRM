@@ -630,7 +630,7 @@ UInt8 srmDeviceUpdateConnectors(SRMDevice *device)
 
 UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device)
 {
-    srmCoreSendDeallocatorMessage(device->core, SRM_DEALLOCATOR_MSG_CREATE_CONTEXT, device, 0, 0);
+    srmCoreSendDeallocatorMessage(device->core, SRM_DEALLOCATOR_MSG_CREATE_CONTEXT, device, 0, 0, EGL_NO_IMAGE);
 
     while (device->core->deallocatorState == 0)
         usleep(1000);

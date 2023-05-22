@@ -43,6 +43,7 @@ SRMList *srmDeviceGetDMATextureFormats(SRMDevice *device);
 SRMList *srmDeviceGetDMARenderFormats(SRMDevice *device);
 
 EGLDisplay *srmDeviceGetEGLDisplay(SRMDevice *device);
+EGLContext *srmDeviceGetEGLContext(SRMDevice *device);
 
 #ifdef __cplusplus
 }

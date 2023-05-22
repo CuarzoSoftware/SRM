@@ -97,7 +97,6 @@ UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
     {
         pthread_mutex_lock(&connector->repaintMutex);
         pthread_cond_wait(&connector->repaintCond, &connector->repaintMutex);
-        connector->repaintRequested = 0;
         pthread_mutex_unlock(&connector->repaintMutex);
     }
 

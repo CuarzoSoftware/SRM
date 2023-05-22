@@ -391,8 +391,8 @@ static UInt8 initCrtc(SRMConnector *connector)
                                        connector->interfaceData);
     }
 
-    eglSwapBuffers(connector->device->eglDisplay, data->connectorEGLSurface);
-    gbm_surface_lock_front_buffer(data->connectorGBMSurface);
+    //eglSwapBuffers(connector->device->eglDisplay, data->connectorEGLSurface);
+    //gbm_surface_lock_front_buffer(data->connectorGBMSurface);
 
     Int32 ret = drmModeSetCrtc(connector->device->fd,
                    connector->currentCrtc->id,
@@ -411,6 +411,7 @@ static UInt8 initCrtc(SRMConnector *connector)
         return 0;
     }
 
+    /*
     data->currentBufferIndex = !data->currentBufferIndex;
 
     gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
@@ -418,6 +419,7 @@ static UInt8 initCrtc(SRMConnector *connector)
     connector->interface->pageFlipped(connector, connector->interfaceData);
 
     data->currentBufferIndex = !data->currentBufferIndex;
+    */
 
     return 1;
 }

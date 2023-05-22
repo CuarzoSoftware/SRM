@@ -88,6 +88,16 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
     if (!connector->cursorBO)
         return 0;
 
+    if (!pixels)
+    {
+        drmModeSetCursor(connector->device->fd,
+                         connector->currentCrtc->id,
+                         0,
+                         0,
+                         0);
+        return 1;
+    }
+
     gbm_bo_write(connector->cursorBO, pixels, 64*64*4);
 
     drmModeSetCursor(connector->device->fd,
@@ -291,8 +301,7 @@ UInt8 srmConnectorRepaint(SRMConnector *connector)
         connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
     {
 
-        if (!connector->repaintRequested)
-            srmConnectorUnlockRenderThread(connector);
+        srmConnectorUnlockRenderThread(connector);
 
         return 1;
     }

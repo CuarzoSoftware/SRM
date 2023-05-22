@@ -34,6 +34,10 @@ struct SRMDeviceStruct
     EGLDeviceEXT eglDevice;
     EGLDisplay eglDisplay;
     EGLContext eglSharedContext;
+
+    /* EGLSurface eglBaseSurface;
+    struct gbm_surface *baseSurface;*/
+
     EGLContext eglDeallocatorContext;
     EGLint eglSharedContextAttribs[7];
     SRMEGLDeviceExtensions eglExtensions;

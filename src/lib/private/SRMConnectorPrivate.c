@@ -486,8 +486,9 @@ void *srmConnectorRenderThread(void *conn)
         if (!srmRenderModeCommonWaitRepaintRequest(connector))
             break;
 
-        if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
+        if (connector->repaintRequested && connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
         {
+            connector->repaintRequested = 0;
             connector->renderInterface.render(connector);
             connector->renderInterface.flipPage(connector);
         }
@@ -523,10 +524,10 @@ void *srmConnectorRenderThread(void *conn)
 
 void srmConnectorUnlockRenderThread(SRMConnector *connector)
 {
-    pthread_mutex_lock(&connector->repaintMutex);
+    //pthread_mutex_lock(&connector->repaintMutex);
     connector->repaintRequested = 1;
     pthread_cond_signal(&connector->repaintCond);
-    pthread_mutex_unlock(&connector->repaintMutex);
+    //pthread_mutex_unlock(&connector->repaintMutex);
 }
 
 

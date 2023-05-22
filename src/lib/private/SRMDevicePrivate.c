@@ -369,8 +369,44 @@ void srmDeviceDestroyDMAFormats(SRMDevice *device)
     srmFormatsListDestroy(&device->dmaTextureFormats);
 }
 
+static const EGLint eglConfigAttribs[] =
+    {
+        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+        EGL_RED_SIZE, 8,
+        EGL_GREEN_SIZE, 8,
+        EGL_BLUE_SIZE, 8,
+        EGL_ALPHA_SIZE, 0,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+        EGL_NONE
+};
+
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 {
+    /*
+    device->baseSurface = gbm_surface_create(
+        device->gbm,
+        64,
+        64,
+        GBM_FORMAT_XRGB8888,
+        GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+
+    if (!device->baseSurface)
+    {
+        SRMError("[%s] Failed to create base GBM surface.", device->name);
+        return 0;
+    }
+
+    EGLConfig config;
+
+    if (!srmRenderModeCommonChooseEGLConfiguration(device->eglDisplay,
+                                                   eglConfigAttribs,
+                                                   GBM_FORMAT_XRGB8888,
+                                                   &config))
+    {
+        SRMError("[%s] Failed to choose base EGL configuration.", device->name);
+        return 0;
+    }*/
+
     size_t atti = 0;
     device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_CLIENT_VERSION;
     device->eglSharedContextAttribs[atti++] = 2;
@@ -405,8 +441,19 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
         SRMDebug("[%s] Using %s priority EGL context.", device->name, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
     }
 
+    /*
+    device->eglBaseSurface = eglCreateWindowSurface(device->eglDisplay,
+                                                       config,
+                                                       (EGLNativeWindowType)device->baseSurface,
+                                                       NULL);
+
+    if (device->eglBaseSurface == EGL_NO_SURFACE)
+    {
+        SRMError("[%s] Failed to create base EGL surface.", device->name);
+        return 0;
+    }
+    */
     eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
-    eglBindAPI(EGL_OPENGL_ES_API);
 
     return 1;
 }

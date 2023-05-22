@@ -143,3 +143,8 @@ EGLDisplay *srmDeviceGetEGLDisplay(SRMDevice *device)
 {
     return device->eglDisplay;
 }
+
+EGLContext *srmDeviceGetEGLContext(SRMDevice *device)
+{
+    return device->eglSharedContext;
+}

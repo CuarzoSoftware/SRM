@@ -15,6 +15,7 @@
 SRMBuffer *srmBufferCreate(SRMCore *core)
 {
     SRMBuffer *buffer = calloc(1, sizeof(SRMBuffer));
+    pthread_mutex_init(&buffer->mutex, NULL);
     buffer->core = core;
     buffer->fd = -1;
     buffer->textures = srmListCreate();
@@ -42,6 +43,7 @@ Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
         close(prime_handle.fd);
         goto fail;
     }
+
 
     SRMDebug("[%s] Got buffer DMA fd using DRM_IOCTL_PRIME_HANDLE_TO_FD.", device->name);
     return prime_handle.fd;

@@ -4,6 +4,7 @@
 #include "../SRMBuffer.h"
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
+#include <pthread.h>
 #include <gbm.h>
 #include <linux/dma-buf.h>
 
@@ -22,6 +23,7 @@ struct SRMBufferTexture
 struct SRMBufferStruct
 {
     // Common
+    pthread_mutex_t mutex;
     enum SRM_BUFFER_SRC src;
 
     UInt32 caps;

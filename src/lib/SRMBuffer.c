@@ -32,6 +32,8 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
     buffer->format = format;
     const SRMGLFormat *glFmt;
 
+    pthread_mutex_lock(&buffer->mutex);
+
     // Try to use linear so that can be mapped
     buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_WRITE;
     buffer->bo = gbm_bo_create(core->allocatorDevice->gbm, width, height, format, buffer->flags);
@@ -90,6 +92,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     buffer->caps |= SRM_BUFFER_CAP_WRITE;
     SRMDebug("[%s] CPU buffer created using gbm_bo_write.", core->allocatorDevice->name);
+    pthread_mutex_unlock(&buffer->mutex);
     return buffer;
 
     gbmMap:
@@ -128,6 +131,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     buffer->caps |= SRM_BUFFER_CAP_READ | SRM_BUFFER_CAP_WRITE | SRM_BUFFER_CAP_MAP;
     SRMDebug("[%s] CPU buffer created using mapping.", core->allocatorDevice->name);
+    pthread_mutex_unlock(&buffer->mutex);
     return buffer;
 
     glesOnly:
@@ -236,10 +240,12 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     buffer->caps |= SRM_BUFFER_CAP_WRITE;
 
+    pthread_mutex_unlock(&buffer->mutex);
     return buffer;
 
     fail:
     SRMError("[%s] Failed to create CPU buffer.", core->allocatorDevice->name);
+    pthread_mutex_unlock(&buffer->mutex);
     srmBufferDestroy(buffer);
     return NULL;
 }
@@ -247,6 +253,8 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
 {
     SRMBuffer *buffer = srmBufferCreate(core);
+
+    pthread_mutex_lock(&buffer->mutex);
     buffer->src = SRM_BUFFER_SRC_WL_DRM;
 
     buffer->bo = gbm_bo_import(core->allocatorDevice->gbm, GBM_BO_IMPORT_WL_BUFFER, wlBuffer, GBM_BO_USE_RENDERING);
@@ -265,9 +273,11 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
     buffer->height = gbm_bo_get_height(buffer->bo);
     buffer->stride = gbm_bo_get_stride(buffer->bo);
     buffer->offset = gbm_bo_get_offset(buffer->bo, 0);
+    pthread_mutex_unlock(&buffer->mutex);
     return buffer;
 
     fail:
+    pthread_mutex_unlock(&buffer->mutex);
     free(buffer);
     return NULL;
 }
@@ -318,6 +328,8 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         return 0;
     }
 
+    pthread_mutex_lock(&buffer->mutex);
+
     // Creates the texture
     texture = calloc(1, sizeof(struct SRMBufferTexture));
     texture->device = device;
@@ -366,6 +378,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     {
         SRMError("srmBufferGetTextureID error. Failed to create EGL image.");
         free(texture);
+        pthread_mutex_unlock(&buffer->mutex);
         return 0;
     }
 
@@ -381,12 +394,14 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     srmListAppendData(buffer->textures, texture);
-
+    pthread_mutex_unlock(&buffer->mutex);
     return texture->texture;
 }
 
 void srmBufferDestroy(SRMBuffer *buffer)
 {
+    pthread_mutex_lock(&buffer->mutex);
+
     if (buffer->framebuffer)
     {
         srmCoreSendDeallocatorMessage(buffer->core,
@@ -432,6 +447,9 @@ void srmBufferDestroy(SRMBuffer *buffer)
         gbm_bo_destroy(buffer->bo);
     }
 
+    pthread_mutex_unlock(&buffer->mutex);
+    pthread_mutex_destroy(&buffer->mutex);
+
     free(buffer);
 }
 
@@ -447,6 +465,7 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         UInt32 dstOffset = buffer->offset + dstY*buffer->stride + dstX*buffer->pixelSize;
         UInt32 srcOffset = 0;
 
+        pthread_mutex_lock(&buffer->mutex);
         buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_WRITE;
         ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
 
@@ -462,6 +481,7 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
 
         buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
         ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
+        pthread_mutex_unlock(&buffer->mutex);
 
 
         /* Disable EGL image recreation

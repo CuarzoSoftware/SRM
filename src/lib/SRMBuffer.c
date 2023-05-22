@@ -21,6 +21,8 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <linux/dma-buf.h>
+#include <linux/dma-heap.h>
 
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UInt32 stride, const void *pixels, SRM_BUFFER_FORMAT format)
 {
@@ -34,12 +36,26 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     pthread_mutex_lock(&buffer->mutex);
 
-    // Try to use linear so that can be mapped
-    buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_WRITE;
-    buffer->bo = gbm_bo_create(core->allocatorDevice->gbm, width, height, format, buffer->flags);
+    buffer->modifier = DRM_FORMAT_MOD_LINEAR;
+    buffer->bo = gbm_bo_create_with_modifiers(core->allocatorDevice->gbm,
+                                              width,
+                                              height,
+                                              format,
+                                              &buffer->modifier,
+                                              1);
 
     if (!buffer->bo)
     {
+        SRMWarning("gbm_bo_create_with_modifiers failed.");
+
+        // Try to use linear so that can be mapped
+        buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_SCANOUT;
+        buffer->bo = gbm_bo_create(core->allocatorDevice->gbm, width, height, format, buffer->flags);
+    }
+
+    if (!buffer->bo)
+    {
+        SRMWarning("GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_SCANOUT failed.");
         buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR;
         buffer->bo = gbm_bo_create(core->allocatorDevice->gbm, width, height, format, buffer->flags);
     }
@@ -290,6 +306,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         return 0;
     }
 
+
     // Check if already created
     struct SRMBufferTexture *texture;
     SRMListForeach(item, buffer->textures)
@@ -410,6 +427,10 @@ void srmBufferDestroy(SRMBuffer *buffer)
                                       0,
                                       buffer->framebuffer);
     }
+
+    buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
+    ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
+
     if (buffer->textures)
     {
         while (!srmListIsEmpty(buffer->textures))
@@ -430,6 +451,9 @@ void srmBufferDestroy(SRMBuffer *buffer)
 
         srmListDestoy(buffer->textures);
     }
+
+    buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
+    ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
 
     if (buffer->bo)
     {

@@ -274,6 +274,12 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
 
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 {
+    if (buffer->src == SRM_BUFFER_SRC_WL_DRM && device != buffer->core->allocatorDevice)
+    {
+        SRMError("[%s] wl_drm buffers can only be accessed from allocator device.");
+        return 0;
+    }
+
     // Check if already created
     struct SRMBufferTexture *texture;
     SRMListForeach(item, buffer->textures)

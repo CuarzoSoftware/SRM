@@ -33,7 +33,7 @@ void srmListItemSetData(SRMListItem *item, void *data);
 
 // Loops
 #define SRMListForeach(item, list) for(SRMListItem *item = srmListGetFront(list); item != NULL; item = srmListItemGetNext(item))
-#define srmListForeachRev(item, list) for(SRMListItem *item = srmListGetBack(list); item != NULL; item = srmListItemGetPrev(item))
+#define SRMListForeachRev(item, list) for(SRMListItem *item = srmListGetBack(list); item != NULL; item = srmListItemGetPrev(item))
 
 #ifdef __cplusplus
 }

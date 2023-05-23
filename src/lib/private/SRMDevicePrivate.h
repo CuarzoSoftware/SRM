@@ -11,6 +11,13 @@
 extern "C" {
 #endif
 
+struct SRMBufferToDestroy
+{
+    GLuint textureID;
+    GLuint framebufferID;
+    EGLImage image;
+};
+
 struct SRMDeviceStruct
 {
     SRMCore *core;
@@ -59,7 +66,7 @@ struct SRMDeviceStruct
     SRMList *encoders;
     SRMList *planes;
     SRMList *connectors;
-
+    SRMList *buffersToDestroy;
 };
 
 SRMDevice *srmDeviceCreate(SRMCore *core, const char *name);
@@ -81,6 +88,8 @@ UInt8 srmDeviceUpdateCrtcs(SRMDevice *device);
 UInt8 srmDeviceUpdateEncoders(SRMDevice *device);
 UInt8 srmDeviceUpdatePlanes(SRMDevice *device);
 UInt8 srmDeviceUpdateConnectors(SRMDevice *device);
+
+void srmDeviceDestroyPendingBuffers(SRMDevice *device);
 
 #ifdef __cplusplus
 }

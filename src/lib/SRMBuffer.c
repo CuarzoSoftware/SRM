@@ -388,10 +388,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
                                EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->bo) >> 32),
                                EGL_NONE };
 
-    EGLSync fence = eglCreateSync(device->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
     texture->image = eglCreateImage(device->eglDisplay, NULL, EGL_LINUX_DMA_BUF_EXT, NULL, image_attribs);
-    eglWaitSync(device->eglDisplay, fence, 1000000);
-    eglDestroySync(device->eglDisplay, fence);
 
     if (texture->image == EGL_NO_IMAGE)
     {
@@ -421,6 +418,7 @@ void srmBufferDestroy(SRMBuffer *buffer)
 {
     pthread_mutex_lock(&buffer->mutex);
 
+    /*
     if (buffer->framebuffer)
     {
         srmCoreSendDeallocatorMessage(buffer->core,
@@ -429,7 +427,7 @@ void srmBufferDestroy(SRMBuffer *buffer)
                                       0,
                                       buffer->framebuffer,
                                       EGL_NO_IMAGE);
-    }
+    }*/
 
     buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
     ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
@@ -440,8 +438,13 @@ void srmBufferDestroy(SRMBuffer *buffer)
         {
             struct SRMBufferTexture *texture = srmListPopBack(buffer->textures);
 
-            EGLSync fence = eglCreateSync(texture->device->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
+            struct SRMBufferToDestroy *b = malloc(sizeof(struct SRMBufferToDestroy));
+            b->framebufferID = 0;
+            b->textureID = texture->texture;
+            b->image = texture->image;
 
+            srmListAppendData(texture->device->buffersToDestroy, b);
+            /*
             srmCoreSendDeallocatorMessage(buffer->core,
                                           SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
                                           texture->device,
@@ -452,8 +455,7 @@ void srmBufferDestroy(SRMBuffer *buffer)
             while (!srmListIsEmpty(buffer->core->deallocatorMessages))
                 usleep(100);
 
-            eglWaitSync(texture->device->eglDisplay, fence, 10000000);
-            eglDestroySync(texture->device->eglDisplay, fence);
+           */
 
             free(texture);
         }

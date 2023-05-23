@@ -29,6 +29,7 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
     device->core = core;
     device->enabled = 1;
     device->eglDevice = EGL_NO_DEVICE_EXT;
+    device->buffersToDestroy = srmListCreate();
 
 
     device->fd = core->interface->openRestricted(name,
@@ -641,4 +642,23 @@ UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device)
         return 0;
     }
     return 1;
+}
+
+void srmDeviceDestroyPendingBuffers(SRMDevice *device)
+{
+    while(!srmListIsEmpty(device->buffersToDestroy))
+    {
+        struct SRMBufferToDestroy *buff = srmListPopBack(device->buffersToDestroy);
+
+        if (buff->framebufferID)
+            glDeleteFramebuffers(1, &buff->framebufferID);
+
+        if (buff->textureID)
+            glDeleteTextures(1, &buff->textureID);
+
+        if (buff->image != EGL_NO_IMAGE)
+            eglDestroyImage(device->eglDisplay, buff->image);
+
+        free(buff);
+    }
 }

@@ -518,6 +518,8 @@ void *srmCoreDeallocatorLoop(void *data)
                                EGL_NO_SURFACE,
                                message->device->eglDeallocatorContext);
 
+                EGLSync fence = eglCreateSync(message->device->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
+
                 if (message->textureID)
                 {
                     SRMDebug("[%s] GL Texture (%d) deleted.", message->device->name, message->textureID);
@@ -532,7 +534,8 @@ void *srmCoreDeallocatorLoop(void *data)
 
                 core->deallocatorState = 1;
 
-
+                eglWaitSync(message->device->eglDisplay, fence, 1000000);
+                eglDestroySync(message->device->eglDisplay, fence);
             }
             else if (message->msg == SRM_DEALLOCATOR_MSG_CREATE_CONTEXT)
             {

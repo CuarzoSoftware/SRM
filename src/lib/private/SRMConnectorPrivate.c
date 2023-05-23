@@ -488,9 +488,12 @@ void *srmConnectorRenderThread(void *conn)
 
         if (connector->repaintRequested && connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
         {
+            EGLSync fence = eglCreateSync(connector->device->rendererDevice->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
             connector->repaintRequested = 0;
             connector->renderInterface.render(connector);
             connector->renderInterface.flipPage(connector);
+            eglWaitSync(connector->device->rendererDevice->eglDisplay, fence, 1000000);
+            eglDestroySync(connector->device->rendererDevice->eglDisplay, fence);
         }
         else if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {

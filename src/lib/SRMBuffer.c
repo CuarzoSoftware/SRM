@@ -24,8 +24,50 @@
 #include <linux/dma-buf.h>
 #include <linux/dma-heap.h>
 
+SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMBufferDMAData *dmaData)
+{
+    if (dmaData->num_fds < 1 || dmaData->num_fds > 4)
+    {
+        SRMError("[%s] Can not import DMA buffer with %d fds.",
+                 core->allocatorDevice->name, dmaData->num_fds);
+        return NULL;
+    }
+
+    if (dmaData->width == 0 || dmaData->height == 0)
+    {
+        SRMError("[%s] Can not import DMA buffer with size %dx%dpx.",
+                 core->allocatorDevice->name, dmaData->width, dmaData->height);
+        return NULL;
+    }
+
+    SRMBuffer *buffer = srmBufferCreate(core);
+    buffer->src = SRM_BUFFER_SRC_DMA;
+    buffer->format = dmaData->format;
+    buffer->width = dmaData->width;
+    buffer->height = dmaData->height;
+    buffer->planesCount = dmaData->num_fds;
+
+    for (UInt32 i = 0; i < buffer->planesCount; i++)
+    {
+        buffer->fds[i] = dmaData->fds[i];
+        buffer->offsets[i] = dmaData->offsets[i];
+        buffer->strides[i] = dmaData->strides[i];
+        buffer->modifiers[i] = dmaData->modifiers[i];
+
+    }
+
+    return buffer;
+}
+
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UInt32 stride, const void *pixels, SRM_BUFFER_FORMAT format)
 {
+    if (width == 0 || height == 0)
+    {
+        SRMError("[%s] Can not create CPU buffer with size %dx%dpx.",
+                 core->allocatorDevice->name, width, height);
+        return NULL;
+    }
+
     SRMBuffer *buffer = srmBufferCreate(core);
     buffer->src = SRM_BUFFER_SRC_CPU;
     buffer->planesCount = 1;
@@ -36,12 +78,12 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     pthread_mutex_lock(&buffer->mutex);
 
-    buffer->modifier = DRM_FORMAT_MOD_LINEAR;
+    buffer->modifiers[0] = DRM_FORMAT_MOD_LINEAR;
     buffer->bo = gbm_bo_create_with_modifiers(core->allocatorDevice->gbm,
                                               width,
                                               height,
                                               format,
-                                              &buffer->modifier,
+                                              &buffer->modifiers[0],
                                               1);
 
     if (!buffer->bo)
@@ -74,20 +116,20 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
         goto glesOnly;
     }
 
-    buffer->modifier = gbm_bo_get_modifier(buffer->bo);
-    buffer->stride = gbm_bo_get_stride(buffer->bo);
+    buffer->modifiers[0] = gbm_bo_get_modifier(buffer->bo);
+    buffer->strides[0] = gbm_bo_get_stride(buffer->bo);
     buffer->pixelSize = buffer->bpp/8;
 
-    buffer->fd = srmBufferGetDMAFDFromBO(core->allocatorDevice, buffer->bo);
+    buffer->fds[0] = srmBufferGetDMAFDFromBO(core->allocatorDevice, buffer->bo);
 
-    if (buffer->fd >= 0)
+    if (buffer->fds[0] >= 0)
     {
         // Map the DMA buffer into user space
-        buffer->map = mmap(NULL, height * buffer->stride, PROT_READ | PROT_WRITE, MAP_SHARED, buffer->fd, 0);
+        buffer->map = mmap(NULL, height * buffer->strides[0], PROT_READ | PROT_WRITE, MAP_SHARED, buffer->fds[0], 0);
 
         if (buffer->map == MAP_FAILED)
         {
-            buffer->map = mmap(NULL, height * buffer->stride, PROT_WRITE, MAP_SHARED, buffer->fd, 0);
+            buffer->map = mmap(NULL, height * buffer->strides[0], PROT_WRITE, MAP_SHARED, buffer->fds[0], 0);
 
             if (buffer->map == MAP_FAILED)
             {
@@ -113,7 +155,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     gbmMap:
 
-    buffer->map = gbm_bo_map(buffer->bo, 0, 0, width, height, GBM_BO_TRANSFER_READ, &buffer->stride, &buffer->mapData);
+    buffer->map = gbm_bo_map(buffer->bo, 0, 0, width, height, GBM_BO_TRANSFER_READ, &buffer->strides[0], &buffer->mapData);
 
     if (!buffer->map)
     {
@@ -123,31 +165,19 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
 
     SRMDebug("[%s] Buffer mapped with gbm_bo_map().", core->allocatorDevice->name);
 
-    /* Only if LINEAR */
-
     mapWrite:
 
-    buffer->offset = gbm_bo_get_offset(buffer->bo, 0);
-
-    const UInt8 *src = pixels;
-    UInt8 *dst = buffer->map;
-
-    buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_WRITE;
-    ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
-
-    for (UInt32 i = 0; i < height; i++)
-    {
-        memcpy(&dst[buffer->offset + i*buffer->stride],
-               &src[i*stride],
-               stride);
-    }
-
-    buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
-    ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
+    buffer->offsets[0] = gbm_bo_get_offset(buffer->bo, 0);
 
     buffer->caps |= SRM_BUFFER_CAP_READ | SRM_BUFFER_CAP_WRITE | SRM_BUFFER_CAP_MAP;
+
+    pthread_mutex_unlock(&buffer->mutex);
+    srmBufferWrite(buffer, stride, 0, 0, width, height, pixels);
+    pthread_mutex_lock(&buffer->mutex);
+
     SRMDebug("[%s] CPU buffer created using mapping.", core->allocatorDevice->name);
     pthread_mutex_unlock(&buffer->mutex);
+
     return buffer;
 
     glesOnly:
@@ -173,7 +203,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, UInt32 width, UInt32 height, UI
     if (srmFormatGetDepthBpp(format, &depth, &buffer->bpp))
     {
         buffer->pixelSize = buffer->bpp/8;
-        buffer->stride = buffer->pixelSize*width;
+        buffer->strides[0] = buffer->pixelSize*width;
     }
 
     // Creates the texture
@@ -277,7 +307,7 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
 
     if (!buffer->bo)
     {
-        SRMDebug("[%s] Failed to create buffer from WL_DRM.", core->allocatorDevice->name);
+        SRMDebug("[%s] Failed to create buffer from wl_drm.", core->allocatorDevice->name);
         goto fail;
     }
 
@@ -287,8 +317,13 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
     buffer->format = gbm_bo_get_format(buffer->bo);
     buffer->width = gbm_bo_get_width(buffer->bo);
     buffer->height = gbm_bo_get_height(buffer->bo);
-    buffer->stride = gbm_bo_get_stride(buffer->bo);
-    buffer->offset = gbm_bo_get_offset(buffer->bo, 0);
+
+    for (UInt32 i = 0; i < buffer->planesCount; i++)
+    {
+        buffer->strides[i] = gbm_bo_get_stride_for_plane(buffer->bo, i);
+        buffer->offsets[i] = gbm_bo_get_offset(buffer->bo, i);
+    }
+
     pthread_mutex_unlock(&buffer->mutex);
     return buffer;
 
@@ -306,7 +341,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         return 0;
     }
 
-
     // Check if already created
     struct SRMBufferTexture *texture;
     SRMListForeach(item, buffer->textures)
@@ -317,7 +351,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         {
             if (texture->updated)
             {
-
                 /* TODO: Some GPUs do not require EGL image recreation when the DMA buf is updated. Check with glRead or
                  * something like that if it needs it */
 
@@ -328,7 +361,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
                                               0,
                                               texture->image);
 
-
                 free(texture);
                 srmListRemoveItem(buffer->textures, item);
                 break;
@@ -338,12 +370,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         }
     }
 
-    if (!buffer->bo)
-    {
-        SRMError("srmBufferGetTextureID error. Buffer is not shareable.");
-        return 0;
-    }
-
     pthread_mutex_lock(&buffer->mutex);
 
     // Creates the texture
@@ -351,7 +377,10 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     texture->device = device;
     texture->image = EGL_NO_IMAGE;
 
-    if (device == buffer->core->allocatorDevice)
+    UInt32 index = 0;
+    EGLAttrib imageAttribs[sizeof(EGLAttrib)*(6 + 10*buffer->planesCount) + 1];
+
+    if (device == buffer->core->allocatorDevice && buffer->bo)
     {
         texture->image = eglCreateImage(device->eglDisplay, device->eglSharedContext, EGL_NATIVE_PIXMAP_KHR, buffer->bo, NULL);
 
@@ -371,24 +400,34 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         goto skipDMA;
     }
 
-    if (buffer->fd == -1)
-        buffer->fd = srmBufferGetDMAFDFromBO(buffer->core->allocatorDevice, buffer->bo);
+    if (buffer->fds[0] == -1)
+    {
+        buffer->fds[0] = srmBufferGetDMAFDFromBO(buffer->core->allocatorDevice, buffer->bo);
 
-    if (buffer->fd == -1)
+        for (UInt32 i = 1; i < buffer->planesCount; i++)
+            buffer->fds[i] = buffer->fds[0];
+    }
+
+    if (buffer->fds[0] == -1)
         goto skipDMA;
 
-    EGLAttrib image_attribs[] = {
-                               EGL_WIDTH, gbm_bo_get_width(buffer->bo),
-                               EGL_HEIGHT, gbm_bo_get_height(buffer->bo),
-                               EGL_LINUX_DRM_FOURCC_EXT, gbm_bo_get_format(buffer->bo),
-                               EGL_DMA_BUF_PLANE0_FD_EXT, buffer->fd,
-                               EGL_DMA_BUF_PLANE0_OFFSET_EXT, gbm_bo_get_offset(buffer->bo, 0),
-                               EGL_DMA_BUF_PLANE0_PITCH_EXT, gbm_bo_get_stride_for_plane(buffer->bo, 0),
-                               EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->bo) & 0xffffffff),
-                               EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, (EGLAttrib)(gbm_bo_get_modifier(buffer->bo) >> 32),
-                               EGL_NONE };
+    imageAttribs[index++] = EGL_WIDTH;
+    imageAttribs[index++] = buffer->width;
+    imageAttribs[index++] = EGL_HEIGHT;
+    imageAttribs[index++] = buffer->height;
+    imageAttribs[index++] = EGL_LINUX_DRM_FOURCC_EXT;
+    imageAttribs[index++] = buffer->format;
 
-    texture->image = eglCreateImage(device->eglDisplay, NULL, EGL_LINUX_DMA_BUF_EXT, NULL, image_attribs);
+    EGL_DMA_PLANE_DEF(0)
+    EGL_DMA_PLANE_DEF(1)
+    EGL_DMA_PLANE_DEF(2)
+    EGL_DMA_PLANE_DEF(3)
+
+    imageAttribs[index++] = EGL_NONE;
+
+    texture->image = eglCreateImage(device->eglDisplay, NULL, EGL_LINUX_DMA_BUF_EXT, NULL, imageAttribs);
+
+    skipDMA:
 
     if (texture->image == EGL_NO_IMAGE)
     {
@@ -397,8 +436,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         pthread_mutex_unlock(&buffer->mutex);
         return 0;
     }
-
-    skipDMA:
 
     glGenTextures(1, &texture->texture);
     glBindTexture(GL_TEXTURE_2D, texture->texture);
@@ -418,7 +455,6 @@ void srmBufferDestroy(SRMBuffer *buffer)
 {
     pthread_mutex_lock(&buffer->mutex);
 
-    /*
     if (buffer->framebuffer)
     {
         srmCoreSendDeallocatorMessage(buffer->core,
@@ -427,10 +463,7 @@ void srmBufferDestroy(SRMBuffer *buffer)
                                       0,
                                       buffer->framebuffer,
                                       EGL_NO_IMAGE);
-    }*/
-
-    buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
-    ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
+    }
 
     if (buffer->textures)
     {
@@ -438,13 +471,6 @@ void srmBufferDestroy(SRMBuffer *buffer)
         {
             struct SRMBufferTexture *texture = srmListPopBack(buffer->textures);
 
-            struct SRMBufferToDestroy *b = malloc(sizeof(struct SRMBufferToDestroy));
-            b->framebufferID = 0;
-            b->textureID = texture->texture;
-            b->image = texture->image;
-
-            srmListAppendData(texture->device->buffersToDestroy, b);
-            /*
             srmCoreSendDeallocatorMessage(buffer->core,
                                           SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
                                           texture->device,
@@ -452,19 +478,21 @@ void srmBufferDestroy(SRMBuffer *buffer)
                                           0,
                                           texture->image);
 
-            while (!srmListIsEmpty(buffer->core->deallocatorMessages))
-                usleep(100);
-
-           */
-
             free(texture);
         }
 
         srmListDestoy(buffer->textures);
     }
 
-    buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
-    ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
+    while (!srmListIsEmpty(buffer->core->deallocatorMessages))
+        usleep(10);
+
+
+    for (UInt32 i = 0; i < buffer->planesCount; i++)
+    {
+        if (buffer->fds[i] != -1)
+            close(buffer->fds[i]);
+    }
 
     if (buffer->bo)
     {
@@ -473,11 +501,8 @@ void srmBufferDestroy(SRMBuffer *buffer)
             if (buffer->mapData)
                 gbm_bo_unmap(buffer->bo, buffer->mapData);
             else
-                munmap(buffer->map, buffer->height * buffer->stride);
+                munmap(buffer->map, buffer->height * buffer->strides[0]);
         }
-
-        if (buffer->fd != -1)
-            close(buffer->fd);
 
         gbm_bo_destroy(buffer->bo);
     }
@@ -496,26 +521,24 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
     if (buffer->map)
     {
         const UInt8 *src = pixels;
-        UInt8 *dst = buffer->map;
-        UInt32 dstOffset = buffer->offset + dstY*buffer->stride + dstX*buffer->pixelSize;
-        UInt32 srcOffset = 0;
+        UInt8 *dst = &buffer->map[buffer->offsets[0] + dstY*buffer->strides[0] + dstX*buffer->pixelSize];
 
         pthread_mutex_lock(&buffer->mutex);
         buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_WRITE;
-        ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
+        ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
 
         for (UInt32 i = 0; i < dstHeight; i++)
         {
-            memcpy(&dst[dstOffset],
-                   &src[srcOffset],
+            memcpy(dst,
+                   src,
                    buffer->pixelSize * dstWidth);
 
-            dstOffset += buffer->stride;
-            srcOffset += stride;
+            dst += buffer->strides[0];
+            src += stride;
         }
 
         buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
-        ioctl(buffer->fd, DMA_BUF_IOCTL_SYNC, &buffer->sync);
+        ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
         pthread_mutex_unlock(&buffer->mutex);
 
 
@@ -542,7 +565,6 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
                         buffer->glFormat, buffer->glType, pixels);
 
         glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
-
         glFlush();
 
         /* SRMDebug("[%s] Buffer written using glTexSubImage2D.", buffer->core->allocatorDevice->name); */
@@ -554,8 +576,6 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
     SRMError("[%s] Buffer can not be written.", buffer->core->allocatorDevice->name);
     return 0;
 }
-
-
 
 SRM_BUFFER_FORMAT srmBufferGetFormat(SRMBuffer *buffer)
 {

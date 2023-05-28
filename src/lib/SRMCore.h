@@ -21,7 +21,7 @@ SRMListener *srmCoreAddConnectorUnpluggedEventListener(SRMCore *core, void(*call
 const SRMEGLCoreExtensions *srmCoreGetEGLExtensions(SRMCore *core);
 const SRMEGLCoreFunctions *srmCoreGetEGLFunctions(SRMCore *core);
 
-/* Formats supported by all rendering GPUs */
+/* DMA formats supported by all rendering GPUs */
 SRMList *srmCoreGetSharedDMATextureFormats(SRMCore *core);
 
 void srmCoreDestroy(SRMCore *core);

@@ -22,14 +22,11 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
 {
     SRMDevice *device = calloc(1, sizeof(SRMDevice));
 
-    Int32 len = strlen(name);
-    device->name = malloc(len);
-    strcpy(device->name, name);
+    strncpy(device->name, name, sizeof(device->name));
 
     device->core = core;
     device->enabled = 1;
     device->eglDevice = EGL_NO_DEVICE_EXT;
-    device->buffersToDestroy = srmListCreate();
 
 
     device->fd = core->interface->openRestricted(name,
@@ -370,6 +367,7 @@ void srmDeviceDestroyDMAFormats(SRMDevice *device)
     srmFormatsListDestroy(&device->dmaTextureFormats);
 }
 
+/*
 static const EGLint eglConfigAttribs[] =
     {
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
@@ -379,7 +377,7 @@ static const EGLint eglConfigAttribs[] =
         EGL_ALPHA_SIZE, 0,
         EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
         EGL_NONE
-};
+};*/
 
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 {
@@ -634,7 +632,7 @@ UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device)
     srmCoreSendDeallocatorMessage(device->core, SRM_DEALLOCATOR_MSG_CREATE_CONTEXT, device, 0, 0, EGL_NO_IMAGE);
 
     while (device->core->deallocatorState == 0)
-        usleep(1000);
+        usleep(10);
 
     if (device->core->deallocatorState == -1)
     {
@@ -644,21 +642,3 @@ UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device)
     return 1;
 }
 
-void srmDeviceDestroyPendingBuffers(SRMDevice *device)
-{
-    while(!srmListIsEmpty(device->buffersToDestroy))
-    {
-        struct SRMBufferToDestroy *buff = srmListPopBack(device->buffersToDestroy);
-
-        if (buff->framebufferID)
-            glDeleteFramebuffers(1, &buff->framebufferID);
-
-        if (buff->textureID)
-            glDeleteTextures(1, &buff->textureID);
-
-        if (buff->image != EGL_NO_IMAGE)
-            eglDestroyImage(device->eglDisplay, buff->image);
-
-        free(buff);
-    }
-}

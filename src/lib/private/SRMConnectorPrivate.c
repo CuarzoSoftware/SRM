@@ -490,7 +490,6 @@ void *srmConnectorRenderThread(void *conn)
         {
             connector->repaintRequested = 0;
             connector->renderInterface.render(connector);
-            srmDeviceDestroyPendingBuffers(connector->device->rendererDevice);
             connector->renderInterface.flipPage(connector);
         }
         else if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)

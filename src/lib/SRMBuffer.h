@@ -8,6 +8,8 @@
 extern "C" {
 #endif
 
+#define SRM_MAX_PLANES 4
+
 enum SRM_BUFFER_CAP
 {
     SRM_BUFFER_CAP_READ = 1,
@@ -18,8 +20,23 @@ enum SRM_BUFFER_CAP
 enum SRM_BUFFER_SRC
 {
     SRM_BUFFER_SRC_CPU,
+    SRM_BUFFER_SRC_DMA,
     SRM_BUFFER_SRC_WL_DRM
 };
+
+struct SRMBufferDMADataStruct
+{
+    UInt32 width;
+    UInt32 height;
+    UInt32 format;
+    UInt32 num_fds;
+    Int32 fds[SRM_MAX_PLANES];
+    UInt32 strides[SRM_MAX_PLANES];
+    UInt32 offsets[SRM_MAX_PLANES];
+    UInt64 modifiers[SRM_MAX_PLANES];
+};
+
+SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMBufferDMAData *dmaData);
 
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core,
                                   UInt32 width,

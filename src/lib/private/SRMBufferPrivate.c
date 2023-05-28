@@ -17,9 +17,12 @@ SRMBuffer *srmBufferCreate(SRMCore *core)
     SRMBuffer *buffer = calloc(1, sizeof(SRMBuffer));
     pthread_mutex_init(&buffer->mutex, NULL);
     buffer->core = core;
-    buffer->fd = -1;
+
+    for (int i = 0; i < SRM_MAX_PLANES; i++)
+        buffer->fds[i] = -1;
+
     buffer->textures = srmListCreate();
-    buffer->modifier = DRM_FORMAT_MOD_INVALID;
+    buffer->modifiers[0] = DRM_FORMAT_MOD_INVALID;
     return buffer;    
 }
 

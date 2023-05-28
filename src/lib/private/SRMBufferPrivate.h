@@ -12,6 +12,21 @@
 extern "C" {
 #endif
 
+#define EGL_DMA_PLANE_DEF(planes_n) \
+if (buffer->planesCount > planes_n) \
+{ \
+    imageAttribs[index++] = EGL_DMA_BUF_PLANE ## planes_n ## _FD_EXT; \
+    imageAttribs[index++] = buffer->fds[planes_n]; \
+    imageAttribs[index++] = EGL_DMA_BUF_PLANE ## planes_n ## _OFFSET_EXT; \
+    imageAttribs[index++] = buffer->offsets[planes_n]; \
+    imageAttribs[index++] = EGL_DMA_BUF_PLANE ## planes_n ## _PITCH_EXT; \
+    imageAttribs[index++] = buffer->strides[planes_n]; \
+    imageAttribs[index++] = EGL_DMA_BUF_PLANE ## planes_n ## _MODIFIER_LO_EXT; \
+    imageAttribs[index++] = buffer->modifiers[planes_n] & 0xffffffff; \
+    imageAttribs[index++] = EGL_DMA_BUF_PLANE ## planes_n ## _MODIFIER_HI_EXT; \
+    imageAttribs[index++] = buffer->modifiers[planes_n] >> 32; \
+} \
+
 struct SRMBufferTexture
 {
     SRMDevice *device;
@@ -26,16 +41,13 @@ struct SRMBufferStruct
     pthread_mutex_t mutex;
     enum SRM_BUFFER_SRC src;
 
-    UInt32 caps;
-    UInt32 planesCount;
-    UInt32 format;
     UInt32 width;
     UInt32 height;
+    UInt32 format;
+    UInt32 caps;
+
     UInt32 bpp;
     UInt32 pixelSize;
-    UInt32 stride;
-    UInt32 offset;
-    UInt64 modifier;
     SRMCore *core;
     SRMList *textures;
 
@@ -45,7 +57,11 @@ struct SRMBufferStruct
     void *mapData;
 
     // DMA
-    Int32 fd;
+    UInt32 planesCount;
+    UInt64 modifiers[SRM_MAX_PLANES];
+    Int32 fds[SRM_MAX_PLANES];
+    UInt32 strides[SRM_MAX_PLANES];
+    UInt32 offsets[SRM_MAX_PLANES];
     void *map;
     struct dma_buf_sync sync;
 

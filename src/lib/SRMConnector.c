@@ -300,9 +300,7 @@ UInt8 srmConnectorRepaint(SRMConnector *connector)
         connector->state == SRM_CONNECTOR_STATE_INITIALIZED ||
         connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
     {
-
         srmConnectorUnlockRenderThread(connector);
-
         return 1;
     }
 
@@ -317,7 +315,6 @@ void srmConnectorUninitialize(SRMConnector *connector)
     {
         usleep(20000);
     }
-
 
     // Nothing to do
     if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED ||
@@ -387,4 +384,52 @@ UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)
         return 0;
 
     return connector->renderInterface.getCurrentBufferIndex(connector);
+}
+
+UInt8 srmConnectorPause(SRMConnector *connector)
+{
+    switch (connector->state)
+    {
+        case SRM_CONNECTOR_STATE_PAUSED:
+            return 1;
+        case SRM_CONNECTOR_STATE_UNINITIALIZED:
+        case SRM_CONNECTOR_STATE_UNINITIALIZING:
+            return 0;
+        case SRM_CONNECTOR_STATE_INITIALIZED:
+        {
+            connector->state = SRM_CONNECTOR_STATE_PAUSING;
+            return srmConnectorPause(connector);
+        }
+        default:
+        {
+            srmConnectorUnlockRenderThread(connector);
+            usleep(100);
+            return srmConnectorPause(connector);
+        }
+    }
+    return 0;
+}
+
+UInt8 srmConnectorResume(SRMConnector *connector)
+{
+    switch (connector->state)
+    {
+        case SRM_CONNECTOR_STATE_INITIALIZED:
+                return 1;
+        case SRM_CONNECTOR_STATE_UNINITIALIZED:
+        case SRM_CONNECTOR_STATE_UNINITIALIZING:
+                return 0;
+        case SRM_CONNECTOR_STATE_PAUSED:
+        {
+                connector->state = SRM_CONNECTOR_STATE_RESUMING;
+                return srmConnectorResume(connector);
+        }
+        default:
+        {
+                srmConnectorUnlockRenderThread(connector);
+                usleep(100);
+                return srmConnectorResume(connector);
+        }
+    }
+    return 0;
 }

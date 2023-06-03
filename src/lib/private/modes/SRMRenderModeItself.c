@@ -526,7 +526,7 @@ static UInt8 updateMode(SRMConnector *connector)
 
         destroyEGLSurfaces(connector);
 
-        /* destroyEGLContext(connector); dont destroy user GL objects */
+        /* destroyEGLContext(connector); do not destroy user GL objects */
 
         destroyDRMFramebuffers(connector);
         destroyGBMSurfaces(connector);
@@ -545,6 +545,39 @@ static UInt32 getCurrentBufferIndex(SRMConnector *connector)
     return data->currentBufferIndex;
 }
 
+static void pauseRendering(SRMConnector *connector)
+{
+    drmModeSetCrtc(connector->device->fd,
+                   connector->currentCrtc->id,
+                   0,
+                   0,
+                   0,
+                   NULL,
+                   0,
+                   NULL);
+}
+
+static void resumeRendering(SRMConnector *connector)
+{
+    RenderModeData *data = (RenderModeData*)connector->renderData;
+
+    Int32 ret = drmModeSetCrtc(connector->device->fd,
+                               connector->currentCrtc->id,
+                               data->connectorDRMFramebuffers[data->currentBufferIndex],
+                               0,
+                               0,
+                               &connector->id,
+                               1,
+                               &connector->currentMode->info);
+
+    if (ret)
+    {
+        SRMError("Failed to resume crtc mode on device %s connector %d.",
+                 connector->device->name,
+                 connector->id);
+    }
+}
+
 void srmRenderModeItselfSetInterface(SRMConnector *connector)
 {
     connector->renderInterface.initialize = &initialize;
@@ -553,4 +586,6 @@ void srmRenderModeItselfSetInterface(SRMConnector *connector)
     connector->renderInterface.updateMode = &updateMode;
     connector->renderInterface.getCurrentBufferIndex = &getCurrentBufferIndex;
     connector->renderInterface.uninitialize = &uninitialize;
+    connector->renderInterface.pause = &pauseRendering;
+    connector->renderInterface.resume = &resumeRendering;
 }

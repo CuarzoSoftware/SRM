@@ -495,21 +495,27 @@ void *srmConnectorRenderThread(void *conn)
         else if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {
             if (connector->renderInterface.updateMode(connector))
-            {
                 connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
-                SRMDebug("Mode success.");
-            }
             else
-            {
                 connector->state = SRM_CONNECTOR_STATE_REVERTING_MODE;
-                SRMDebug("Mode fail.");
-            }
         }
         else if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING)
         {
             connector->renderInterface.uninitialize(connector);
             connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
             break;
+        }
+        else if (connector->state == SRM_CONNECTOR_STATE_PAUSING)
+        {
+            connector->state = SRM_CONNECTOR_STATE_PAUSED;
+            connector->renderInterface.pause(connector);
+            SRMDebug("[%s] Connector %d paused.", connector->device->rendererDevice->name, connector->id);
+        }
+        else if (connector->state == SRM_CONNECTOR_STATE_RESUMING)
+        {
+            connector->renderInterface.resume(connector);
+            connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
+            SRMDebug("[%s] Connector %d resumed.", connector->device->rendererDevice->name, connector->id);
         }
     }
 
@@ -529,6 +535,3 @@ void srmConnectorUnlockRenderThread(SRMConnector *connector)
     pthread_cond_signal(&connector->repaintCond);
     //pthread_mutex_unlock(&connector->repaintMutex);
 }
-
-
-

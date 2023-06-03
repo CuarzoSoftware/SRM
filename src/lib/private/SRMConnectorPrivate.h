@@ -20,6 +20,8 @@ struct SRMConnectorRenderInterface
     UInt8(*updateMode)(SRMConnector *connector);
     UInt32(*getCurrentBufferIndex)(SRMConnector *connector);
     void (*uninitialize)(SRMConnector *connector);
+    void (*pause)(SRMConnector *connector);
+    void (*resume)(SRMConnector *connector);
 };
 
 struct SRMConnectorPropIDs

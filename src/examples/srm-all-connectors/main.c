@@ -400,9 +400,7 @@ int main(void)
 
             srmBufferWrite(buffer, BUF_STRIDE, 0, 0, BUF_WIDTH, BUF_HEIGHT, bufferPixels);
         }
-
     }
-
 
     /* Unsubscribe to DRM events
      *

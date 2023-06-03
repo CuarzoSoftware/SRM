@@ -45,6 +45,8 @@ UInt8 srmConnectorSetMode(SRMConnector *connector, SRMConnectorMode *mode);
 UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *interface, void *userData);
 UInt8 srmConnectorRepaint(SRMConnector *connector);
 void srmConnectorUninitialize(SRMConnector *connector);
+UInt8 srmConnectorPause(SRMConnector *connector);
+UInt8 srmConnectorResume(SRMConnector *connector);
 UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector);
 
 #ifdef __cplusplus

@@ -486,13 +486,19 @@ void *srmConnectorRenderThread(void *conn)
         if (!srmRenderModeCommonWaitRepaintRequest(connector))
             break;
 
-        if (connector->repaintRequested && connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
+        if (connector->repaintRequested)
         {
             connector->repaintRequested = 0;
-            connector->renderInterface.render(connector);
-            connector->renderInterface.flipPage(connector);
+
+            if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
+            {
+                connector->renderInterface.render(connector);
+                connector->renderInterface.flipPage(connector);
+                continue;
+            }
         }
-        else if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
+
+        if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {
             if (connector->renderInterface.updateMode(connector))
                 connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
@@ -513,10 +519,11 @@ void *srmConnectorRenderThread(void *conn)
         }
         else if (connector->state == SRM_CONNECTOR_STATE_RESUMING)
         {
-            connector->renderInterface.resume(connector);
             connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
+            connector->renderInterface.resume(connector);
             SRMDebug("[%s] Connector %d resumed.", connector->device->rendererDevice->name, connector->id);
         }
+
     }
 
     return NULL;

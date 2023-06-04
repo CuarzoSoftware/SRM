@@ -343,6 +343,9 @@ static UInt8 flipPage(SRMConnector *connector)
 
     while(connector->pendingPageFlip)
     {
+        if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
+            break;
+
         // Prevent multiple threads invoking the drmHandleEvent at a time wich causes bugs
         // If more than 1 connector is requesting a page flip, both can be handled here
         // since the struct passed to drmHandleEvent is standard and could be handling events
@@ -356,11 +359,10 @@ static UInt8 flipPage(SRMConnector *connector)
             break;
         }
 
-        poll(&fds, 1, -1);
+        poll(&fds, 1, 100);
 
         if(fds.revents & POLLIN)
         {
-
             drmHandleEvent(fds.fd, &connector->drmEventCtx);
         }
 

@@ -403,7 +403,7 @@ UInt8 srmConnectorPause(SRMConnector *connector)
         default:
         {
             srmConnectorUnlockRenderThread(connector);
-            usleep(100);
+            usleep(10000);
             return srmConnectorPause(connector);
         }
     }
@@ -427,7 +427,7 @@ UInt8 srmConnectorResume(SRMConnector *connector)
         default:
         {
                 srmConnectorUnlockRenderThread(connector);
-                usleep(100);
+                usleep(10000);
                 return srmConnectorResume(connector);
         }
     }

@@ -488,10 +488,9 @@ void *srmConnectorRenderThread(void *conn)
 
         if (connector->repaintRequested)
         {
-            connector->repaintRequested = 0;
-
             if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
             {
+                connector->repaintRequested = 0;
                 connector->renderInterface.render(connector);
                 connector->renderInterface.flipPage(connector);
                 continue;

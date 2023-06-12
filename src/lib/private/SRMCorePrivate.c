@@ -525,9 +525,6 @@ void *srmCoreDeallocatorLoop(void *data)
                     glDeleteTextures(1, &message->textureID);
                 }
 
-                if (message->framebufferID)
-                    glDeleteFramebuffers(1, &message->framebufferID);
-
                 if (message->image != EGL_NO_IMAGE)
                     eglDestroyImage(message->device->eglDisplay, message->image);
 
@@ -592,7 +589,6 @@ void srmCoreSendDeallocatorMessage(SRMCore *core,
                                     enum SRM_DEALLOCATOR_MSG msg,
                                     SRMDevice *device,
                                     GLuint textureID,
-                                    GLuint framebufferID,
                                     EGLImage image)
 {
     pthread_mutex_lock(&core->deallocatorMutex);
@@ -601,7 +597,6 @@ void srmCoreSendDeallocatorMessage(SRMCore *core,
     message->msg = msg;
     message->device = device;
     message->textureID = textureID;
-    message->framebufferID = framebufferID;
     message->image = image;
     srmListAppendData(core->deallocatorMessages, message);
     pthread_cond_signal(&core->deallocatorCond);

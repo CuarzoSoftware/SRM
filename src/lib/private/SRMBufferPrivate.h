@@ -66,7 +66,6 @@ struct SRMBufferStruct
     struct dma_buf_sync sync;
 
     // Gles
-    GLuint framebuffer;
     GLint glInternalFormat;
     GLint glFormat;
     GLint glType;

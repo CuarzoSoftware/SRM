@@ -3,6 +3,7 @@
 
 #include "SRMTypes.h"
 #include <GLES2/gl2.h>
+#include <gbm.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,7 +22,8 @@ enum SRM_BUFFER_SRC
 {
     SRM_BUFFER_SRC_CPU,
     SRM_BUFFER_SRC_DMA,
-    SRM_BUFFER_SRC_WL_DRM
+    SRM_BUFFER_SRC_WL_DRM,
+    SRM_BUFFER_SRC_GBM,
 };
 
 struct SRMBufferDMADataStruct
@@ -35,6 +37,8 @@ struct SRMBufferDMADataStruct
     UInt32 offsets[SRM_MAX_PLANES];
     UInt64 modifiers[SRM_MAX_PLANES];
 };
+
+SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo);
 
 SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMBufferDMAData *dmaData);
 

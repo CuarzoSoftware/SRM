@@ -222,6 +222,15 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
         device->eglFunctions.eglQueryDmaBufModifiersEXT = (PFNEGLQUERYDMABUFMODIFIERSEXTPROC) eglGetProcAddress("eglQueryDmaBufModifiersEXT");
     }
 
+    device->eglFunctions.eglSwapBuffersWithDamageKHR = (PFNEGLSWAPBUFFERSWITHDAMAGEKHRPROC) eglGetProcAddress("eglSwapBuffersWithDamageKHR");
+
+    device->eglFunctions.eglSetDamageRegionKHR = (PFNEGLSETDAMAGEREGIONKHRPROC) eglGetProcAddress("eglSetDamageRegionKHR");
+
+    if (device->eglFunctions.eglSetDamageRegionKHR)
+    {
+        SRMDebug("Has eglSetDamageRegionKHR.");
+    }
+
     return 1;
 }
 
@@ -629,7 +638,7 @@ UInt8 srmDeviceUpdateConnectors(SRMDevice *device)
 
 UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device)
 {
-    srmCoreSendDeallocatorMessage(device->core, SRM_DEALLOCATOR_MSG_CREATE_CONTEXT, device, 0, 0, EGL_NO_IMAGE);
+    srmCoreSendDeallocatorMessage(device->core, SRM_DEALLOCATOR_MSG_CREATE_CONTEXT, device, 0, EGL_NO_IMAGE);
 
     while (device->core->deallocatorState == 0)
         usleep(10);

@@ -19,6 +19,8 @@ struct SRMConnectorRenderInterface
     UInt8(*flipPage)(SRMConnector *connector);
     UInt8(*updateMode)(SRMConnector *connector);
     UInt32(*getCurrentBufferIndex)(SRMConnector *connector);
+    UInt32(*getBuffersCount)(SRMConnector *connector);
+    SRMBuffer*(*getBuffer)(SRMConnector *connector, UInt32 bufferIndex);
     void (*uninitialize)(SRMConnector *connector);
     void (*pause)(SRMConnector *connector);
     void (*resume)(SRMConnector *connector);
@@ -77,11 +79,13 @@ struct SRMConnectorStruct
     pthread_mutex_t repaintMutex;
     UInt8 repaintRequested;
 
+    // Damage
+    EGLint damageRectsCount;
+    SRMRect *damageRects;
+
     // Render specific
     struct SRMConnectorRenderInterface renderInterface;
     void *renderData;
-
-
 };
 
 SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id);

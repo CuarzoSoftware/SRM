@@ -114,6 +114,7 @@ static void drawColorSquares(UInt32 w, UInt32 h)
 
 static void setupShaders(SRMConnector *connector, void *userData)
 {
+    SRM_UNUSED(connector);
     struct ConnectorUserData *data = userData;
 
     data->vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -193,6 +194,33 @@ static void initializeGL(SRMConnector *connector, void *userData)
 static void paintGL(SRMConnector *connector, void *userData)
 {
     struct ConnectorUserData *data = userData;
+
+    if (srmConnectorGetCurrentBufferIndex(connector) == 1)
+    {
+        SRMBuffer *prev = srmConnectorGetBuffer(connector, 0);
+
+        if (prev)
+        {
+            // Moving black vertical line
+            glScissor(0, 0, data->w, data->h);
+            glClearColor(1.f, 1.f, 1.f, 1.f);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(data->rendererDevice, prev));
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            drawColorSquares(data->w/2, data->h/2);
+            srmConnectorRepaint(connector);
+            //usleep(2000000);
+            return;
+        }
+    }
+    else
+    {
+        //usleep(2000000);
+    }
 
     if (buffer)
     {
@@ -395,7 +423,7 @@ int main(void)
         // Update the background texture every second
         if (buffer)
         {
-            for (Int32 i = 0; i < BUF_SIZE;i++)
+            for (Int32 i = 0; i < BUF_SIZE; i++)
                 bufferPixels[i] = rand() % 256;
 
             srmBufferWrite(buffer, BUF_STRIDE, 0, 0, BUF_WIDTH, BUF_HEIGHT, bufferPixels);

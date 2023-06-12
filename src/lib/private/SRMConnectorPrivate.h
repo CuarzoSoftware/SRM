@@ -79,10 +79,6 @@ struct SRMConnectorStruct
     pthread_mutex_t repaintMutex;
     UInt8 repaintRequested;
 
-    // Damage
-    EGLint damageRectsCount;
-    SRMRect *damageRects;
-
     // Render specific
     struct SRMConnectorRenderInterface renderInterface;
     void *renderData;

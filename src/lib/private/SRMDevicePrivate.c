@@ -222,15 +222,6 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
         device->eglFunctions.eglQueryDmaBufModifiersEXT = (PFNEGLQUERYDMABUFMODIFIERSEXTPROC) eglGetProcAddress("eglQueryDmaBufModifiersEXT");
     }
 
-    device->eglFunctions.eglSwapBuffersWithDamageKHR = (PFNEGLSWAPBUFFERSWITHDAMAGEKHRPROC) eglGetProcAddress("eglSwapBuffersWithDamageKHR");
-
-    device->eglFunctions.eglSetDamageRegionKHR = (PFNEGLSETDAMAGEREGIONKHRPROC) eglGetProcAddress("eglSetDamageRegionKHR");
-
-    if (device->eglFunctions.eglSetDamageRegionKHR)
-    {
-        SRMDebug("Has eglSetDamageRegionKHR.");
-    }
-
     return 1;
 }
 

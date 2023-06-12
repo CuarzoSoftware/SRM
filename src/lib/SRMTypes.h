@@ -78,16 +78,6 @@ typedef struct SRMGLFormatStruct SRMGLFormat;
 struct SRMBufferDMADataStruct;
 typedef struct SRMBufferDMADataStruct SRMBufferDMAData;
 
-struct SRMRectStruct
-{
-    EGLint x;
-    EGLint y;
-    EGLint width;
-    EGLint height;
-};
-
-typedef struct SRMRectStruct SRMRect;
-
 struct SRMInterfaceStruct
 {
     int (*openRestricted)(const char *path, int flags, void *data);

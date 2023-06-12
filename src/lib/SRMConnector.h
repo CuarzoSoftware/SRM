@@ -50,8 +50,6 @@ UInt8 srmConnectorResume(SRMConnector *connector);
 UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector);
 UInt32 srmConnectorGetBuffersCount(SRMConnector *connector);
 SRMBuffer *srmConnectorGetBuffer(SRMConnector *connector, UInt32 bufferIndex);
-UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector);
-UInt8 srmConnectorSetBufferDamage(SRMConnector *connector, SRMRect *rects, EGLint n);
 
 #ifdef __cplusplus
 }

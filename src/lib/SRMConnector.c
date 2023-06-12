@@ -436,39 +436,6 @@ UInt8 srmConnectorResume(SRMConnector *connector)
     return 0;
 }
 
-UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector)
-{
-    SRM_RENDER_MODE renderMode = srmDeviceGetRenderMode(connector->device);
-
-    if (renderMode == SRM_RENDER_MODE_ITSELF)
-        return connector->device->eglFunctions.eglSwapBuffersWithDamageKHR == NULL ? 0 : 1;
-
-    // DUMB and CPU modes always support damage
-    return 1;
-}
-
-UInt8 srmConnectorSetBufferDamage(SRMConnector *connector, SRMRect *rects, EGLint n)
-{
-    if (!srmConnectorHasBufferDamageSupport(connector))
-        return 0;
-
-    if (connector->damageRects)
-    {
-        free(connector->damageRects);
-        connector->damageRects = NULL;
-        connector->damageRectsCount = 0;
-    }
-
-    if (n <= 0)
-        return 0;
-
-    ssize_t size = sizeof(SRMRect)*n;
-    connector->damageRects = malloc(size);
-    memcpy(connector->damageRects, rects, size);
-    connector->damageRectsCount = n;
-    return 1;
-}
-
 UInt32 srmConnectorGetBuffersCount(SRMConnector *connector)
 {
     if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)

@@ -304,23 +304,8 @@ static void destroyEGLSurfaces(SRMConnector *connector)
 
 static UInt8 swapBuffers(SRMConnector *connector, EGLDisplay display, EGLSurface surface)
 {
-    UInt8 ret = 0;
-    if (connector->damageRectsCount > 0)
-    {
-        ret = connector->device->eglFunctions.eglSwapBuffersWithDamageKHR(display,
-                                                                          surface,
-                                                                          (EGLint*)connector->damageRects,
-                                                                          connector->damageRectsCount);
-        connector->damageRectsCount = 0;
-        free(connector->damageRects);
-        connector->damageRects = NULL;
-    }
-    else
-    {
-        ret = eglSwapBuffers(display, surface);
-    }
-
-    return ret;
+    SRM_UNUSED(connector);
+    return eglSwapBuffers(display, surface);
 }
 
 static UInt8 createDRMFramebuffers(SRMConnector *connector)

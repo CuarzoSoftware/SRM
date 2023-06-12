@@ -40,9 +40,10 @@ struct SRMBufferDMADataStruct
 
 SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo);
 
-SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMBufferDMAData *dmaData);
+SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMDevice *allocator, SRMBufferDMAData *dmaData);
 
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core,
+                                  SRMDevice *allocator,
                                   UInt32 width,
                                   UInt32 height,
                                   UInt32 stride,
@@ -59,6 +60,7 @@ UInt8 srmBufferWrite(SRMBuffer *buffer,
                       UInt32 dstHeight,
                       const void *pixels);
 
+SRMDevice *srmBufferGetAllocatorDevice(SRMBuffer *buffer);
 SRM_BUFFER_FORMAT srmBufferGetFormat(SRMBuffer *buffer);
 UInt32 srmBufferGetWidth(SRMBuffer *buffer);
 UInt32 srmBufferGetHeight(SRMBuffer *buffer);

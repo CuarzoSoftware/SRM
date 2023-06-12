@@ -209,6 +209,7 @@ static UInt8 createBuffers(SRMConnector *connector)
         }
 
         data->buffers[i] = srmBufferCreateFromCPU(connector->device->core,
+                                                  connector->device,
                                                   connector->currentMode->info.hdisplay,
                                                   connector->currentMode->info.vdisplay,
                                                   0,

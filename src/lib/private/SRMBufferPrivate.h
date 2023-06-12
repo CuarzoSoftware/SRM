@@ -38,6 +38,7 @@ struct SRMBufferTexture
 struct SRMBufferStruct
 {
     // Common
+    SRMDevice *allocator;
     pthread_mutex_t mutex;
     enum SRM_BUFFER_SRC src;
 
@@ -71,7 +72,7 @@ struct SRMBufferStruct
     GLint glType;
 };
 
-SRMBuffer *srmBufferCreate(SRMCore *core);
+SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator);
 Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo);
 
 #ifdef __cplusplus

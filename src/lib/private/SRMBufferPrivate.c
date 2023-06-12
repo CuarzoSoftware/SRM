@@ -1,6 +1,7 @@
 #include <private/SRMBufferPrivate.h>
 #include <private/SRMDevicePrivate.h>
 
+#include <SRMCore.h>
 #include <SRMList.h>
 #include <SRMLog.h>
 
@@ -12,7 +13,7 @@
 #include <stdlib.h>
 
 
-SRMBuffer *srmBufferCreate(SRMCore *core)
+SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator)
 {
     SRMBuffer *buffer = calloc(1, sizeof(SRMBuffer));
     pthread_mutex_init(&buffer->mutex, NULL);
@@ -23,6 +24,12 @@ SRMBuffer *srmBufferCreate(SRMCore *core)
 
     buffer->textures = srmListCreate();
     buffer->modifiers[0] = DRM_FORMAT_MOD_INVALID;
+
+    if (allocator)
+        buffer->allocator = allocator;
+    else
+        buffer->allocator = srmCoreGetAllocatorDevice(core);
+
     return buffer;    
 }
 
@@ -47,7 +54,6 @@ Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
         goto fail;
     }
 
-
     SRMDebug("[%s] Got buffer DMA fd using DRM_IOCTL_PRIME_HANDLE_TO_FD.", device->name);
     return prime_handle.fd;
 
@@ -64,5 +70,3 @@ Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
     SRMError("Error: Failed to get file descriptor for handle %u: %s", prime_handle.handle, strerror(errno));
     return -1;
 }
-
-

@@ -390,6 +390,8 @@ UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)
 
 UInt8 srmConnectorPause(SRMConnector *connector)
 {
+    SRMDebug("STATE %d", connector->state);
+
     switch (connector->state)
     {
         case SRM_CONNECTOR_STATE_PAUSED:

@@ -356,7 +356,7 @@ int main(void)
         return 1;
     }
 
-    buffer = srmBufferCreateFromCPU(core, BUF_WIDTH, BUF_HEIGHT, BUF_STRIDE, bufferPixels, DRM_FORMAT_XBGR8888);
+    buffer = srmBufferCreateFromCPU(core, NULL, BUF_WIDTH, BUF_HEIGHT, BUF_STRIDE, bufferPixels, DRM_FORMAT_XBGR8888);
 
     if (!buffer)
     {

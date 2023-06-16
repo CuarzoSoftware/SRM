@@ -464,9 +464,7 @@ void srmBufferDestroy(SRMBuffer *buffer)
         srmListDestoy(buffer->textures);
     }
 
-    while (!srmListIsEmpty(buffer->core->deallocatorMessages))
-        usleep(10);
-
+    while (!srmListIsEmpty(buffer->core->deallocatorMessages)) { usleep(1); }
 
     for (UInt32 i = 0; i < buffer->planesCount; i++)
     {
@@ -491,7 +489,6 @@ void srmBufferDestroy(SRMBuffer *buffer)
 
     pthread_mutex_unlock(&buffer->mutex);
     pthread_mutex_destroy(&buffer->mutex);
-
     free(buffer);
 }
 

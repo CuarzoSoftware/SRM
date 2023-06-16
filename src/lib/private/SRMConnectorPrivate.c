@@ -535,8 +535,8 @@ void *srmConnectorRenderThread(void *conn)
 
 void srmConnectorUnlockRenderThread(SRMConnector *connector)
 {
-    pthread_mutex_lock(&connector->repaintMutex);
+    //pthread_mutex_lock(&connector->repaintMutex);
     connector->repaintRequested = 1;
     pthread_cond_signal(&connector->repaintCond);
-    pthread_mutex_unlock(&connector->repaintMutex);
+    //pthread_mutex_unlock(&connector->repaintMutex);
 }

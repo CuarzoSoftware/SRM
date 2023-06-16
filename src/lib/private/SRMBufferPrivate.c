@@ -12,7 +12,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-
 SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator)
 {
     SRMBuffer *buffer = calloc(1, sizeof(SRMBuffer));

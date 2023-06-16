@@ -492,7 +492,6 @@ UInt8 srmCoreUpdateEGLFunctions(SRMCore *core)
     return 1;
 }
 
-
 void *srmCoreDeallocatorLoop(void *data)
 {
     SRMCore *core = data;
@@ -504,7 +503,9 @@ void *srmCoreDeallocatorLoop(void *data)
     while (1)
     {
         pthread_mutex_lock(&core->deallocatorMutex);
-        pthread_cond_wait(&core->deallocatorCond, &core->deallocatorMutex);
+
+        if (srmListIsEmpty(core->deallocatorMessages))
+            pthread_cond_wait(&core->deallocatorCond, &core->deallocatorMutex);
 
         while (!srmListIsEmpty(core->deallocatorMessages))
         {
@@ -529,7 +530,6 @@ void *srmCoreDeallocatorLoop(void *data)
                     eglDestroyImage(message->device->eglDisplay, message->image);
 
                 core->deallocatorState = 1;
-
 
             }
             else if (message->msg == SRM_DEALLOCATOR_MSG_CREATE_CONTEXT)

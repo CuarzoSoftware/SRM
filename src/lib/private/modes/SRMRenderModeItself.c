@@ -174,88 +174,7 @@ static void destroyEGLContext(SRMConnector *connector)
 
         data->connectorEGLContext = EGL_NO_CONTEXT;
     }
-
 }
-
-/* Experiemntal
-static UInt8 createBuffers(SRMConnector *connector)
-{
-    RenderModeData *data = (RenderModeData*)connector->renderData;
-
-    if (!eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->connectorEGLContext))
-    {
-        SRMError("[%s] eglMakeCurrent() failed on buffers mode.", connector->device->name);
-        return 0;
-    }
-
-    for (Int32 i = 0; i < SRM_BUFFERS_COUNT; i++)
-    {
-        glGenFramebuffers(1, &data->glFramebuffers[i]);
-
-        if (!data->glFramebuffers[i])
-        {
-            SRMError("[%s] Failed to create GL framebuffer %d.", connector->device->name, i);
-            return 0;
-        }
-
-        data->buffers[i] = srmBufferCreateFromCPU(connector->device->core,
-                                                  connector->device,
-                                                  connector->currentMode->info.hdisplay,
-                                                  connector->currentMode->info.vdisplay,
-                                                  0,
-                                                  NULL,
-                                                  GBM_FORMAT_XRGB8888);
-
-        if (!data->buffers[i] || !data->buffers[i]->bo)
-        {
-            SRMError("[%s] Failed to create buffer %d.", connector->device->name, i);
-            return 0;
-        }
-
-        glBindFramebuffer(GL_FRAMEBUFFER, data->glFramebuffers[i]);
-
-        GLuint textureId = srmBufferGetTextureID(connector->device, data->buffers[i]);
-
-        if (!textureId)
-        {
-            SRMError("[%s] Failed to get texture from buffer %d.", connector->device->name, i);
-            return 0;
-        }
-
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId, 0);
-
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        {
-            SRMError("[%s] Failed to complete framebuffer %d.", connector->device->name, i);
-            return 0;
-        }
-
-        struct gbm_bo *bo = data->buffers[i]->bo;
-
-        Int32 ret = drmModeAddFB(connector->device->fd,
-                           gbm_bo_get_width(bo),
-                           gbm_bo_get_height(bo),
-                           24,
-                           gbm_bo_get_bpp(bo),
-                           gbm_bo_get_stride(bo),
-                           gbm_bo_get_handle(bo).u32,
-                           &data->connectorDRMFramebuffers[i]);
-
-        if (ret)
-        {
-            SRMError("Failed o create DRM framebuffer %d for device %s connector %d (ITSELF MODE).",
-                     i,
-                     connector->device->name,
-                     connector->id);
-            return 0;
-        }
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-
-    return 1;
-}
-*/
 
 static UInt8 createEGLSurfaces(SRMConnector *connector)
 {
@@ -496,10 +415,6 @@ static UInt8 render(SRMConnector *connector)
                    data->connectorEGLSurface,
                    data->connectorEGLContext);
 
-    /* Experimental
-    if (data->buffers[0])
-        glBindFramebuffer(GL_FRAMEBUFFER, data->glFramebuffers[data->currentBufferIndex]);*/
-
     connector->interface->paintGL(connector, connector->interfaceData);
 
     return 1;
@@ -541,7 +456,7 @@ static UInt8 flipPage(SRMConnector *connector)
             break;
         }
 
-        poll(&fds, 1, 500000);
+        poll(&fds, 1, 500);
 
         if(fds.revents & POLLIN)
             drmHandleEvent(fds.fd, &connector->drmEventCtx);
@@ -559,10 +474,6 @@ static UInt8 initCrtc(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    /* Experimental
-    if (!data->connectorGBMSurface)
-        glBindFramebuffer(GL_FRAMEBUFFER, data->glFramebuffers[data->currentBufferIndex]);*/
-
     if (connector->state == SRM_CONNECTOR_STATE_INITIALIZING)
     {
         connector->interface->initializeGL(connector,
@@ -574,18 +485,12 @@ static UInt8 initCrtc(SRMConnector *connector)
                                        connector->interfaceData);
     }
 
-    /* Experimental
-    if (!data->connectorGBMSurface)
-        glFinish();
-    eglSwapBuffers(connector->device->eglDisplay, data->connectorEGLSurface);
-    gbm_surface_lock_front_buffer(data->connectorGBMSurface);*/
-
     swapBuffers(connector, connector->device->eglDisplay, data->connectorEGLSurface);
     gbm_surface_lock_front_buffer(data->connectorGBMSurface);
 
     Int32 ret = drmModeSetCrtc(connector->device->fd,
                    connector->currentCrtc->id,
-                   data->connectorDRMFramebuffers[data->currentBufferIndex],
+                   data->connectorDRMFramebuffers[nextBufferIndex(connector)],
                    0,
                    0,
                    &connector->id,
@@ -599,17 +504,6 @@ static UInt8 initCrtc(SRMConnector *connector)
                  connector->id);
         return 0;
     }
-
-    data->currentBufferIndex = nextBufferIndex(connector);
-
-    /* Experimental
-    if (!data->connectorGBMSurface)
-        data->currentBufferIndex = 1 - data->currentBufferIndex;
-    data->currentBufferIndex = !data->currentBufferIndex;
-    gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
-    connector->interface->pageFlipped(connector, connector->interfaceData);
-    data->currentBufferIndex = !data->currentBufferIndex;
-    */
 
     return 1;
 }
@@ -659,12 +553,6 @@ static UInt8 initialize(SRMConnector *connector)
     if (!createEGLContext(connector))
         goto fail;
 
-    /* Experimental
-    if (createBuffers(connector))
-        goto common;
-
-    surfacesModeOnly: */
-
     if (!createGBMSurfaces(connector))
         goto fail;
 
@@ -673,8 +561,6 @@ static UInt8 initialize(SRMConnector *connector)
 
     if (!createDRMFramebuffers(connector))
         goto fail;
-
-    // common:
 
     if (!initCrtc(connector))
         goto fail;

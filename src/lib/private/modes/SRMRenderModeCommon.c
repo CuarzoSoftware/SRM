@@ -93,12 +93,13 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
 
 UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
 {
+    pthread_mutex_lock(&connector->repaintMutex);
     if (!connector->repaintRequested)
     {
-        pthread_mutex_lock(&connector->repaintMutex);
         pthread_cond_wait(&connector->repaintCond, &connector->repaintMutex);
-        pthread_mutex_unlock(&connector->repaintMutex);
     }
+    pthread_mutex_unlock(&connector->repaintMutex);
+
 
     if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING)
     {

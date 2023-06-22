@@ -401,7 +401,10 @@ UInt8 srmConnectorPause(SRMConnector *connector)
             return 0;
         case SRM_CONNECTOR_STATE_INITIALIZED:
         {
+            //pthread_mutex_lock(&connector->stateMutex);
             connector->state = SRM_CONNECTOR_STATE_PAUSING;
+            //pthread_mutex_unlock(&connector->stateMutex);
+
             return srmConnectorPause(connector);
         }
         default:
@@ -425,7 +428,9 @@ UInt8 srmConnectorResume(SRMConnector *connector)
                 return 0;
         case SRM_CONNECTOR_STATE_PAUSED:
         {
+                //pthread_mutex_lock(&connector->stateMutex);
                 connector->state = SRM_CONNECTOR_STATE_RESUMING;
+                //pthread_mutex_unlock(&connector->stateMutex);
                 return srmConnectorResume(connector);
         }
         default:

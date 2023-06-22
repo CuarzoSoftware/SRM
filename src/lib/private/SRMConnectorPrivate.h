@@ -78,6 +78,7 @@ struct SRMConnectorStruct
     pthread_cond_t repaintCond;
     pthread_mutex_t repaintMutex;
     UInt8 repaintRequested;
+    pthread_mutex_t stateMutex;
 
     // Render specific
     struct SRMConnectorRenderInterface renderInterface;

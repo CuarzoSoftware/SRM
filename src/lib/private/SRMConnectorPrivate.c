@@ -27,6 +27,7 @@ SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
     connector->id = id;
     connector->device = device;
     connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
+    pthread_mutex_init(&connector->stateMutex, NULL);
 
     srmConnectorUpdateProperties(connector);
 
@@ -432,6 +433,7 @@ UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bes
 
 void srmConnectorDestroy(SRMConnector *connector)
 {
+    pthread_mutex_destroy(&connector->stateMutex);
     srmConnectorUninitialize(connector);
     srmConnectorDestroyNames(connector);
     srmConnectorDestroyEncoders(connector);
@@ -486,6 +488,7 @@ void *srmConnectorRenderThread(void *conn)
         if (!srmRenderModeCommonWaitRepaintRequest(connector))
             break;
 
+        pthread_mutex_lock(&connector->stateMutex);
         if (connector->repaintRequested)
         {
             if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
@@ -493,9 +496,11 @@ void *srmConnectorRenderThread(void *conn)
                 connector->repaintRequested = 0;
                 connector->renderInterface.render(connector);
                 connector->renderInterface.flipPage(connector);
+                pthread_mutex_unlock(&connector->stateMutex);
                 continue;
             }
         }
+        pthread_mutex_unlock(&connector->stateMutex);
 
         if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {

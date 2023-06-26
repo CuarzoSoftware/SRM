@@ -8,6 +8,7 @@
 
 #include <private/modes/SRMRenderModeCommon.h>
 #include <private/modes/SRMRenderModeItself.h>
+#include <private/modes/SRMRenderModeDumb.h>
 
 #include <SRMLog.h>
 #include <SRMList.h>
@@ -473,7 +474,7 @@ void *srmConnectorRenderThread(void *conn)
     srmRenderModeCommonCreateCursor(connector);
 
     if (srmDeviceGetRenderMode(connector->device) == SRM_RENDER_MODE_ITSELF)
-        srmRenderModeItselfSetInterface(connector);
+        srmRenderModeDumbSetInterface(connector);//srmRenderModeItselfSetInterface(connector);
     else
         goto fail;
 

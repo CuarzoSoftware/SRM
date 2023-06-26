@@ -463,3 +463,36 @@ SRMBuffer *srmConnectorGetBuffer(SRMConnector *connector, UInt32 bufferIndex)
 
     return connector->renderInterface.getBuffer(connector, bufferIndex);
 }
+
+UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector)
+{
+    SRM_RENDER_MODE renderMode = srmDeviceGetRenderMode(connector->device);
+
+    //if (renderMode == SRM_RENDER_MODE_ITSELF)
+    //    return 0;
+
+    // DUMB and CPU modes always support damage
+    return 1;
+}
+
+UInt8 srmConnectorSetBufferDamage(SRMConnector *connector, SRMRect *rects, Int32 n)
+{
+    //if (!srmConnectorHasBufferDamageSupport(connector))
+    //    return 0;
+
+    if (connector->damageRects)
+    {
+        free(connector->damageRects);
+        connector->damageRects = NULL;
+        connector->damageRectsCount = 0;
+    }
+
+    if (n <= 0)
+        return 0;
+
+    ssize_t size = sizeof(SRMRect)*n;
+    connector->damageRects = malloc(size);
+    memcpy(connector->damageRects, rects, size);
+    connector->damageRectsCount = n;
+    return 1;
+}

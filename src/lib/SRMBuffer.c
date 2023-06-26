@@ -639,7 +639,7 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo)
         goto skipMap;
     }
 
-    buffer->map = gbm_bo_map(buffer->bo, 0, 0,buffer->width, buffer->height, GBM_BO_TRANSFER_READ, &buffer->strides[0], &buffer->mapData);
+    buffer->map = gbm_bo_map(buffer->bo, 0, 0, buffer->width, buffer->height, GBM_BO_TRANSFER_READ, &buffer->strides[0], &buffer->mapData);
 
     if (!buffer->map)
         buffer->mapData = NULL;
@@ -656,4 +656,21 @@ skipMap:
 SRMDevice *srmBufferGetAllocatorDevice(SRMBuffer *buffer)
 {
     return buffer->allocator;
+}
+
+UInt8 srmBufferRead(SRMBuffer *buffer, Int32 srcX, Int32 srcY, Int32 srcW, Int32 srcH, Int32 dstX, Int32 dstY, Int32 dstStride, UInt8 *dstBuffer)
+{
+    if (buffer->map && buffer->modifiers[0] == DRM_FORMAT_MOD_LINEAR)
+    {
+        for (Int32 i = 0; i < srcH; i++)
+        {
+            memcpy(&dstBuffer[(i + dstY)*dstStride + buffer->pixelSize*dstX],
+                   &buffer->map[(i + srcY)*buffer->strides[0] + buffer->pixelSize*srcX],
+                   srcW*buffer->pixelSize);
+
+        }
+        return 1;
+    }
+
+    return 0;
 }

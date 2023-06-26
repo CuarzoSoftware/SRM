@@ -64,6 +64,7 @@ SRMDevice *srmBufferGetAllocatorDevice(SRMBuffer *buffer);
 SRM_BUFFER_FORMAT srmBufferGetFormat(SRMBuffer *buffer);
 UInt32 srmBufferGetWidth(SRMBuffer *buffer);
 UInt32 srmBufferGetHeight(SRMBuffer *buffer);
+UInt8 srmBufferRead(SRMBuffer *buffer, Int32 srcX, Int32 srcY, Int32 srcW, Int32 srcH, Int32 dstX, Int32 dstY, Int32 dstStride, UInt8 *dstBuffer);
 
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
 void srmBufferDestroy(SRMBuffer *buffer);

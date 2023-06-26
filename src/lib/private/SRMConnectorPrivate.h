@@ -79,6 +79,8 @@ struct SRMConnectorStruct
     pthread_mutex_t repaintMutex;
     UInt8 repaintRequested;
     pthread_mutex_t stateMutex;
+    SRMRect *damageRects;
+    Int32 damageRectsCount;
 
     // Render specific
     struct SRMConnectorRenderInterface renderInterface;

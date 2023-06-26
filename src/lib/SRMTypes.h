@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <drm/drm_fourcc.h>
-#include <EGL/egl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -77,6 +76,16 @@ typedef struct SRMGLFormatStruct SRMGLFormat;
 
 struct SRMBufferDMADataStruct;
 typedef struct SRMBufferDMADataStruct SRMBufferDMAData;
+
+struct SRMRectStruct
+{
+    Int32 x;
+    Int32 y;
+    Int32 width;
+    Int32 height;
+};
+
+typedef struct SRMRectStruct SRMRect;
 
 struct SRMInterfaceStruct
 {

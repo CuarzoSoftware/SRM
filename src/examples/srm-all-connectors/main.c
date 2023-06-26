@@ -226,6 +226,8 @@ static void paintGL(SRMConnector *connector, void *userData)
     if (data->phase >= 2*M_PI)
         data->phase -= 2*M_PI;
 
+    SRMRect damage = {0, 0, 200, 200};
+    srmConnectorSetBufferDamage(connector, &damage, 1);
     srmConnectorRepaint(connector);
 }
 

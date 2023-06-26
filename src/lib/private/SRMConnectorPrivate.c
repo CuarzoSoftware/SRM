@@ -474,7 +474,9 @@ void *srmConnectorRenderThread(void *conn)
     srmRenderModeCommonCreateCursor(connector);
 
     if (srmDeviceGetRenderMode(connector->device) == SRM_RENDER_MODE_ITSELF)
-        srmRenderModeDumbSetInterface(connector);//srmRenderModeItselfSetInterface(connector);
+        srmRenderModeItselfSetInterface(connector);
+    else if (srmDeviceGetRenderMode(connector->device) == SRM_RENDER_MODE_DUMB)
+        srmRenderModeDumbSetInterface(connector);
     else
         goto fail;
 
@@ -502,6 +504,15 @@ void *srmConnectorRenderThread(void *conn)
             }
         }
         pthread_mutex_unlock(&connector->stateMutex);
+
+        if (connector->atomicCursorHasChanges)
+        {
+            drmModeAtomicReqPtr req;
+            req = drmModeAtomicAlloc();
+            srmRenderModeCommitCursorChanges(connector, req);
+            drmModeAtomicCommit(connector->device->fd, req, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+            drmModeAtomicFree(req);
+        }
 
         if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {

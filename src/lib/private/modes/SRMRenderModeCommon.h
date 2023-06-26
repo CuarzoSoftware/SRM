@@ -2,6 +2,7 @@
 #define SRMRENDERMODECOMMON_H
 
 #include <EGL/egl.h>
+#include <xf86drmMode.h>
 #include "../../SRMTypes.h"
 
 #ifdef __cplusplus
@@ -13,6 +14,7 @@ Int8  srmRenderModeCommonChooseEGLConfiguration(EGLDisplay egl_display, const EG
 void  srmRenderModeCommonPageFlipHandler(int, unsigned int, unsigned int, unsigned int, void *data);
 UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector);
 UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector);
+void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqPtr req);
 
 #ifdef __cplusplus
 }

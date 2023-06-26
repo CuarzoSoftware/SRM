@@ -92,21 +92,39 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
 
     if (!pixels)
     {
-        drmModeSetCursor(connector->device->fd,
-                         connector->currentCrtc->id,
-                         0,
-                         0,
-                         0);
+        if (connector->device->clientCapAtomic)
+        {
+            connector->cursorVisible = 0;
+            connector->atomicCursorHasChanges = 1;
+            pthread_cond_signal(&connector->repaintCond);
+        }
+        else
+        {
+            drmModeSetCursor(connector->device->fd,
+                             connector->currentCrtc->id,
+                             0,
+                             0,
+                             0);
+        }
         return 1;
     }
 
     gbm_bo_write(connector->cursorBO, pixels, 64*64*4);
 
-    drmModeSetCursor(connector->device->fd,
-                     connector->currentCrtc->id,
-                     gbm_bo_get_handle(connector->cursorBO).u32,
-                     64,
-                     64);
+    if (connector->device->clientCapAtomic)
+    {
+        connector->cursorVisible = 1;
+        connector->atomicCursorHasChanges = 1;
+        pthread_cond_signal(&connector->repaintCond);
+    }
+    else
+    {
+        drmModeSetCursor(connector->device->fd,
+                         connector->currentCrtc->id,
+                         gbm_bo_get_handle(connector->cursorBO).u32,
+                         64,
+                         64);
+    }
 
     return 1;
 }
@@ -116,10 +134,20 @@ UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
     if (!connector->cursorBO)
         return 0;
 
-    drmModeMoveCursor(connector->device->fd,
-                      connector->currentCrtc->id,
-                      x,
-                      y);
+    if (connector->device->clientCapAtomic)
+    {
+        connector->cursorX = x;
+        connector->cursorY = y;
+        connector->atomicCursorHasChanges = 1;
+        pthread_cond_signal(&connector->repaintCond);
+    }
+    else
+    {
+        drmModeMoveCursor(connector->device->fd,
+                          connector->currentCrtc->id,
+                          x,
+                          y);
+    }
 
     return 1;
 }
@@ -168,11 +196,9 @@ UInt8 srmConnectorSetMode(SRMConnector *connector, SRMConnectorMode *mode)
 
         while (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {
-            SRMDebug("CHANGING MODE");
             srmConnectorUnlockRenderThread(connector);
             usleep(1000000);
         }
-        SRMDebug("CHANGING MODE ENDED");
 
         if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
         {
@@ -395,8 +421,6 @@ UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)
 
 UInt8 srmConnectorPause(SRMConnector *connector)
 {
-    SRMDebug("STATE %d", connector->state);
-
     switch (connector->state)
     {
         case SRM_CONNECTOR_STATE_PAUSED:
@@ -468,8 +492,8 @@ UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector)
 {
     SRM_RENDER_MODE renderMode = srmDeviceGetRenderMode(connector->device);
 
-    //if (renderMode == SRM_RENDER_MODE_ITSELF)
-    //    return 0;
+    if (renderMode == SRM_RENDER_MODE_ITSELF)
+        return 0;
 
     // DUMB and CPU modes always support damage
     return 1;
@@ -477,8 +501,8 @@ UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector)
 
 UInt8 srmConnectorSetBufferDamage(SRMConnector *connector, SRMRect *rects, Int32 n)
 {
-    //if (!srmConnectorHasBufferDamageSupport(connector))
-    //    return 0;
+    if (!srmConnectorHasBufferDamageSupport(connector))
+        return 0;
 
     if (connector->damageRects)
     {

@@ -391,7 +391,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         goto skipDMA;
     }
 
-    if (buffer->fds[0] == -1)
+    if (buffer->fds[0] == -1 && buffer->bo)
     {
         buffer->fds[0] = srmBufferGetDMAFDFromBO(buffer->allocator, buffer->bo);
 

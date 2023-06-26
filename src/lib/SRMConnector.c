@@ -165,12 +165,14 @@ UInt8 srmConnectorSetMode(SRMConnector *connector, SRMConnectorMode *mode)
 
         connector->targetMode = mode;
         connector->state = SRM_CONNECTOR_STATE_CHANGING_MODE;
-        srmConnectorUnlockRenderThread(connector);
 
         while (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {
-            usleep(200);
+            SRMDebug("CHANGING MODE");
+            srmConnectorUnlockRenderThread(connector);
+            usleep(1000000);
         }
+        SRMDebug("CHANGING MODE ENDED");
 
         if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
         {
@@ -330,7 +332,10 @@ void srmConnectorUninitialize(SRMConnector *connector)
     srmConnectorUnlockRenderThread(connector);
 
     while (connector->state != SRM_CONNECTOR_STATE_UNINITIALIZED)
+    {
+        srmConnectorUnlockRenderThread(connector);
         usleep(20000);
+    }
 
     if (connector->currentCrtc)
     {

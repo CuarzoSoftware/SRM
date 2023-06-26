@@ -662,6 +662,10 @@ UInt8 srmBufferRead(SRMBuffer *buffer, Int32 srcX, Int32 srcY, Int32 srcW, Int32
 {
     if (buffer->map && buffer->modifiers[0] == DRM_FORMAT_MOD_LINEAR)
     {
+        pthread_mutex_lock(&buffer->mutex);
+        buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
+        ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
+
         for (Int32 i = 0; i < srcH; i++)
         {
             memcpy(&dstBuffer[(i + dstY)*dstStride + buffer->pixelSize*dstX],
@@ -669,6 +673,10 @@ UInt8 srmBufferRead(SRMBuffer *buffer, Int32 srcX, Int32 srcY, Int32 srcW, Int32
                    srcW*buffer->pixelSize);
 
         }
+
+        buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
+        ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
+        pthread_mutex_unlock(&buffer->mutex);
         return 1;
     }
 

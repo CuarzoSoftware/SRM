@@ -223,27 +223,14 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
                    data->connectorEGLContext);
 
     SRMList *bos = srmListCreate();
-    eglSwapBuffers(connector->device->rendererDevice->eglDisplay,
-                   data->connectorEGLSurface);
-    struct gbm_bo *initBo = gbm_surface_lock_front_buffer(data->connectorGBMSurface);
-    srmListAppendData(bos, initBo);
+
     struct gbm_bo *bo = NULL;
 
-    while (initBo != bo)
+    while (srmListGetLength(bos) < 1 && gbm_surface_has_free_buffers(data->connectorGBMSurface) > 0)
     {
         eglSwapBuffers(connector->device->rendererDevice->eglDisplay,
                        data->connectorEGLSurface);
         bo = gbm_surface_lock_front_buffer(data->connectorGBMSurface);
-
-        SRMListForeach(boIt, bos)
-        {
-            struct gbm_bo *b = srmListItemGetData(boIt);
-            gbm_surface_release_buffer(data->connectorGBMSurface, b);
-        }
-
-        if (bo == initBo)
-            break;
-
         srmListAppendData(bos, bo);
     }
 
@@ -262,6 +249,7 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
     SRMListForeach(boIt, bos)
     {
         struct gbm_bo *b = srmListItemGetData(boIt);
+        gbm_surface_release_buffer(data->connectorGBMSurface, b);
         data->connectorBOs[i] = b;
         i++;
     }
@@ -586,7 +574,6 @@ static UInt8 flipPage(SRMConnector *connector)
     skipGLRead:
 
     swapBuffers(connector, connector->device->rendererDevice->eglDisplay, data->connectorEGLSurface);
-    glFinish();
 
     if (useBufferRead)
     {
@@ -614,6 +601,24 @@ static UInt8 flipPage(SRMConnector *connector)
     }
 
     gbm_surface_lock_front_buffer(data->connectorGBMSurface);
+
+    if (data->buffersCount == 1)
+    {
+        if (connector->device->clientCapAtomic)
+        {
+            drmModeAtomicReqPtr req;
+            req = drmModeAtomicAlloc();
+            srmRenderModeCommitCursorChanges(connector, req);
+            drmModeAtomicCommit(connector->device->fd,
+                                req,
+                                DRM_MODE_ATOMIC_NONBLOCK,
+                                connector);
+
+            drmModeAtomicFree(req);
+        }
+        goto skipFlip;
+    }
+
     connector->pendingPageFlip = 1;
 
     if (connector->device->clientCapAtomic)
@@ -674,6 +679,8 @@ static UInt8 flipPage(SRMConnector *connector)
         pthread_mutex_unlock(&connector->device->pageFlipMutex);
     }
 
+    skipFlip:
+
     data->currentBufferIndex = nextBufferIndex(connector);
     gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
     connector->interface->pageFlipped(connector, connector->interfaceData);
@@ -694,9 +701,6 @@ static UInt8 initCrtc(SRMConnector *connector)
         connector->interface->resizeGL(connector,
                                        connector->interfaceData);
     }
-
-    swapBuffers(connector, connector->device->eglDisplay, data->connectorEGLSurface);
-    gbm_surface_lock_front_buffer(data->connectorGBMSurface);
 
     if (connector->device->clientCapAtomic)
     {
@@ -762,7 +766,7 @@ static UInt8 initCrtc(SRMConnector *connector)
         drmModeAtomicAddProperty(req,
                                  connector->currentPrimaryPlane->id,
                                  connector->currentPrimaryPlane->propIDs.FB_ID,
-                                 data->connectorDRMFramebuffers[nextBufferIndex(connector)]);
+                                 data->connectorDRMFramebuffers[data->currentBufferIndex]);
 
         drmModeAtomicAddProperty(req,
                                  connector->currentPrimaryPlane->id,
@@ -806,7 +810,7 @@ static UInt8 initCrtc(SRMConnector *connector)
     {
         Int32 ret = drmModeSetCrtc(connector->device->fd,
                                    connector->currentCrtc->id,
-                                   data->connectorDRMFramebuffers[nextBufferIndex(connector)],
+                                   data->connectorDRMFramebuffers[data->currentBufferIndex],
                                    0,
                                    0,
                                    &connector->id,

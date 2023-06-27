@@ -204,25 +204,14 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
                    data->connectorEGLContext);
 
     SRMList *bos = srmListCreate();
-    eglSwapBuffers(connector->device->eglDisplay, data->connectorEGLSurface);
-    struct gbm_bo *initBo = gbm_surface_lock_front_buffer(data->connectorGBMSurface);
-    srmListAppendData(bos, initBo);
+
     struct gbm_bo *bo = NULL;
 
-    while (initBo != bo)
+    while (srmListGetLength(bos) < 2 && gbm_surface_has_free_buffers(data->connectorGBMSurface) > 0)
     {
-        eglSwapBuffers(connector->device->eglDisplay, data->connectorEGLSurface);
+        eglSwapBuffers(connector->device->rendererDevice->eglDisplay,
+                       data->connectorEGLSurface);
         bo = gbm_surface_lock_front_buffer(data->connectorGBMSurface);
-
-        SRMListForeach(boIt, bos)
-        {
-            struct gbm_bo *b = srmListItemGetData(boIt);
-            gbm_surface_release_buffer(data->connectorGBMSurface, b);
-        }
-
-        if (bo == initBo)
-            break;
-
         srmListAppendData(bos, bo);
     }
 
@@ -241,6 +230,7 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
     SRMListForeach(boIt, bos)
     {
         struct gbm_bo *b = srmListItemGetData(boIt);
+        gbm_surface_release_buffer(data->connectorGBMSurface, b);
         data->connectorBOs[i] = b;
         i++;
     }
@@ -498,9 +488,6 @@ static UInt8 initCrtc(SRMConnector *connector)
         connector->interface->resizeGL(connector,
                                        connector->interfaceData);
     }
-
-    swapBuffers(connector, connector->device->eglDisplay, data->connectorEGLSurface);
-    gbm_surface_lock_front_buffer(data->connectorGBMSurface);
 
     if (connector->device->clientCapAtomic)
     {

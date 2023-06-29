@@ -2,9 +2,8 @@
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMListenerPrivate.h>
 #include <private/SRMConnectorPrivate.h>
-
+#include <SRMList.h>
 #include <SRMLog.h>
-
 #include <xf86drmMode.h>
 #include <sys/poll.h>
 #include <string.h>
@@ -12,10 +11,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <time.h>
-
-
-#include <SRMList.h>
-
 
 SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
 {
@@ -94,6 +89,14 @@ void srmCoreDestroy(SRMCore *core)
 
     if (core->monitor)
         udev_monitor_unref(core->monitor);
+
+    srmCoreUnitDeallocator(core);
+
+    srmListDestoy(core->connectorPluggedListeners);
+    srmListDestoy(core->connectorUnpluggedListeners);
+    srmListDestoy(core->deviceCreatedListeners);
+    srmListDestoy(core->deviceRemovedListeners);
+    srmListDestoy(core->devices);
 
     if (core->udev)
         udev_unref(core->udev);

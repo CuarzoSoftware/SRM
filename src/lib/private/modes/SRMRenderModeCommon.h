@@ -13,6 +13,7 @@ Int8  srmRenderModeCommonMatchConfigToVisual(EGLDisplay egl_display, EGLint visu
 Int8  srmRenderModeCommonChooseEGLConfiguration(EGLDisplay egl_display, const EGLint *attribs, EGLint visual_id, EGLConfig *config_out);
 void  srmRenderModeCommonPageFlipHandler(int, unsigned int, unsigned int, unsigned int, void *data);
 UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector);
+void srmRenderModeCommonDestroyCursor(SRMConnector *connector);
 UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector);
 void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqPtr req);
 

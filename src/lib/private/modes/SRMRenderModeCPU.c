@@ -881,7 +881,7 @@ static UInt8 flipPage(SRMConnector *connector)
                              data->cpuBuffers[data->currentBufferIndex]);
             }
 
-            glPixelStorei(GL_PACK_ALIGNMENT, 0);
+            glPixelStorei(GL_PACK_ALIGNMENT, 4);
             glPixelStorei(GL_PACK_ROW_LENGTH, 0);
             glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
             glPixelStorei(GL_PACK_SKIP_ROWS, 0);

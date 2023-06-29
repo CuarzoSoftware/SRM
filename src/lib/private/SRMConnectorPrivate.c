@@ -453,7 +453,7 @@ void *srmConnectorRenderThread(void *conn)
         SRMError("Could not create render mutex for device %s connector %d.",
                  connector->device->name,
                  connector->id);
-        goto fail;
+        goto repaintMutexFail;
     }
 
     if (pthread_cond_init(&connector->repaintCond, NULL))
@@ -461,7 +461,7 @@ void *srmConnectorRenderThread(void *conn)
         SRMError("Could not create render cond for device %s connector %d.",
                  connector->device->name,
                  connector->id);
-        goto fail;
+        goto repaintCondFail;
     }
 
     connector->pendingPageFlip = 0;
@@ -544,11 +544,12 @@ void *srmConnectorRenderThread(void *conn)
         }
     }
 
-    return NULL;
-
-    fail:
-    pthread_mutex_destroy(&connector->repaintMutex);
+fail:
+    srmRenderModeCommonDestroyCursor(connector);
+repaintCondFail:
     pthread_cond_destroy(&connector->repaintCond);
+repaintMutexFail:
+    pthread_mutex_destroy(&connector->repaintMutex);
     connector->renderInitResult = -1;
     return NULL;
 }
@@ -559,4 +560,34 @@ void srmConnectorUnlockRenderThread(SRMConnector *connector)
     connector->repaintRequested = 1;
     pthread_cond_signal(&connector->repaintCond);
     //pthread_mutex_unlock(&connector->repaintMutex);
+}
+
+// This is called when a connector is uninitialized to assign
+// its cursor plane to another initialized connector that needs it
+void srmConnectorSetCursorPlaneToNeededConnector(SRMPlane *cursorPlane)
+{
+    if (cursorPlane->currentConnector)
+        return;
+
+    SRMListForeach(connectorIt, cursorPlane->device->connectors)
+    {
+        SRMConnector *connector = srmListItemGetData(connectorIt);
+
+        if (srmConnectorGetState(connector) == SRM_CONNECTOR_STATE_INITIALIZED &&
+            !srmConnectorHasHardwareCursor(connector))
+        {
+            SRMListForeach (crtcIt, cursorPlane->crtcs)
+            {
+                SRMCrtc *crtc = srmListItemGetData(crtcIt);
+
+                if (crtc->id == connector->currentCrtc->id)
+                {
+                    cursorPlane->currentConnector = connector;
+                    connector->currentCursorPlane = cursorPlane;
+                    srmRenderModeCommonCreateCursor(connector);
+                    return;
+                }
+            }
+        }
+    }
 }

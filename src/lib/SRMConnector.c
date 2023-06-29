@@ -209,10 +209,10 @@ UInt8 srmConnectorSetMode(SRMConnector *connector, SRMConnectorMode *mode)
             connector->targetMode = modeBackup;
             connector->state = SRM_CONNECTOR_STATE_CHANGING_MODE;
             srmConnectorUnlockRenderThread(connector);
+
             while (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
-            {
                 usleep(200);
-            }
+
             return 0;
         }
     }
@@ -286,7 +286,7 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
         goto fail;
     }
 
-    while (!connector->renderInitResult) { usleep(20000); }
+    while (!connector->renderInitResult) { usleep(1000); }
 
     // If failed
     if (connector->renderInitResult != 1)
@@ -355,12 +355,11 @@ void srmConnectorUninitialize(SRMConnector *connector)
 
     // Unitialize
     connector->state = SRM_CONNECTOR_STATE_UNINITIALIZING;
-    srmConnectorUnlockRenderThread(connector);
 
     while (connector->state != SRM_CONNECTOR_STATE_UNINITIALIZED)
     {
         srmConnectorUnlockRenderThread(connector);
-        usleep(20000);
+        usleep(1000);
     }
 
     if (connector->currentCrtc)
@@ -383,19 +382,10 @@ void srmConnectorUninitialize(SRMConnector *connector)
 
     if (connector->currentCursorPlane)
     {
-        /* TODO: Set the cursor to a connector that needs it */
         connector->currentCursorPlane->currentConnector = NULL;
+        srmConnectorSetCursorPlaneToNeededConnector(connector->currentCursorPlane);
         connector->currentCursorPlane = NULL;
     }
-
-    if (connector->cursorBO)
-    {
-        gbm_bo_destroy(connector->cursorBO);
-        connector->cursorBO = NULL;
-    }
-
-    pthread_mutex_destroy(&connector->repaintMutex);
-    pthread_cond_destroy(&connector->repaintCond);
 
     connector->interfaceData = NULL;
     connector->interface = NULL;
@@ -406,9 +396,6 @@ void srmConnectorUninitialize(SRMConnector *connector)
              connector->name,
              connector->model,
              connector->manufacturer);
-
-    /* TODO */
-
 }
 
 UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)
@@ -430,10 +417,7 @@ UInt8 srmConnectorPause(SRMConnector *connector)
             return 0;
         case SRM_CONNECTOR_STATE_INITIALIZED:
         {
-            //pthread_mutex_lock(&connector->stateMutex);
             connector->state = SRM_CONNECTOR_STATE_PAUSING;
-            //pthread_mutex_unlock(&connector->stateMutex);
-
             return srmConnectorPause(connector);
         }
         default:
@@ -451,22 +435,20 @@ UInt8 srmConnectorResume(SRMConnector *connector)
     switch (connector->state)
     {
         case SRM_CONNECTOR_STATE_INITIALIZED:
-                return 1;
+            return 1;
         case SRM_CONNECTOR_STATE_UNINITIALIZED:
         case SRM_CONNECTOR_STATE_UNINITIALIZING:
-                return 0;
+            return 0;
         case SRM_CONNECTOR_STATE_PAUSED:
         {
-                //pthread_mutex_lock(&connector->stateMutex);
-                connector->state = SRM_CONNECTOR_STATE_RESUMING;
-                //pthread_mutex_unlock(&connector->stateMutex);
-                return srmConnectorResume(connector);
+            connector->state = SRM_CONNECTOR_STATE_RESUMING;
+            return srmConnectorResume(connector);
         }
         default:
         {
-                srmConnectorUnlockRenderThread(connector);
-                usleep(10000);
-                return srmConnectorResume(connector);
+            srmConnectorUnlockRenderThread(connector);
+            usleep(10000);
+            return srmConnectorResume(connector);
         }
     }
     return 0;

@@ -103,6 +103,8 @@ void srmConnectorDestroyEncoders(SRMConnector *connector);
 UInt8 srmConnectorUpdateModes(SRMConnector *connector);
 void srmConnectorDestroyModes(SRMConnector *connector);
 
+void srmConnectorSetCursorPlaneToNeededConnector(SRMPlane *cursorPlane);
+
 SRMConnectorMode *srmConnectorFindPreferredMode(SRMConnector *connector);
 UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane);
 void *srmConnectorRenderThread(void *conn);

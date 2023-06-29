@@ -51,11 +51,13 @@ struct SRMCoreStruct
     pthread_t deallocatorThread;
     SRMList *deallocatorMessages;
     Int8 deallocatorState;
+    UInt8 deallocatorRunning;
     pthread_cond_t deallocatorCond;
     pthread_mutex_t deallocatorMutex;
 };
 
 UInt8 srmCoreInitDeallocator(SRMCore *core);
+void srmCoreUnitDeallocator(SRMCore *core);
 void srmCoreSendDeallocatorMessage(SRMCore *core,
                                    enum SRM_DEALLOCATOR_MSG msg,
                                    SRMDevice *device,

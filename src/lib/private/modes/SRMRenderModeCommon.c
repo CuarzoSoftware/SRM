@@ -97,17 +97,37 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
 
     if (connector->cursorBO)
     {
-        drmModeAddFB(connector->device->fd,
-                     gbm_bo_get_width(connector->cursorBO),
-                     gbm_bo_get_height(connector->cursorBO),
-                     32,
-                     gbm_bo_get_bpp(connector->cursorBO),
-                     gbm_bo_get_stride(connector->cursorBO),
-                     gbm_bo_get_handle(connector->cursorBO).u32,
-                     &connector->cursorFB);
+        if (connector->device->clientCapAtomic)
+        {
+            Int32 ret = drmModeAddFB(connector->device->fd,
+                         gbm_bo_get_width(connector->cursorBO),
+                         gbm_bo_get_height(connector->cursorBO),
+                         32,
+                         gbm_bo_get_bpp(connector->cursorBO),
+                         gbm_bo_get_stride(connector->cursorBO),
+                         gbm_bo_get_handle(connector->cursorBO).u32,
+                         &connector->cursorFB);
+
+            if (ret)
+            {
+                SRMError("Failed to setup hw cursor for connector %d.", connector->id);
+                goto fail;
+            }
+
+            return 1;
+        }
+        else
+            return 1;
     }
 
-    return connector->cursorBO != NULL && connector->cursorFB != 0;
+    fail:
+    if (connector->cursorBO)
+    {
+        gbm_bo_destroy(connector->cursorBO);
+        connector->cursorBO = NULL;
+    }
+    SRMError("Failed to setup hw cursor for connector %d.", connector->id);
+    return 0;
 }
 
 UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
@@ -133,6 +153,9 @@ UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
 
 void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqPtr req)
 {
+    if (!connector->currentCursorPlane)
+        return;
+
     if (!connector->atomicCursorHasChanges)
         return;
 
@@ -202,4 +225,44 @@ void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqP
                              connector->currentCursorPlane->id,
                              connector->currentCursorPlane->propIDs.CRTC_Y,
                              connector->cursorY);
+}
+
+void srmRenderModeCommonDestroyCursor(SRMConnector *connector)
+{
+    if (connector->cursorVisible)
+    {
+        if (connector->device->clientCapAtomic)
+        {
+            drmModeAtomicReqPtr req;
+            req = drmModeAtomicAlloc();
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.CRTC_ID,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.FB_ID,
+                                     0);
+
+            drmModeAtomicCommit(connector->device->fd, req, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+            drmModeAtomicFree(req);
+        }
+    }
+
+    if (connector->cursorFB)
+    {
+        drmModeRmFB(connector->device->fd, connector->cursorFB);
+        connector->cursorFB = 0;
+    }
+
+    if (connector->cursorBO)
+    {
+        gbm_bo_destroy(connector->cursorBO);
+        connector->cursorBO = NULL;
+    }
+
+    connector->atomicCursorHasChanges = 0;
+    connector->cursorVisible = 0;
 }

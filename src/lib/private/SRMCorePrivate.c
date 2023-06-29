@@ -1,19 +1,18 @@
 #include <private/SRMCorePrivate.h>
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMConnectorPrivate.h>
-
 #include <SRMFormat.h>
 #include <SRMLog.h>
 #include <SRMList.h>
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 UInt8 srmCoreUpdateEGLExtensions(SRMCore *core)
 {
     if (eglBindAPI(EGL_OPENGL_ES_API) == EGL_FALSE)
     {
-        SRMFatal("Failed to bind to the OpenGL ES API.");
+        SRMFatal("[core] Failed to bind to the OpenGL ES API.");
         return 0;
     }
 
@@ -21,7 +20,7 @@ UInt8 srmCoreUpdateEGLExtensions(SRMCore *core)
 
     if (!extensions)
     {
-        SRMFatal("Failed to query core EGL extensions.");
+        SRMFatal("[core] Failed to query core EGL extensions.");
         return 0;
     }
 
@@ -29,7 +28,7 @@ UInt8 srmCoreUpdateEGLExtensions(SRMCore *core)
 
     if (!core->eglExtensions.EXT_platform_base)
     {
-        SRMFatal("EGL_EXT_platform_base not supported.");
+        SRMFatal("[core] EGL_EXT_platform_base not supported.");
         return 0;
     }
 
@@ -38,7 +37,7 @@ UInt8 srmCoreUpdateEGLExtensions(SRMCore *core)
 
     if (!core->eglExtensions.KHR_platform_gbm && !core->eglExtensions.MESA_platform_gbm)
     {
-        SRMFatal("EGL_KHR_platform_gbm not supported.");
+        SRMFatal("[core] EGL_KHR_platform_gbm not supported.");
         return 0;
     }
 
@@ -48,8 +47,6 @@ UInt8 srmCoreUpdateEGLExtensions(SRMCore *core)
     core->eglExtensions.EXT_device_enumeration = srmEGLHasExtension(extensions, "EGL_EXT_device_enumeration");
     core->eglExtensions.EXT_device_query = srmEGLHasExtension(extensions, "EGL_EXT_device_query");
     core->eglExtensions.KHR_debug = srmEGLHasExtension(extensions, "EGL_KHR_debug");
-
-
     return 1;
 }
 
@@ -59,7 +56,7 @@ UInt8 srmCoreCreateUdev(SRMCore *core)
 
     if(!core->udev)
     {
-        SRMFatal("Failed to create udev context.");
+        SRMFatal("[core] Failed to create udev context.");
         return 0;
     }
 
@@ -450,7 +447,6 @@ static void srmEGLLog(EGLenum error, const char *command, EGLint type, EGLLabelK
             SRMDebug(format, command, srmEGLGetErrorString(error), error, msg);
             break;
     }
-
 }
 
 UInt8 srmCoreUpdateEGLFunctions(SRMCore *core)
@@ -513,12 +509,10 @@ void *srmCoreDeallocatorLoop(void *data)
 
             if (message->msg == SRM_DEALLOCATOR_MSG_DESTROY_BUFFER)
             {
-
                 eglMakeCurrent(message->device->eglDisplay,
                                EGL_NO_SURFACE,
                                EGL_NO_SURFACE,
                                message->device->eglDeallocatorContext);
-
 
                 if (message->textureID)
                 {
@@ -561,16 +555,19 @@ void *srmCoreDeallocatorLoop(void *data)
         pthread_mutex_unlock(&core->deallocatorMutex);
 
         if (finish)
+        {
+            core->deallocatorRunning = 0;
             return NULL;
+        }
     }
 }
-
 
 UInt8 srmCoreInitDeallocator(SRMCore *core)
 {
     pthread_mutex_init(&core->deallocatorMutex, NULL);
     pthread_cond_init(&core->deallocatorCond, NULL);
     core->deallocatorMessages = srmListCreate();
+    core->deallocatorRunning = 1;
 
     if (pthread_create(&core->deallocatorThread, NULL, srmCoreDeallocatorLoop, core))
     {
@@ -579,10 +576,30 @@ UInt8 srmCoreInitDeallocator(SRMCore *core)
         pthread_cond_destroy(&core->deallocatorCond);
         srmListDestoy(core->deallocatorMessages);
         core->deallocatorMessages = NULL;
+        core->deallocatorRunning = 0;
         return 0;
     }
 
     return 1;
+}
+
+void srmCoreUnitDeallocator(SRMCore *core)
+{
+    if (core->deallocatorRunning)
+    {
+        srmCoreSendDeallocatorMessage(core,
+                                      SRM_DEALLOCATOR_MSG_STOP_THREAD,
+                                      NULL,
+                                      0,
+                                      EGL_NO_IMAGE);
+
+        while (core->deallocatorRunning)
+            usleep(1000);
+
+        srmListDestoy(core->deallocatorMessages);
+        pthread_cond_destroy(&core->deallocatorCond);
+        pthread_mutex_destroy(&core->deallocatorMutex);
+    }
 }
 
 void srmCoreSendDeallocatorMessage(SRMCore *core,
@@ -591,6 +608,12 @@ void srmCoreSendDeallocatorMessage(SRMCore *core,
                                     GLuint textureID,
                                     EGLImage image)
 {
+    if (!core->deallocatorRunning)
+    {
+        core->deallocatorState = 1;
+        return;
+    }
+
     pthread_mutex_lock(&core->deallocatorMutex);
     core->deallocatorState = 0;
     struct SRMDeallocatorThreadMessage *message = malloc(sizeof(struct SRMDeallocatorThreadMessage));

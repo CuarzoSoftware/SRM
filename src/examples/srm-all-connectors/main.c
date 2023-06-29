@@ -32,19 +32,20 @@
 #include <math.h>
 #include <sys/time.h>
 
+// Background shared texture params
 #define BUF_WIDTH 64
 #define BUF_HEIGHT 64
 #define BUF_STRIDE 4*BUF_WIDTH
 #define BUF_SIZE BUF_STRIDE*BUF_HEIGHT
 
-/* Hardware cursor pixels */
-static UInt8 cursorPixels[64*64*4];
+/* Background texture shared among all GPUs */
+static SRMBuffer *buffer = NULL;
 
 /* Background texture pixels */
 static UInt8 bufferPixels[BUF_SIZE];
 
-/* Background texture shared among all GPUs */
-static SRMBuffer *buffer = NULL;
+/* Hardware cursor pixels */
+static UInt8 cursorPixels[64*64*4];
 
 /* Square vertices (left for vertex shader, right for fragment shader) */
 static GLfloat square[16] =
@@ -158,11 +159,6 @@ static void setupShaders(SRMConnector *connector, void *userData)
 
     // Enables the vertex array
     glEnableVertexAttribArray(0);
-
-    /* Calling srmBufferGetTextureID() returns a GL texture ID for a specific device.
-     * In this case, we want one for the device that do the rendering for this connector
-     * (connector->device->rendererDevice) */
-
 }
 
 static void initializeGL(SRMConnector *connector, void *userData)
@@ -197,7 +193,13 @@ static void paintGL(SRMConnector *connector, void *userData)
 
     if (buffer)
     {
-        glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(data->rendererDevice, buffer));
+        /* Calling srmBufferGetTextureID() returns a GL texture ID for a specific device.
+         * In this case, we want one for the device that do the rendering for this connector
+         * (connector->device->rendererDevice).
+         * The texture is only created the first time this method is called.
+         * Calling srmBufferGetTextureID() again returns the same texture ID.*/
+        GLuint textureId = srmBufferGetTextureID(data->rendererDevice, buffer);
+        glBindTexture(GL_TEXTURE_2D, textureId);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -226,8 +228,6 @@ static void paintGL(SRMConnector *connector, void *userData)
     if (data->phase >= 2*M_PI)
         data->phase -= 2*M_PI;
 
-    SRMRect damage = {0, 0, 200, 200};
-    srmConnectorSetBufferDamage(connector, &damage, 1);
     srmConnectorRepaint(connector);
 }
 
@@ -305,10 +305,11 @@ static void initConnector(SRMConnector *connector)
     SRMDevice *device = srmConnectorGetDevice(connector);
     userData->rendererDevice = srmDeviceGetRendererDevice(device);
 
+    // This initializes the rendering thread
     if (!srmConnectorInitialize(connector, &connectorInterface, userData))
     {
         /* Fails to init connector */
-
+        SRMError("[srm-all-connectors] Failed to init connector %s.", srmConnectorGetModel(connector));
         free(userData);
     }
 
@@ -358,12 +359,11 @@ int main(void)
         return 1;
     }
 
+    // Passing NULL as the allocator device ensures the texture is going to be avaliable on all GPUs
     buffer = srmBufferCreateFromCPU(core, NULL, BUF_WIDTH, BUF_HEIGHT, BUF_STRIDE, bufferPixels, DRM_FORMAT_XBGR8888);
 
     if (!buffer)
-    {
         SRMWarning("Failed to create background texture buffer.");
-    }
 
     // Set the pixels of the cursor white
     memset(cursorPixels, 255, sizeof(cursorPixels));
@@ -374,19 +374,24 @@ int main(void)
     SRMListener *connectorPluggedEventListener = srmCoreAddConnectorPluggedEventListener(core, &connectorPluggedEventHandler, NULL);
     SRMListener *connectorUnpluggedEventListener = srmCoreAddConnectorUnpluggedEventListener(core, &connectorUnpluggedEventHandler, NULL);
 
+    // Loop for each GPU
     SRMListForeach (deviceIt, srmCoreGetDevices(core))
     {
         SRMDevice *device = srmListItemGetData(deviceIt);
 
+        // Loop for each connector
         SRMListForeach (connectorIt, srmDeviceGetConnectors(device))
         {
             SRMConnector *connector = srmListItemGetData(connectorIt);
 
+            // Remove the srmConnectorGetmmWidth() if this is a virtual machine
+            // As virtual screens may not have a physical size
             if (srmConnectorIsConnected(connector) && srmConnectorGetmmWidth(connector) != 0)
                 initConnector(connector);
         }
     }
 
+    // Here we update the shared background texture every sec
     while (1)
     {
         /* Evdev monitor poll DRM devices/connectors hotplugging events (-1 disables timeout).

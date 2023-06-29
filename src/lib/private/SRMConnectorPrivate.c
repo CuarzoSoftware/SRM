@@ -1,3 +1,4 @@
+#include "private/modes/SRMRenderModeCPU.h"
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMConnectorModePrivate.h>
 #include <private/SRMDevicePrivate.h>
@@ -477,6 +478,8 @@ void *srmConnectorRenderThread(void *conn)
         srmRenderModeItselfSetInterface(connector);
     else if (srmDeviceGetRenderMode(connector->device) == SRM_RENDER_MODE_DUMB)
         srmRenderModeDumbSetInterface(connector);
+    else if (srmDeviceGetRenderMode(connector->device) == SRM_RENDER_MODE_CPU)
+        srmRenderModeCPUSetInterface(connector);
     else
         goto fail;
 

@@ -114,6 +114,7 @@ if get_option('build_examples')
 
     m_dep = c.find_library('m', dirs: library_paths, required: true)
 
+    subdir('examples/srm-basic')
     subdir('examples/srm-display-info')
     subdir('examples/srm-all-connectors')
 endif

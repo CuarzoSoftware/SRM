@@ -513,7 +513,7 @@ void *srmConnectorRenderThread(void *conn)
             drmModeAtomicReqPtr req;
             req = drmModeAtomicAlloc();
             srmRenderModeCommitCursorChanges(connector, req);
-            drmModeAtomicCommit(connector->device->fd, req, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+            drmModeAtomicCommit(connector->device->fd, req, DRM_MODE_PAGE_FLIP_EVENT, NULL);
             drmModeAtomicFree(req);
         }
 

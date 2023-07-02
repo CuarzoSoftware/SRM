@@ -1,3 +1,4 @@
+#include "private/modes/SRMRenderModeCommon.h"
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMEncoderPrivate.h>
@@ -95,7 +96,7 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
         if (connector->device->clientCapAtomic)
         {
             connector->cursorVisible = 0;
-            connector->atomicCursorHasChanges = 1;
+            connector->atomicCursorHasChanges |= SRM_CURSOR_ATOMIC_CHANGE_VISIBILITY;
             pthread_cond_signal(&connector->repaintCond);
         }
         else
@@ -114,7 +115,7 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
     if (connector->device->clientCapAtomic)
     {
         connector->cursorVisible = 1;
-        connector->atomicCursorHasChanges = 1;
+        connector->atomicCursorHasChanges |= SRM_CURSOR_ATOMIC_CHANGE_VISIBILITY;
         pthread_cond_signal(&connector->repaintCond);
     }
     else
@@ -138,7 +139,7 @@ UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
     {
         connector->cursorX = x;
         connector->cursorY = y;
-        connector->atomicCursorHasChanges = 1;
+        connector->atomicCursorHasChanges |= SRM_CURSOR_ATOMIC_CHANGE_POSITION;
         pthread_cond_signal(&connector->repaintCond);
     }
     else

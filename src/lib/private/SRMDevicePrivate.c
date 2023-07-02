@@ -505,6 +505,9 @@ UInt8 srmDeviceUpdateCaps(SRMDevice *device)
     drmGetCap(device->fd, DRM_CAP_ADDFB2_MODIFIERS, &value);
     device->capAddFb2Modifiers = value == 1;
 
+    drmGetCap(device->fd, DRM_CAP_ASYNC_PAGE_FLIP, &value);
+    device->capAsyncPageFlip = value == 1;
+
     return 1;
 }
 

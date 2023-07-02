@@ -156,75 +156,78 @@ void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqP
     if (!connector->currentCursorPlane)
         return;
 
-    /*if (!connector->atomicCursorHasChanges)
-        return;*/
+    if (connector->atomicCursorHasChanges & SRM_CURSOR_ATOMIC_CHANGE_VISIBILITY)
+    {
+        if (connector->cursorVisible)
+        {
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.FB_ID,
+                                     connector->cursorFB);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.CRTC_ID,
+                                     connector->currentCrtc->id);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.CRTC_W,
+                                     64);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.CRTC_H,
+                                     64);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.SRC_X,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.SRC_Y,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.SRC_W,
+                                     (UInt64)64 << 16);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.SRC_H,
+                                     (UInt64)64 << 16);
+        }
+        else
+        {
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.CRTC_ID,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCursorPlane->id,
+                                     connector->currentCursorPlane->propIDs.FB_ID,
+                                     0);
+        }
+    }
+
+    if (connector->atomicCursorHasChanges & SRM_CURSOR_ATOMIC_CHANGE_POSITION)
+    {
+        drmModeAtomicAddProperty(req,
+                                 connector->currentCursorPlane->id,
+                                 connector->currentCursorPlane->propIDs.CRTC_X,
+                                 connector->cursorX);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentCursorPlane->id,
+                                 connector->currentCursorPlane->propIDs.CRTC_Y,
+                                 connector->cursorY);
+    }
 
     connector->atomicCursorHasChanges = 0;
-
-    if (connector->cursorVisible)
-    {
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCursorPlane->id,
-                                 connector->currentCursorPlane->propIDs.FB_ID,
-                                 connector->cursorFB);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCursorPlane->id,
-                                 connector->currentCursorPlane->propIDs.CRTC_ID,
-                                 connector->currentCrtc->id);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCursorPlane->id,
-                                 connector->currentCursorPlane->propIDs.CRTC_W,
-                                 64);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCursorPlane->id,
-                                 connector->currentCursorPlane->propIDs.CRTC_H,
-                                 64);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCursorPlane->id,
-                                 connector->currentCursorPlane->propIDs.SRC_X,
-                                 0);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCursorPlane->id,
-                                 connector->currentCursorPlane->propIDs.SRC_Y,
-                                 0);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCursorPlane->id,
-                                 connector->currentCursorPlane->propIDs.SRC_W,
-                                 (UInt64)64 << 16);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCursorPlane->id,
-                                 connector->currentCursorPlane->propIDs.SRC_H,
-                                 (UInt64)64 << 16);
-    }
-    else
-    {
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCursorPlane->id,
-                                 connector->currentCursorPlane->propIDs.CRTC_ID,
-                                 0);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCursorPlane->id,
-                                 connector->currentCursorPlane->propIDs.FB_ID,
-                                 0);
-    }
-
-    drmModeAtomicAddProperty(req,
-                             connector->currentCursorPlane->id,
-                             connector->currentCursorPlane->propIDs.CRTC_X,
-                             connector->cursorX);
-
-    drmModeAtomicAddProperty(req,
-                             connector->currentCursorPlane->id,
-                             connector->currentCursorPlane->propIDs.CRTC_Y,
-                             connector->cursorY);
 }
 
 void srmRenderModeCommonDestroyCursor(SRMConnector *connector)

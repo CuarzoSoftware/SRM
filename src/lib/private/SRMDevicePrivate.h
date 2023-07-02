@@ -55,6 +55,7 @@ struct SRMDeviceStruct
     UInt8 capPrimeImport;
     UInt8 capPrimeExport;
     UInt8 capAddFb2Modifiers;
+    UInt8 capAsyncPageFlip;
 
     SRMList *crtcs;
     SRMList *encoders;

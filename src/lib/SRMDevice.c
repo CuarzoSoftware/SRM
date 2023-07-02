@@ -67,6 +67,11 @@ UInt8 srmDeviceGetCapAddFb2Modifiers(SRMDevice *device)
     return device->capAddFb2Modifiers;
 }
 
+UInt8 srmDeviceGetCapAsyncPageFlip(SRMDevice *device)
+{
+    return device->capAsyncPageFlip;
+}
+
 UInt8 srmDeviceSetEnabled(SRMDevice *device, UInt8 enabled)
 {
     // If it is the only GPU it can not be disabled

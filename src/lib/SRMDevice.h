@@ -25,6 +25,7 @@ UInt8 srmDeviceGetCapDumbBuffer(SRMDevice *device);
 UInt8 srmDeviceGetCapPrimeImport(SRMDevice *device);
 UInt8 srmDeviceGetCapPrimeExport(SRMDevice *device);
 UInt8 srmDeviceGetCapAddFb2Modifiers(SRMDevice *device);
+UInt8 srmDeviceGetCapAsyncPageFlip(SRMDevice *device);
 
 // Enables or disables the GPU
 UInt8 srmDeviceSetEnabled(SRMDevice *device, UInt8 enabled);

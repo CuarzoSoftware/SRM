@@ -156,8 +156,8 @@ void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqP
     if (!connector->currentCursorPlane)
         return;
 
-    if (!connector->atomicCursorHasChanges)
-        return;
+    /*if (!connector->atomicCursorHasChanges)
+        return;*/
 
     connector->atomicCursorHasChanges = 0;
 

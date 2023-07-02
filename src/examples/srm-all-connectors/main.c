@@ -386,7 +386,7 @@ int main(void)
 
             // Remove the srmConnectorGetmmWidth() if this is a virtual machine
             // As virtual screens may not have a physical size
-            if (srmConnectorIsConnected(connector) && srmConnectorGetmmWidth(connector) != 0)
+            if (srmConnectorIsConnected(connector))// && srmConnectorGetmmWidth(connector) != 0)
                 initConnector(connector);
         }
     }

@@ -1,3 +1,4 @@
+#include <GL/gl.h>
 #include <private/SRMBufferPrivate.h>
 #include <private/SRMCorePrivate.h>
 #include <private/SRMDevicePrivate.h>
@@ -74,7 +75,20 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     buffer->format = format;
     const SRMGLFormat *glFmt;
 
+    UInt8 supportLinear = 0;
+
+    SRMListForeach(fmtIt, buffer->allocator->dmaTextureFormats)
+    {
+        SRMFormat *fmt = srmListItemGetData(fmtIt);
+
+        if (fmt->format == format && fmt->modifier == DRM_FORMAT_MOD_LINEAR)
+            supportLinear = 1;
+    }
+
     pthread_mutex_lock(&buffer->mutex);
+
+    if (!supportLinear)
+        goto glesOnly;
 
     buffer->modifiers[0] = DRM_FORMAT_MOD_LINEAR;
     buffer->bo = gbm_bo_create_with_modifiers(buffer->allocator->gbm,
@@ -539,14 +553,14 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
     else
     {
         glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(buffer->allocator, buffer));
-        glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / buffer->pixelSize);
-        glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, 0);
-        glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / buffer->pixelSize);
+        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+        glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
 
         glTexSubImage2D(GL_TEXTURE_2D, 0, dstX, dstY, dstWidth, dstHeight,
                         buffer->glFormat, buffer->glType, pixels);
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
         glFlush();
 
         /* SRMDebug("[%s] Buffer written using glTexSubImage2D.", buffer->core->allocatorDevice->name); */

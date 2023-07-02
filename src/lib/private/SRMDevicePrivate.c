@@ -340,14 +340,14 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
         if (modifiersCount == 0 || !allExternalOnly)
             srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], DRM_FORMAT_MOD_INVALID);
 
-
+        /*
         if (modifiersCount == 0)
         {
             // Asume the linear layout is supported if the driver doesn't
             // explicitly say otherwise
             srmFormatsListAddFormat(device->dmaTextureFormats, formats[i], DRM_FORMAT_MOD_LINEAR);
             srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], DRM_FORMAT_MOD_LINEAR);
-        }
+        }*/
 
         if (modifiers)
             free(modifiers);

@@ -93,6 +93,9 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
 
     if (!pixels)
     {
+        if (connector->cursorVisible == 0)
+            return 1;
+
         if (connector->device->clientCapAtomic)
         {
             connector->cursorVisible = 0;
@@ -111,6 +114,9 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
     }
 
     gbm_bo_write(connector->cursorBO, pixels, 64*64*4);
+
+    if (connector->cursorVisible == 1)
+        return 1;
 
     if (connector->device->clientCapAtomic)
     {
@@ -134,6 +140,9 @@ UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
 {
     if (!connector->cursorBO)
         return 0;
+
+    if (connector->cursorX == x && connector->cursorY == y)
+        return 1;
 
     if (connector->device->clientCapAtomic)
     {
@@ -198,7 +207,7 @@ UInt8 srmConnectorSetMode(SRMConnector *connector, SRMConnectorMode *mode)
         while (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {
             srmConnectorUnlockRenderThread(connector);
-            usleep(1000000);
+            usleep(10000);
         }
 
         if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)

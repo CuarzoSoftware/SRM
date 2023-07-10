@@ -513,7 +513,7 @@ void *srmConnectorRenderThread(void *conn)
             drmModeAtomicReqPtr req;
             req = drmModeAtomicAlloc();
             srmRenderModeCommitCursorChanges(connector, req);
-            drmModeAtomicCommit(connector->device->fd, req, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+            drmModeAtomicCommit(connector->device->fd, req, DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK, NULL);
             drmModeAtomicFree(req);
         }
 
@@ -522,7 +522,10 @@ void *srmConnectorRenderThread(void *conn)
             if (connector->renderInterface.updateMode(connector))
                 connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
             else
+            {
+                SRMFatal("Changing mode failed");
                 connector->state = SRM_CONNECTOR_STATE_REVERTING_MODE;
+            }
         }
         else if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING)
         {
@@ -556,10 +559,8 @@ repaintMutexFail:
 
 void srmConnectorUnlockRenderThread(SRMConnector *connector)
 {
-    //pthread_mutex_lock(&connector->repaintMutex);
     connector->repaintRequested = 1;
     pthread_cond_signal(&connector->repaintCond);
-    //pthread_mutex_unlock(&connector->repaintMutex);
 }
 
 // This is called when a connector is uninitialized to assign

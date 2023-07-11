@@ -8,6 +8,7 @@
 #include <SRMLog.h>
 #include <stdlib.h>
 #include <xf86drmMode.h>
+#include <unistd.h>
 
 // Choose EGL configurations
 
@@ -280,7 +281,10 @@ Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags,
 
     // -EBUSY
     if (ret == -16)
+    {
+        usleep(100);
         goto retry;
+    }
 
     return ret;
 }

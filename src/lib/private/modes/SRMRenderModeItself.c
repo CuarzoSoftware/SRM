@@ -414,10 +414,6 @@ static UInt8 flipPage(SRMConnector *connector)
     {
         drmModeAtomicReqPtr req;
         req = drmModeAtomicAlloc();
-        UInt32 flags = DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK;
-
-        if (connector->atomicCursorHasChanges)
-            flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
         srmRenderModeCommitCursorChanges(connector, req);
         drmModeAtomicAddProperty(req,
@@ -427,7 +423,7 @@ static UInt8 flipPage(SRMConnector *connector)
 
         srmRenderModeAtomicCommit(connector->device->fd,
                                   req,
-                                  flags,
+                                  DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
                                   connector);
         drmModeAtomicFree(req);
     }

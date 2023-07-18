@@ -9,6 +9,10 @@ project(
 	]
 )
 
+if get_option('buildtype') == 'custom'
+    add_project_arguments('-Ofast', '-g3',  language : 'c')
+endif
+
 little_endian = target_machine.endian() == 'little'
 big_endian = target_machine.endian() == 'big'
 

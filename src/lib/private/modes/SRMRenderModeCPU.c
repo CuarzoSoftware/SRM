@@ -968,6 +968,7 @@ static UInt8 flipPage(SRMConnector *connector)
     swapBuffers(connector, connector->device->eglDisplay, data->connectorEGLSurface);
     gbm_surface_lock_front_buffer(data->connectorGBMSurface);
 
+    Int32 ret;
     connector->pendingPageFlip = 1;
 
     if (connector->device->clientCapAtomic)
@@ -982,7 +983,7 @@ static UInt8 flipPage(SRMConnector *connector)
                                  connector->currentPrimaryPlane->propIDs.FB_ID,
                                  data->connectorDRMFramebuffers[data->currentBufferIndex]);
 
-        srmRenderModeAtomicCommit(connector->device->fd,
+        ret = srmRenderModeAtomicCommit(connector->device->fd,
                             req,
                             DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
                             connector);
@@ -991,12 +992,15 @@ static UInt8 flipPage(SRMConnector *connector)
     }
     else
     {
-        drmModePageFlip(connector->device->fd,
+        ret = drmModePageFlip(connector->device->fd,
                         connector->currentCrtc->id,
                         data->connectorDRMFramebuffers[data->currentBufferIndex],
                         DRM_MODE_PAGE_FLIP_EVENT,
                         connector);
     }
+
+    if (ret)
+        connector->pendingPageFlip = 0;
 
     struct pollfd fds;
     fds.fd = connector->device->fd;

@@ -151,8 +151,8 @@ static void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *
 
     /* This is called when a connector is no longer avaliable (E.g. Unplugging an HDMI display). */
 
-    /* The connnector is automatically uninitialized after this event (if connected)
-     * so there is no need to call srmConnectorUninitialize() */
+    /* The connnector is automatically uninitialized after this event (if initialized)
+     * so calling srmConnectorUninitialize() is a no-op. */
 }
 
 int main(void)
@@ -173,15 +173,18 @@ int main(void)
     SRMListener *connectorUnpluggedEventListener = srmCoreAddConnectorUnpluggedEventListener(core, &connectorUnpluggedEventHandler, NULL);
 
     // Find and initialize avaliable connectors
+
+    // Loop each GPU (device)
     SRMListForeach (deviceIt, srmCoreGetDevices(core))
     {
         SRMDevice *device = srmListItemGetData(deviceIt);
 
+        // Loop each GPU connector (screen)
         SRMListForeach (connectorIt, srmDeviceGetConnectors(device))
         {
             SRMConnector *connector = srmListItemGetData(connectorIt);
 
-            if (srmConnectorIsConnected(connector) && srmConnectorGetmmWidth(connector) != 0)
+            if (srmConnectorIsConnected(connector))
             {
                 if (!srmConnectorInitialize(connector, &connectorInterface, NULL))
                     SRMError("[srm-basic] Failed to initialize connector %s.",

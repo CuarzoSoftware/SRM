@@ -69,7 +69,7 @@ struct ConnectorUserData
     // Used to animate the cursor and white line
     float phase;
 
-    // Current screen mode dimensions
+    // Quick access to current screen mode dimensions
     UInt32 w, h;
 
     // Count FPS
@@ -130,7 +130,8 @@ static void setupShaders(SRMConnector *connector, void *userData)
     if (!success)
     {
         glGetShaderInfoLog(data->vertexShader, 512, NULL, infoLog);
-        SRMError("Vertex shader compilation error: %s.", infoLog);
+        SRMFatal("Vertex shader compilation error: %s.", infoLog);
+        exit(1);
     }
 
     data->fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -142,7 +143,8 @@ static void setupShaders(SRMConnector *connector, void *userData)
     if (!success)
     {
         glGetShaderInfoLog(data->fragmentShader, 512, NULL, infoLog);
-        SRMError("Fragment shader compilation error: %s.", infoLog);
+        SRMFatal("Fragment shader compilation error: %s.", infoLog);
+        exit(1);
     }
 
     data->program = glCreateProgram();
@@ -178,7 +180,7 @@ static void initializeGL(SRMConnector *connector, void *userData)
     // Draw color squares
     drawColorSquares(data->w, data->h);
 
-    // Set the pixels of the HW cursor
+    // Set the pixels of the HW cursor (just white)
     srmConnectorSetCursor(connector, cursorPixels);
 
     // Schedule a repaint
@@ -193,7 +195,7 @@ static void paintGL(SRMConnector *connector, void *userData)
 
     if (buffer)
     {
-        /* Calling srmBufferGetTextureID() returns a GL texture ID for a specific device.
+        /* Calling srmBufferGetTextureID() returns a GL texture ID for a specific device (GPU).
          * In this case, we want one for the device that do the rendering for this connector
          * (connector->device->rendererDevice).
          * The texture is only created the first time this method is called.
@@ -258,9 +260,9 @@ static void pageFlipped(SRMConnector *connector, void *userData)
     if (currSec != data->sec && currSec % 5 == 0)
     {
         data->sec = currSec;
-        SRMLog("srm-all-connectors: Connector (%d) FPS: %d.",
+        SRMLog("[srm-all-connectors] Connector (%d) FPS: %d.",
                srmConnectorGetID(connector),
-               (data->framesCount * 1000) / msDiff);
+               ((data->framesCount * 1000) / msDiff) + 1);
     }
 }
 
@@ -317,18 +319,21 @@ static void initConnector(SRMConnector *connector)
 
 }
 
+/* When a new GPU/driver is connected/initialized */
 static void deviceCreatedEventHandler(SRMListener *listener, SRMDevice *device)
 {
     SRM_UNUSED(listener);
     SRM_UNUSED(device);
 }
 
+/* When a GPU/driver is disconnected/uninitialized */
 static void deviceRemovedEventHandler(SRMListener *listener, SRMDevice *device)
 {
     SRM_UNUSED(listener);
     SRM_UNUSED(device);
 }
 
+/* When a new connector (screen) is connected */
 static void connectorPluggedEventHandler(SRMListener *listener, SRMConnector *connector)
 {
     SRM_UNUSED(listener);
@@ -337,6 +342,7 @@ static void connectorPluggedEventHandler(SRMListener *listener, SRMConnector *co
     initConnector(connector);
 }
 
+/* When a connector (screen) is disconnected */
 static void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *connector)
 {
     SRM_UNUSED(listener);
@@ -365,7 +371,7 @@ int main(void)
     if (!buffer)
         SRMWarning("Failed to create background texture buffer.");
 
-    // Set the pixels of the cursor white
+    // Set the pixels of the cursor to white
     memset(cursorPixels, 255, sizeof(cursorPixels));
 
     // Subscribe to DRM events
@@ -379,7 +385,7 @@ int main(void)
     {
         SRMDevice *device = srmListItemGetData(deviceIt);
 
-        // Loop for each connector
+        // Loop for each GPU connector
         SRMListForeach (connectorIt, srmDeviceGetConnectors(device))
         {
             SRMConnector *connector = srmListItemGetData(connectorIt);

@@ -89,6 +89,7 @@ Here are the steps in which SRM internally finds the best configuration:
 You can customize the framebuffer count for both "ITSELF" and "DUMB" render modes using the following environment variables:
 
 **SRM_RENDER_MODE_ITSELF_FB_COUNT**=[1, 2, 3]
+
 **SRM_RENDER_MODE_DUMB_FB_COUNT**=[1, 2, 3]
 
 If you set the value to 1 for any of these variables, it will disable v-sync.

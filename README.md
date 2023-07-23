@@ -39,8 +39,8 @@ If you have any questions or suggestions, please feel free to email me at <ehopp
 ### Build
 
 ```
-$ cd SRM
-$ meson setup build
+$ cd SRM/src
+$ meson setup build -Dbuildtype=custom
 $ cd build
 $ sudo meson install
 ```

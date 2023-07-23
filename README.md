@@ -84,5 +84,23 @@ Here are the steps in which SRM internally finds the best configuration:
 7. SRM also looks for a CURSOR PLANE, which, if available, can assign its pixels and position using the setCursor() and setCursorPos() functions.
 8. If no CURSOR PLANE is found because they are all being used by other connectors, the CURSOR PLANE will be automatically added to the connector that needs it once one of those connectors is deinitialized.
 
+### Environment Variables
+
+You can customize the framebuffer count for both "ITSELF" and "DUMB" render modes using the following environment variables:
+
+**SRM_RENDER_MODE_ITSELF_FB_COUNT**=[1, 2, 3]
+**SRM_RENDER_MODE_DUMB_FB_COUNT**=[1, 2, 3]
+
+If you set the value to 1 for any of these variables, it will disable v-sync.
+
+Please note that v-sync is always disabled for the "CPU" mode, and this setting cannot be changed.
+
+By default, the framebuffer count for each render mode is as follows:
+
+* ITSELF: 2
+* DUMB: 1
+* CPU: 1
+
+Remember to adjust the values accordingly based on your specific requirements and hardware capabilities.
 
 

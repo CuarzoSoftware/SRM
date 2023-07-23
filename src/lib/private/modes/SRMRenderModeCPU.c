@@ -12,7 +12,6 @@
 #include <SRMLog.h>
 
 #include <string.h>
-#include <sys/poll.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <GL/gl.h>
@@ -774,15 +773,6 @@ static UInt32 nextBufferIndex(SRMConnector *connector)
         return data->currentBufferIndex + 1;
 }
 
-static UInt32 prevBufferIndex(SRMConnector *connector)
-{
-    RenderModeData *data = (RenderModeData*)connector->renderData;
-    if (data->currentBufferIndex == 0)
-        return data->buffersCount - 1;
-    else
-        return data->buffersCount - 1;
-}
-
 static UInt8 render(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
@@ -866,9 +856,11 @@ static UInt8 flipPage(SRMConnector *connector)
             glPixelStorei(GL_PACK_ALIGNMENT, 4);
             glPixelStorei(GL_PACK_ROW_LENGTH, connector->currentMode->info.hdisplay);
 
+            Int32 y;
+
             for (UInt32 i = 0; i < damageCount; i++)
             {
-                Int32 y = connector->currentMode->info.vdisplay - damage[i].y - damage[i].height;
+                y = connector->currentMode->info.vdisplay - damage[i].y - damage[i].height;
                 glPixelStorei(GL_PACK_SKIP_PIXELS, damage[i].x);
                 glPixelStorei(GL_PACK_SKIP_ROWS, y);
 
@@ -907,9 +899,11 @@ static UInt8 flipPage(SRMConnector *connector)
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         glPixelStorei(GL_UNPACK_ROW_LENGTH, data->rendererBuffers[data->currentBufferIndex]->strides[0]/4);
 
+        UInt8 *mp, *buff;
         for (UInt32 i = 0; i < damageCount; i++)
         {
-            UInt8 *buff = &data->rendererBuffers[data->currentBufferIndex]->map[data->rendererBuffers[
+            mp = data->rendererBuffers[data->currentBufferIndex]->map;
+            buff = &mp[data->rendererBuffers[
                 data->currentBufferIndex]->offsets[0]
             ];
 
@@ -934,9 +928,11 @@ static UInt8 flipPage(SRMConnector *connector)
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         glPixelStorei(GL_UNPACK_ROW_LENGTH, connector->currentMode->info.hdisplay);
 
+        Int32 y;
+
         for (UInt32 i = 0; i < damageCount; i++)
         {
-            Int32 y = connector->currentMode->info.vdisplay - damage[i].y - damage[i].height;
+            y = connector->currentMode->info.vdisplay - damage[i].y - damage[i].height;
             glPixelStorei(GL_UNPACK_SKIP_PIXELS, damage[i].x);
             glPixelStorei(GL_UNPACK_SKIP_ROWS, y);
             glTexSubImage2D(GL_TEXTURE_2D,
@@ -968,70 +964,7 @@ static UInt8 flipPage(SRMConnector *connector)
     swapBuffers(connector, connector->device->eglDisplay, data->connectorEGLSurface);
     gbm_surface_lock_front_buffer(data->connectorGBMSurface);
 
-    Int32 ret;
-    connector->pendingPageFlip = 1;
-
-    if (connector->device->clientCapAtomic)
-    {
-        drmModeAtomicReqPtr req;
-        req = drmModeAtomicAlloc();
-
-        srmRenderModeCommitCursorChanges(connector, req);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentPrimaryPlane->id,
-                                 connector->currentPrimaryPlane->propIDs.FB_ID,
-                                 data->connectorDRMFramebuffers[data->currentBufferIndex]);
-
-        ret = srmRenderModeAtomicCommit(connector->device->fd,
-                            req,
-                            DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
-                            connector);
-
-        drmModeAtomicFree(req);
-    }
-    else
-    {
-        ret = drmModePageFlip(connector->device->fd,
-                        connector->currentCrtc->id,
-                        data->connectorDRMFramebuffers[data->currentBufferIndex],
-                        DRM_MODE_PAGE_FLIP_EVENT,
-                        connector);
-    }
-
-    if (ret)
-        connector->pendingPageFlip = 0;
-
-    struct pollfd fds;
-    fds.fd = connector->device->fd;
-    fds.events = POLLIN;
-    fds.revents = 0;
-
-    while(connector->pendingPageFlip)
-    {
-        if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
-            break;
-
-        // Prevent multiple threads invoking the drmHandleEvent at a time wich causes bugs
-        // If more than 1 connector is requesting a page flip, both can be handled here
-        // since the struct passed to drmHandleEvent is standard and could be handling events
-        // from any connector (E.g. pageFlipHandler(conn1) or pageFlipHandler(conn2))
-        pthread_mutex_lock(&connector->device->pageFlipMutex);
-
-        // Double check if the pageflip was notified in another thread
-        if (!connector->pendingPageFlip)
-        {
-            pthread_mutex_unlock(&connector->device->pageFlipMutex);
-            break;
-        }
-
-        poll(&fds, 1, 500);
-
-        if(fds.revents & POLLIN)
-            drmHandleEvent(fds.fd, &connector->drmEventCtx);
-
-        pthread_mutex_unlock(&connector->device->pageFlipMutex);
-    }
+    srmRenderModeCommonPageFlip(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
 
     data->currentBufferIndex = nextBufferIndex(connector);
     gbm_surface_release_buffer(data->rendererGBMSurface, data->rendererBOs[data->currentBufferIndex]);

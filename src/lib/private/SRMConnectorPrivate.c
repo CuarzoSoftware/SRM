@@ -495,64 +495,19 @@ void *srmConnectorRenderThread(void *conn)
             break;
 
         pthread_mutex_lock(&connector->stateMutex);
-        if (connector->repaintRequested)
+        if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
         {
-            if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
+            if (connector->repaintRequested)
             {
-                connector->repaintRequested = 0;
-                connector->renderInterface.render(connector);
-                connector->renderInterface.flipPage(connector);
-                pthread_mutex_unlock(&connector->stateMutex);
-                continue;
+                    connector->repaintRequested = 0;
+                    connector->renderInterface.render(connector);
+                    connector->renderInterface.flipPage(connector);
+                    pthread_mutex_unlock(&connector->stateMutex);
+                    continue;
             }
-        }
-        else if (connector->atomicCursorHasChanges)
-        {
-            Int32 ret;
-            drmModeAtomicReqPtr req;
-            req = drmModeAtomicAlloc();
-            srmRenderModeCommitCursorChanges(connector, req);
-            drmModeAtomicAddProperty(req,
-                                     connector->currentPrimaryPlane->id,
-                                     connector->currentPrimaryPlane->propIDs.FB_ID,
-                                     connector->lastFb);
-            ret = drmModeAtomicCommit(connector->device->fd, req,
-                                DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
-                                connector);
-            drmModeAtomicFree(req);
-
-            if (!ret)
-                connector->pendingPageFlip = 1;
-
-            struct pollfd fds;
-            fds.fd = connector->device->fd;
-            fds.events = POLLIN;
-            fds.revents = 0;
-
-            while(connector->pendingPageFlip)
+            else if (connector->atomicCursorHasChanges)
             {
-                if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
-                    break;
-
-                // Prevent multiple threads invoking the drmHandleEvent at a time wich causes bugs
-                // If more than 1 connector is requesting a page flip, both can be handled here
-                // since the struct passed to drmHandleEvent is standard and could be handling events
-                // from any connector (E.g. pageFlipHandler(conn1) or pageFlipHandler(conn2))
-                pthread_mutex_lock(&connector->device->pageFlipMutex);
-
-                // Double check if the pageflip was notified in another thread
-                if (!connector->pendingPageFlip)
-                {
-                    pthread_mutex_unlock(&connector->device->pageFlipMutex);
-                    break;
-                }
-
-                poll(&fds, 1, 500);
-
-                if(fds.revents & POLLIN)
-                    drmHandleEvent(fds.fd, &connector->drmEventCtx);
-
-                pthread_mutex_unlock(&connector->device->pageFlipMutex);
+                srmRenderModeCommonPageFlip(connector, connector->lastFb);
             }
         }
         pthread_mutex_unlock(&connector->stateMutex);

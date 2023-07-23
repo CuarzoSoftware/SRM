@@ -207,7 +207,7 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
 
     struct gbm_bo *bo = NULL;
 
-    while (srmListGetLength(bos) < 3 && gbm_surface_has_free_buffers(data->connectorGBMSurface) > 0)
+    while (srmListGetLength(bos) < 2 && gbm_surface_has_free_buffers(data->connectorGBMSurface) > 0)
     {
         eglSwapBuffers(connector->device->rendererDevice->eglDisplay,
                        data->connectorEGLSurface);
@@ -444,6 +444,7 @@ static UInt8 flipPage(SRMConnector *connector)
         }
     }
 
+    connector->lastFb = data->connectorDRMFramebuffers[data->currentBufferIndex];
     connector->pendingPageFlip = 1;
 
     if (connector->device->clientCapAtomic)
@@ -455,7 +456,7 @@ static UInt8 flipPage(SRMConnector *connector)
         drmModeAtomicAddProperty(req,
                                  connector->currentPrimaryPlane->id,
                                  connector->currentPrimaryPlane->propIDs.FB_ID,
-                                 data->connectorDRMFramebuffers[data->currentBufferIndex]);
+                                 connector->lastFb);
 
         ret = srmRenderModeAtomicCommit(connector->device->fd,
                                   req,
@@ -467,7 +468,7 @@ static UInt8 flipPage(SRMConnector *connector)
     {
         ret = drmModePageFlip(connector->device->fd,
                         connector->currentCrtc->id,
-                        data->connectorDRMFramebuffers[data->currentBufferIndex],
+                        connector->lastFb,
                         DRM_MODE_PAGE_FLIP_EVENT,
                         connector);
     }

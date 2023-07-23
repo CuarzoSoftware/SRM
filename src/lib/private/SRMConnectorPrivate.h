@@ -77,6 +77,7 @@ struct SRMConnectorStruct
     pthread_t renderThread;
 
     // Render common
+    UInt32 lastFb;
     drmEventContext drmEventCtx;
     UInt8 pendingPageFlip;
     pthread_cond_t repaintCond;

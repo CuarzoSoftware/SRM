@@ -104,7 +104,6 @@ UInt8 srmCoreEnumerateDevices(SRMCore *core)
             }
         }
 
-
         udev_device_unref(dev);
     }
 
@@ -151,6 +150,10 @@ UInt8 srmCoreInitMonitor(SRMCore *core)
     fail:
     udev_monitor_unref(core->monitor);
     core->monitor = NULL;
+
+    if (core->monitorFd.fd >= 0)
+        close(core->monitorFd.fd);
+
     return 0;
 
 }
@@ -539,6 +542,16 @@ void *srmCoreDeallocatorLoop(void *data)
                     core->deallocatorState = -1;
                     free(message);
                     break;
+                }
+
+                core->deallocatorState = 1;
+            }
+            else if (message->msg == SRM_DEALLOCATOR_MSG_DESTROY_CONTEXT)
+            {
+                if (message->device->eglDeallocatorContext != EGL_NO_CONTEXT)
+                {
+                    eglDestroyContext(message->device->eglDisplay, message->device->eglDeallocatorContext);
+                    eglReleaseThread();
                 }
 
                 core->deallocatorState = 1;

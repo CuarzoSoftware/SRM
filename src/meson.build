@@ -125,5 +125,6 @@ endif
 
 if get_option('build_tests')
     subdir('tests/srm-test-lists')
+    subdir('tests/srm-test-memory')
 endif
 

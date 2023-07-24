@@ -7,9 +7,10 @@
 extern "C" {
 #endif
 
-void *srmCoreGetUserData(SRMCore *core);
 SRMCore *srmCoreCreate(SRMInterface *interface, void *userData);
 SRMList *srmCoreGetDevices(SRMCore *core);
+void *srmCoreGetUserData(SRMCore *core);
+void srmCoreSetUserData(SRMCore *core, void *userData);
 SRMDevice *srmCoreGetAllocatorDevice(SRMCore *core);
 Int32 srmCoreGetMonitorFD(SRMCore *core);
 Int32 srmCoreProccessMonitor(SRMCore *core, Int32 msTimeout);

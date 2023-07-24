@@ -20,69 +20,84 @@
 
 SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
 {
+    // REF 1
     SRMDevice *device = calloc(1, sizeof(SRMDevice));
-
     strncpy(device->name, name, sizeof(device->name));
-
     device->core = core;
     device->enabled = 1;
     device->eglDevice = EGL_NO_DEVICE_EXT;
+    device->fd = -1;
 
-
+    // REF 2
     device->fd = core->interface->openRestricted(name,
                                                  O_RDWR | O_CLOEXEC,
                                                  core->interfaceUserData);
 
+    if (device->fd < 0)
+    {
+        SRMError("[device] Failed to open DRM device %s.", device->name);
+        goto fail;
+    }
+
+    // REF 3
     if (pthread_mutex_init(&device->pageFlipMutex, NULL))
     {
         SRMError("Failed to create page flip mutex for device %s.", device->name);
         goto fail;
     }
+    device->pageFlipMutexInitialized = 1;
 
-    if (device->fd < 0)
-    {
-        SRMError("Failed to open DRM device %s.", name);
-        goto fail;
-    }
-
+    // REF 4
     if (!srmDeviceInitializeGBM(device))
         goto fail;
 
+    // REF 5
     if (!srmDeviceInitializeEGL(device))
         goto fail;
 
+    // REF -
     if (!srmDeviceUpdateEGLExtensions(device))
         goto fail;
 
+    // REF -
     if (!srmDeviceUpdateEGLFunctions(device))
         goto fail;
 
+    // REF 6
     srmDeviceUpdateDMAFormats(device);
 
+    // REF 7
     if (!srmDeviceInitializeEGLSharedContext(device))
         goto fail;
 
+    // REF 8
     if (!srmDeviceInitEGLDeallocatorContext(device))
         goto fail;
 
+    // REF -
     if (!srmDeviceUpdateClientCaps(device))
         goto fail;
 
+    // REF -
     if (!srmDeviceUpdateCaps(device))
         goto fail;
 
+    // REF 9
     device->crtcs = srmListCreate();
     if (!srmDeviceUpdateCrtcs(device))
         goto fail;
 
+    // REF 10
     device->encoders = srmListCreate();
     if (!srmDeviceUpdateEncoders(device))
         goto fail;
 
+    // REF 11
     device->planes = srmListCreate();
     if (!srmDeviceUpdatePlanes(device))
         goto fail;
 
+    // REF 12
     device->connectors = srmListCreate();
     if (!srmDeviceUpdateConnectors(device))
         goto fail;
@@ -96,9 +111,69 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
 
 void srmDeviceDestroy(SRMDevice *device)
 {
-    pthread_mutex_destroy(&device->pageFlipMutex);
+    // UNREF 12
+    if (device->connectors)
+    {
+        while (!srmListIsEmpty(device->connectors))
+            srmConnectorDestroy(srmListItemGetData(srmListGetBack(device->connectors)));
 
-    // TODO free resources
+        srmListDestoy(device->connectors);
+    }
+
+    // UNREF 11
+    if (device->planes)
+    {
+        while (!srmListIsEmpty(device->planes))
+            srmPlaneDestroy(srmListItemGetData(srmListGetBack(device->planes)));
+
+        srmListDestoy(device->planes);
+    }
+
+    // UNREF 10
+    if (device->encoders)
+    {
+        while (!srmListIsEmpty(device->encoders))
+            srmEncoderDestroy(srmListItemGetData(srmListGetBack(device->encoders)));
+
+        srmListDestoy(device->encoders);
+    }
+
+    // UNREF 9
+    if (device->crtcs)
+    {
+        while (!srmListIsEmpty(device->crtcs))
+            srmCrtcDestroy(srmListItemGetData(srmListGetBack(device->crtcs)));
+
+        srmListDestoy(device->crtcs);
+    }
+
+    // UNREF 8
+    srmDeviceUninitEGLDeallocatorContext(device);
+
+    // UNREF 7
+    srmDeviceUninitializeEGLSharedContext(device);
+
+    // UNREF 6
+    srmDeviceDestroyDMAFormats(device);
+
+    // UNREF 5
+    srmDeviceUninitializeEGL(device);
+
+    // UNREF 4
+    srmDeviceUninitializeGBM(device);
+
+    // UNREF 3
+    if (device->pageFlipMutexInitialized)
+        pthread_mutex_destroy(&device->pageFlipMutex);
+
+    // UNREF 2
+    if (device->fd >= 0)
+        device->core->interface->closeRestricted(device->fd, device->core->interfaceUserData);
+
+    if (device->coreLink)
+        srmListRemoveItem(device->core->devices, device->coreLink);
+
+    // UNREF 1
     free(device);
 }
 
@@ -113,6 +188,12 @@ UInt8 srmDeviceInitializeGBM(SRMDevice *device)
     }
 
     return 1;
+}
+
+void srmDeviceUninitializeGBM(SRMDevice *device)
+{
+    if (device->gbm)
+        gbm_device_destroy(device->gbm);
 }
 
 UInt8 srmDeviceInitializeEGL(SRMDevice *device)
@@ -140,6 +221,16 @@ UInt8 srmDeviceInitializeEGL(SRMDevice *device)
     SRMDebug("[%s] EGL vendor: %s.", device->name, vendor ? vendor : "Unknown");
 
     return 1;
+}
+
+void srmDeviceUninitializeEGL(SRMDevice *device)
+{
+    if (device->eglDisplay != EGL_NO_DISPLAY)
+    {
+        eglReleaseThread();
+        eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        eglTerminate(device->eglDisplay);
+    }
 }
 
 UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
@@ -457,6 +548,15 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
     return 1;
 }
 
+void srmDeviceUninitializeEGLSharedContext(SRMDevice *device)
+{
+    if (device->eglSharedContext != EGL_NO_CONTEXT)
+    {
+        eglReleaseThread();
+        eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        eglDestroyContext(device->eglDisplay, device->eglSharedContext);
+    }
+}
 
 UInt8 srmDeviceUpdateClientCaps(SRMDevice *device)
 {
@@ -645,3 +745,13 @@ UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device)
     return 1;
 }
 
+void srmDeviceUninitEGLDeallocatorContext(SRMDevice *device)
+{
+    if (device->eglDeallocatorContext != EGL_NO_CONTEXT)
+    {
+        srmCoreSendDeallocatorMessage(device->core, SRM_DEALLOCATOR_MSG_DESTROY_CONTEXT, device, 0, EGL_NO_IMAGE);
+
+        while (device->core->deallocatorState == 0)
+            usleep(10);
+    }
+}

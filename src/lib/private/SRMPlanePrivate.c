@@ -35,6 +35,9 @@ SRMPlane *srmPlaneCreate(SRMDevice *device, UInt32 id)
 
 void srmPlaneDestroy(SRMPlane *plane)
 {
+    if (plane->deviceLink)
+        srmListRemoveItem(plane->device->planes, plane->deviceLink);
+
     if (plane->crtcs)
         srmListDestoy(plane->crtcs);
 

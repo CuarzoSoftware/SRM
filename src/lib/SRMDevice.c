@@ -6,7 +6,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-
 const char *srmDeviceGetName(SRMDevice *device)
 {
     return device->name;

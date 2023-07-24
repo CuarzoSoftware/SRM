@@ -24,6 +24,9 @@ SRMEncoder *srmEncoderCreate(SRMDevice *device, UInt32 id)
 
 void srmEncoderDestroy(SRMEncoder *encoder)
 {
+    if (encoder->deviceLink)
+        srmListRemoveItem(encoder->device->encoders, encoder->deviceLink);
+
     srmListDestoy(encoder->crtcs);
     free(encoder);
 }

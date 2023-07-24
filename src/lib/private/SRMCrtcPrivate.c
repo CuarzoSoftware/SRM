@@ -1,5 +1,6 @@
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMCrtcPrivate.h>
+#include <SRMList.h>
 #include <SRMLog.h>
 
 #include <xf86drmMode.h>
@@ -24,6 +25,9 @@ SRMCrtc *srmCrtcCreate(SRMDevice *device, UInt32 id)
 
 void srmCrtcDestroy(SRMCrtc *crtc)
 {
+    if (crtc->deviceLink)
+        srmListRemoveItem(crtc->device->crtcs, crtc->deviceLink);
+
     free(crtc);
 }
 

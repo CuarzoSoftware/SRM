@@ -24,6 +24,7 @@ struct SRMDeviceStruct
 
     // Prevent multiple threads calling drmModeHandleEvent
     pthread_mutex_t pageFlipMutex;
+    UInt8 pageFlipMutexInitialized;
 
     Int32 fd;
 
@@ -65,15 +66,24 @@ struct SRMDeviceStruct
 
 SRMDevice *srmDeviceCreate(SRMCore *core, const char *name);
 void srmDeviceDestroy(SRMDevice *device);
+
 UInt8 srmDeviceInitializeGBM(SRMDevice *device);
+void srmDeviceUninitializeGBM(SRMDevice *device);
 
 UInt8 srmDeviceInitializeEGL(SRMDevice *device);
+void srmDeviceUninitializeEGL(SRMDevice *device);
+
 UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device);
 UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device);
+
 UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device);
 void srmDeviceDestroyDMAFormats(SRMDevice *device);
+
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device);
+void srmDeviceUninitializeEGLSharedContext(SRMDevice *device);
+
 UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device);
+void srmDeviceUninitEGLDeallocatorContext(SRMDevice *device);
 
 UInt8 srmDeviceUpdateClientCaps(SRMDevice *device);
 UInt8 srmDeviceUpdateCaps(SRMDevice *device);

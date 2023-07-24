@@ -2,6 +2,7 @@
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMListenerPrivate.h>
 #include <private/SRMConnectorPrivate.h>
+#include <SRMFormat.h>
 #include <SRMList.h>
 #include <SRMLog.h>
 #include <xf86drmMode.h>
@@ -15,34 +16,52 @@
 SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
 {
     SRMLogInit();
+
+    // REF 1
     SRMCore *core = calloc(1, sizeof(SRMCore));
     core->interface = interface;
     core->interfaceUserData = userData;
 
+    // REF -
     if (!srmCoreUpdateEGLExtensions(core))
         goto fail;
 
+    // REF -
     if (!srmCoreUpdateEGLFunctions(core))
         goto fail;
 
+    // REF 2
     if (!srmCoreCreateUdev(core))
         goto fail;
 
+    // REF 3
     core->connectorPluggedListeners = srmListCreate();
+
+    // REF 4
     core->connectorUnpluggedListeners = srmListCreate();
+
+    // REF 5
     core->deviceCreatedListeners = srmListCreate();
+
+    // REF 6
     core->deviceRemovedListeners = srmListCreate();
+
+    // REF 7
     core->devices = srmListCreate();
 
+    // REF 8
     if (!srmCoreInitDeallocator(core))
         goto fail;
 
+    // REF 7
     if (!srmCoreEnumerateDevices(core)) // Fails if no device found
         goto fail;
 
+    // REF 9
     if (!srmCoreInitMonitor(core))
         goto fail;
 
+    // REF 10
     srmCoreUpdateBestConfiguration(core);
 
     return core;
@@ -55,52 +74,82 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
 
 void srmCoreDestroy(SRMCore *core)
 {
-    // Destroy lists
+    // UNREF 7
+    if (core->devices)
+    {
+        // First uninitialize all connectors
+        SRMListForeach(devIt, core->devices)
+        {
+            SRMDevice *dev = srmListItemGetData(devIt);
 
+            SRMListForeach(connIt, dev->connectors)
+            {
+                SRMConnector *conn = srmListItemGetData(connIt);
+                srmConnectorUninitialize(conn);
+            }
+        }
+
+        // Destroy devices
+        while (!srmListIsEmpty(core->devices))
+            srmDeviceDestroy(srmListItemGetData(srmListGetBack(core->devices)));
+
+        srmListDestoy(core->devices);
+    }
+
+    // UNREF 3
     if (core->connectorPluggedListeners)
     {
         while (!srmListIsEmpty(core->connectorPluggedListeners))
             srmListenerDestroy(srmListItemGetData(srmListGetBack(core->connectorPluggedListeners)));
+
+        srmListDestoy(core->connectorPluggedListeners);
     }
 
+    // UNREF 4
     if (core->connectorUnpluggedListeners)
     {
         while (!srmListIsEmpty(core->connectorUnpluggedListeners))
             srmListenerDestroy(srmListItemGetData(srmListGetBack(core->connectorUnpluggedListeners)));
+
+        srmListDestoy(core->connectorUnpluggedListeners);
     }
 
+    // UNREF 5
     if (core->deviceCreatedListeners)
     {
         while (!srmListIsEmpty(core->deviceCreatedListeners))
             srmListenerDestroy(srmListItemGetData(srmListGetBack(core->deviceCreatedListeners)));
+
+        srmListDestoy(core->deviceCreatedListeners);
     }
 
+    // UNREF 6
     if (core->deviceRemovedListeners)
     {
         while (!srmListIsEmpty(core->deviceRemovedListeners))
             srmListenerDestroy(srmListItemGetData(srmListGetBack(core->deviceRemovedListeners)));
+
+        srmListDestoy(core->deviceRemovedListeners);
     }
 
-    if (core->devices)
-    {
-        // TODO handle devices removal
-        srmListDestoy(core->devices);
-    }
-
+    // UNREF 9
     if (core->monitor)
         udev_monitor_unref(core->monitor);
 
+    // UNREF 8
     srmCoreUnitDeallocator(core);
 
-    srmListDestoy(core->connectorPluggedListeners);
-    srmListDestoy(core->connectorUnpluggedListeners);
-    srmListDestoy(core->deviceCreatedListeners);
-    srmListDestoy(core->deviceRemovedListeners);
-    srmListDestoy(core->devices);
+    if (core->monitorFd.fd >= 0)
+        close(core->monitorFd.fd);
 
+    // UNREF 2
     if (core->udev)
         udev_unref(core->udev);
 
+    // UNREF 10
+    srmFormatsListDestroy(&core->sharedDMATextureFormats);
+
+    // UNREF 1
     free(core);
 }
 
@@ -295,4 +344,9 @@ SRMList *srmCoreGetSharedDMATextureFormats(SRMCore *core)
 void *srmCoreGetUserData(SRMCore *core)
 {
     return core->interfaceUserData;
+}
+
+void srmCoreSetUserData(SRMCore *core, void *userData)
+{
+    core->interfaceUserData = userData;
 }

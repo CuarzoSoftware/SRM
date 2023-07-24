@@ -42,6 +42,21 @@ SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
     return connector;
 }
 
+void srmConnectorDestroy(SRMConnector *connector)
+{
+    srmConnectorUninitialize(connector);
+    srmConnectorDestroyNames(connector);
+    srmConnectorDestroyEncoders(connector);
+    srmConnectorDestroyModes(connector);
+
+    pthread_mutex_destroy(&connector->stateMutex);
+
+    if (connector->deviceLink)
+        srmListRemoveItem(connector->device->connectors, connector->deviceLink);
+
+    free(connector);
+}
+
 // Recursively find a free id to add at the end of the name (e.g HDMI-A-0)
 // so that connectors of the same type have unique names
 UInt32 srmConnectorGetFreeNameID(SRMConnector *connector, UInt32 id)
@@ -193,21 +208,29 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
         return 0;
     }
 
-    int len = strlen(di_info_get_make(info));
+    char *make = di_info_get_make(info);
+    int len = strlen(make);
 
     if (len > 0)
     {
         connector->manufacturer = malloc(len+1);
-        memcpy(connector->manufacturer, di_info_get_make(info), len+1);
+        memcpy(connector->manufacturer, make, len+1);
     }
 
-    len = strlen(di_info_get_model(info));
+    char *model = di_info_get_model(info);
+    len = strlen(model);
 
     if (len > 0)
     {
         connector->model = malloc(len+1);
-        memcpy(connector->model, di_info_get_model(info), len+1);
+        memcpy(connector->model, model, len+1);
     }
+
+    if (make)
+        free(make);
+
+    if (model)
+        free(model);
 
     di_info_destroy(info);
 
@@ -431,17 +454,6 @@ UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bes
     }
 
     return *bestEncoder && *bestCrtc && *bestPrimaryPlane;
-}
-
-void srmConnectorDestroy(SRMConnector *connector)
-{
-    pthread_mutex_destroy(&connector->stateMutex);
-    srmConnectorUninitialize(connector);
-    srmConnectorDestroyNames(connector);
-    srmConnectorDestroyEncoders(connector);
-    srmConnectorDestroyModes(connector);
-    srmListRemoveItem(connector->device->connectors, connector->deviceLink);
-    free(connector);
 }
 
 void *srmConnectorRenderThread(void *conn)

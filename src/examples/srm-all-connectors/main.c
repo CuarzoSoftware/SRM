@@ -5,7 +5,8 @@
  *
  * Desc: This example displays a white hardware cursor,
  *       a moving white line and a background texture to all
- *       avaliable connectors at a time until CTRL+C is pressed.
+ *       avaliable connectors at a time for 10 secs or until
+ *       CTRL+C is pressed.
  */
 
 #include <SRMCore.h>
@@ -397,6 +398,8 @@ int main(void)
         }
     }
 
+    UInt64 startMS = getMilliseconds();
+
     // Here we update the shared background texture every sec
     while (1)
     {
@@ -414,6 +417,16 @@ int main(void)
 
             srmBufferWrite(buffer, BUF_STRIDE, 0, 0, BUF_WIDTH, BUF_HEIGHT, bufferPixels);
         }
+
+        if (getMilliseconds() - startMS > 10000)
+            break;
+    }
+
+    if (buffer)
+    {
+        SRMBuffer *tmp = buffer;
+        buffer = NULL;
+        srmBufferDestroy(tmp);
     }
 
     /* Unsubscribe to DRM events
@@ -429,6 +442,8 @@ int main(void)
 
     // Finish SRM
     srmCoreDestroy(core);
+
+    SRMLog("[srm-all-connectors] Finished successfully.");
 
     return 0;
 }

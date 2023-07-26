@@ -113,7 +113,14 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
         return 1;
     }
 
-    gbm_bo_write(connector->cursorBO, pixels, 64*64*4);
+    if (connector->device->clientCapAtomic)
+    {
+        memcpy(connector->cursorPixels, pixels, sizeof (connector->cursorPixels));
+        connector->atomicCursorHasChanges |= SRM_CURSOR_ATOMIC_CHANGE_BUFFER;
+        pthread_cond_signal(&connector->repaintCond);
+    }
+    else
+        gbm_bo_write(connector->cursorBO, pixels, 64*64*4);
 
     if (connector->cursorVisible == 1)
         return 1;

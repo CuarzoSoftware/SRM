@@ -70,6 +70,7 @@ struct SRMConnectorStruct
     Int32 cursorX, cursorY;
     UInt8 cursorVisible;
     UInt8 atomicCursorHasChanges;
+    UInt8 cursorPixels[64*64*4];
 
     // Interface for OpenGL events
     SRMConnectorInterface *interface;

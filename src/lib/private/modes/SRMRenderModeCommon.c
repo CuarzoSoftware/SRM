@@ -230,6 +230,9 @@ void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqP
                                  connector->cursorY);
     }
 
+    if (connector->atomicCursorHasChanges & SRM_CURSOR_ATOMIC_CHANGE_BUFFER)
+        gbm_bo_write(connector->cursorBO, connector->cursorPixels, sizeof(connector->cursorPixels));
+
     connector->atomicCursorHasChanges = 0;
 }
 

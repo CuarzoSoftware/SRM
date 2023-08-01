@@ -65,12 +65,11 @@ struct SRMConnectorStruct
     char *name, *manufacturer, *model, *serial;
 
     // Cursor
-    struct gbm_bo *cursorBO;
-    UInt32 cursorFB;
+    struct gbm_bo *cursorBO, *cursorBOPending;
+    UInt32 cursorFB, cursorFBPending;
     Int32 cursorX, cursorY;
     UInt8 cursorVisible;
     UInt8 atomicCursorHasChanges;
-    UInt8 cursorPixels[64*64*4];
 
     // Interface for OpenGL events
     SRMConnectorInterface *interface;

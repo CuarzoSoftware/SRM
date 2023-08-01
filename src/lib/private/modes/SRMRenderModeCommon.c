@@ -116,19 +116,68 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
                 SRMError("Failed to setup hw cursor for connector %d.", connector->id);
                 goto fail;
             }
+        }
+    }
+    else
+        return 0;
+
+    connector->cursorBOPending = gbm_bo_create(connector->device->gbm,
+                                        64,
+                                        64,
+                                        GBM_FORMAT_ARGB8888,
+                                        GBM_BO_USE_CURSOR | GBM_BO_USE_WRITE);
+
+    if (connector->cursorBOPending)
+    {
+        if (connector->device->clientCapAtomic)
+        {
+            Int32 ret = drmModeAddFB(connector->device->fd,
+                         gbm_bo_get_width(connector->cursorBOPending),
+                         gbm_bo_get_height(connector->cursorBOPending),
+                         32,
+                         gbm_bo_get_bpp(connector->cursorBOPending),
+                         gbm_bo_get_stride(connector->cursorBOPending),
+                         gbm_bo_get_handle(connector->cursorBOPending).u32,
+                         &connector->cursorFBPending);
+
+            if (ret)
+            {
+                SRMError("Failed to setup hw cursor for connector %d.", connector->id);
+                goto fail;
+            }
 
             return 1;
         }
-        else
-            return 1;
+
+        return 1;
     }
 
     fail:
+
+    if (connector->cursorFB)
+    {
+        drmModeRmFB(connector->device->fd, connector->cursorFB);
+        connector->cursorFB = 0;
+    }
+
     if (connector->cursorBO)
     {
         gbm_bo_destroy(connector->cursorBO);
         connector->cursorBO = NULL;
     }
+
+    if (connector->cursorFBPending)
+    {
+        drmModeRmFB(connector->device->fd, connector->cursorFBPending);
+        connector->cursorFBPending = 0;
+    }
+
+    if (connector->cursorBOPending)
+    {
+        gbm_bo_destroy(connector->cursorBOPending);
+        connector->cursorBOPending = NULL;
+    }
+
     SRMError("Failed to setup hw cursor for connector %d.", connector->id);
     return 0;
 }
@@ -159,14 +208,39 @@ void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqP
     if (!connector->currentCursorPlane)
         return;
 
-    if (connector->atomicCursorHasChanges & SRM_CURSOR_ATOMIC_CHANGE_VISIBILITY)
+    UInt8 updatedFB = 0;
+
+    if (connector->atomicCursorHasChanges & SRM_CURSOR_ATOMIC_CHANGE_BUFFER)
     {
+        struct gbm_bo *tmpBo = connector->cursorBO;
+        connector->cursorBO = connector->cursorBOPending;
+        connector->cursorBOPending = tmpBo;
+
+        UInt32 tmpFb = connector->cursorFB;
+        connector->cursorFB = connector->cursorFBPending;
+        connector->cursorFBPending = tmpFb;
+
         if (connector->cursorVisible)
         {
             drmModeAtomicAddProperty(req,
                                      connector->currentCursorPlane->id,
                                      connector->currentCursorPlane->propIDs.FB_ID,
                                      connector->cursorFB);
+            updatedFB = 1;
+        }
+    }
+
+    if (connector->atomicCursorHasChanges & SRM_CURSOR_ATOMIC_CHANGE_VISIBILITY)
+    {
+        if (connector->cursorVisible)
+        {
+            if (!updatedFB)
+            {
+                drmModeAtomicAddProperty(req,
+                                         connector->currentCursorPlane->id,
+                                         connector->currentCursorPlane->propIDs.FB_ID,
+                                         connector->cursorFB);
+            }
 
             drmModeAtomicAddProperty(req,
                                      connector->currentCursorPlane->id,
@@ -230,9 +304,6 @@ void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqP
                                  connector->cursorY);
     }
 
-    if (connector->atomicCursorHasChanges & SRM_CURSOR_ATOMIC_CHANGE_BUFFER)
-        gbm_bo_write(connector->cursorBO, connector->cursorPixels, sizeof(connector->cursorPixels));
-
     connector->atomicCursorHasChanges = 0;
 }
 
@@ -270,6 +341,18 @@ void srmRenderModeCommonDestroyCursor(SRMConnector *connector)
     {
         gbm_bo_destroy(connector->cursorBO);
         connector->cursorBO = NULL;
+    }
+
+    if (connector->cursorFBPending)
+    {
+        drmModeRmFB(connector->device->fd, connector->cursorFBPending);
+        connector->cursorFBPending = 0;
+    }
+
+    if (connector->cursorBOPending)
+    {
+        gbm_bo_destroy(connector->cursorBOPending);
+        connector->cursorBOPending = NULL;
     }
 
     connector->atomicCursorHasChanges = 0;

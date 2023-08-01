@@ -13,7 +13,7 @@ enum SRM_CURSOR_ATOMIC_CHANGE
 {
     SRM_CURSOR_ATOMIC_CHANGE_VISIBILITY = 1,
     SRM_CURSOR_ATOMIC_CHANGE_POSITION = 2,
-    SRM_CURSOR_ATOMIC_CHANGE_BUFFER = 3,
+    SRM_CURSOR_ATOMIC_CHANGE_BUFFER = 4,
 };
 
 Int8  srmRenderModeCommonMatchConfigToVisual(EGLDisplay egl_display, EGLint visual_id, EGLConfig *configs, int count);

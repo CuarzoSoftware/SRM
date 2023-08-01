@@ -563,6 +563,12 @@ UInt8 srmDeviceUpdateClientCaps(SRMDevice *device)
     device->clientCapStereo3D            = drmSetClientCap(device->fd, DRM_CLIENT_CAP_STEREO_3D, 1)             == 0;
     device->clientCapUniversalPlanes     = drmSetClientCap(device->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)      == 0;
     device->clientCapAtomic              = drmSetClientCap(device->fd, DRM_CLIENT_CAP_ATOMIC, 1)                == 0;
+
+    char *atomicENV = getenv("SRM_FORCE_LEGACY_API");
+
+    if (atomicENV && atoi(atomicENV) == 1)
+        device->clientCapAtomic = 0;
+
     device->clientCapAspectRatio         = drmSetClientCap(device->fd, DRM_CLIENT_CAP_ASPECT_RATIO, 1)          == 0;
     device->clientCapWritebackConnectors = drmSetClientCap(device->fd, DRM_CLIENT_CAP_WRITEBACK_CONNECTORS, 1)  == 0;
     return 1;

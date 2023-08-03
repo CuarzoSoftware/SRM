@@ -523,20 +523,28 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_WRITE;
         ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
 
-        for (UInt32 i = 0; i < dstHeight; i++)
+        if (dstX == 0 && dstWidth == buffer->width && stride == buffer->strides[0])
         {
             memcpy(dst,
                    src,
-                   buffer->pixelSize * dstWidth);
+                   stride * dstHeight);
+        }
+        else
+        {
+            for (UInt32 i = 0; i < dstHeight; i++)
+            {
+                memcpy(dst,
+                       src,
+                       buffer->pixelSize * dstWidth);
 
-            dst += buffer->strides[0];
-            src += stride;
+                dst += buffer->strides[0];
+                src += stride;
+            }
         }
 
         buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
         ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
         pthread_mutex_unlock(&buffer->mutex);
-
 
         /* Disable EGL image recreation
         SRMListForeach(texIt, buffer->textures)

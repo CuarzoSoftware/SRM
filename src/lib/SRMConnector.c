@@ -117,24 +117,22 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
 
     if (connector->device->clientCapAtomic)
         connector->atomicCursorHasChanges |= SRM_CURSOR_ATOMIC_CHANGE_BUFFER;
+    else
+    {
+        struct gbm_bo *tmpBo = connector->cursorBO;
+        connector->cursorBO = connector->cursorBOPending;
+        connector->cursorBOPending = tmpBo;
+
+        UInt32 tmpFb = connector->cursorFB;
+        connector->cursorFB = connector->cursorFBPending;
+        connector->cursorFBPending = tmpFb;
+    }
 
     if (connector->cursorVisible == 1)
     {
-        if (!connector->device->clientCapAtomic)
-        {
-            struct gbm_bo *tmpBo = connector->cursorBO;
-            connector->cursorBO = connector->cursorBOPending;
-            connector->cursorBOPending = tmpBo;
+        if (connector->device->clientCapAtomic && connector->atomicCursorHasChanges)
+            pthread_cond_signal(&connector->repaintCond);
 
-            UInt32 tmpFb = connector->cursorFB;
-            connector->cursorFB = connector->cursorFBPending;
-            connector->cursorFBPending = tmpFb;
-        }
-        else
-        {
-            if (connector->atomicCursorHasChanges)
-                pthread_cond_signal(&connector->repaintCond);
-        }
         return 1;
     }
 

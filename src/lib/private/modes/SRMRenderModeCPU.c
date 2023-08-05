@@ -244,6 +244,8 @@ static UInt8 createEGLContext(SRMConnector *connector)
         return 1;
     }
 
+    if (connector->device->eglExtensions.IMG_context_priority)
+        connector->device->eglSharedContextAttribs[3] = EGL_CONTEXT_PRIORITY_LOW_IMG;
     data->connectorEGLContext = eglCreateContext(connector->device->eglDisplay,
                                                  data->connectorEGLConfig,
                                                  // It is EGL_NO_CONTEXT if no context was previously created in this device
@@ -261,6 +263,9 @@ static UInt8 createEGLContext(SRMConnector *connector)
     // Store it if is the first context created for this device, so that later on shared context can be created
     if (connector->device->eglSharedContext == EGL_NO_CONTEXT)
         connector->device->eglSharedContext = data->connectorEGLContext;
+
+    if (connector->device->rendererDevice->eglExtensions.IMG_context_priority)
+        connector->device->rendererDevice->eglSharedContextAttribs[3] = EGL_CONTEXT_PRIORITY_HIGH_IMG;
 
     data->rendererEGLContext = eglCreateContext(connector->device->rendererDevice->eglDisplay,
                                                  data->rendererEGLConfig,

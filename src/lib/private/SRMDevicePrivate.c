@@ -504,7 +504,7 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
     if (device->eglExtensions.IMG_context_priority)
     {
         device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_PRIORITY_LEVEL_IMG;
-        device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_PRIORITY_HIGH_IMG;
+        device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_PRIORITY_LOW_IMG;
     }
 
     if (device->eglExtensions.EXT_create_context_robustness) {
@@ -524,11 +524,11 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 
     if (device->eglExtensions.IMG_context_priority)
     {
-        EGLint priority = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
+        EGLint priority = EGL_CONTEXT_PRIORITY_LOW_IMG;
 
         eglQueryContext(device->eglDisplay, device->eglSharedContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &priority);
 
-        SRMDebug("[%s] Using %s priority EGL context.", device->name, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
+        SRMDebug("[%s] Using %s priority EGL context.", device->name, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "low");
     }
 
     /*

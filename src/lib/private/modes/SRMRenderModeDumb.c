@@ -159,6 +159,8 @@ static UInt8 createEGLContext(SRMConnector *connector)
         return 1;
     }
 
+    if (connector->device->rendererDevice->eglExtensions.IMG_context_priority)
+        connector->device->rendererDevice->eglSharedContextAttribs[3] = EGL_CONTEXT_PRIORITY_HIGH_IMG;
     data->connectorEGLContext = eglCreateContext(connector->device->rendererDevice->eglDisplay,
                                                  data->connectorEGLConfig,
                                                  // It is EGL_NO_CONTEXT if no context was previously created in this device

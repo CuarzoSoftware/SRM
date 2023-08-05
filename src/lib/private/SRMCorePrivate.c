@@ -531,6 +531,9 @@ void *srmCoreDeallocatorLoop(void *data)
             }
             else if (message->msg == SRM_DEALLOCATOR_MSG_CREATE_CONTEXT)
             {
+                if (message->device->eglExtensions.IMG_context_priority)
+                    message->device->eglSharedContextAttribs[3] = EGL_CONTEXT_PRIORITY_LOW_IMG;
+
                 message->device->eglDeallocatorContext = eglCreateContext(message->device->eglDisplay,
                                                                           NULL,
                                                                           message->device->eglSharedContext,

@@ -128,17 +128,14 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
         connector->cursorFBPending = tmpFb;
     }
 
-    if (connector->cursorVisible == 1)
+    if (connector->cursorVisible == 1 && connector->device->clientCapAtomic && connector->atomicCursorHasChanges)
     {
-        if (connector->device->clientCapAtomic && connector->atomicCursorHasChanges)
-            pthread_cond_signal(&connector->repaintCond);
-
+        pthread_cond_signal(&connector->repaintCond);
         return 1;
     }
 
     if (connector->device->clientCapAtomic)
     {
-        connector->cursorVisible = 1;
         connector->atomicCursorHasChanges |= SRM_CURSOR_ATOMIC_CHANGE_VISIBILITY;
         pthread_cond_signal(&connector->repaintCond);
     }
@@ -150,6 +147,8 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
                          64,
                          64);
     }
+
+    connector->cursorVisible = 1;
 
     return 1;
 }

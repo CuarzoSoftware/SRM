@@ -20,9 +20,9 @@ static void closeRestricted(int fd, void *userData)
 }
 
 static SRMInterface srmInterface =
-{
-    .openRestricted = &openRestricted,
-    .closeRestricted = &closeRestricted
+    {
+        .openRestricted = &openRestricted,
+        .closeRestricted = &closeRestricted
 };
 
 static unsigned long prev = 0;

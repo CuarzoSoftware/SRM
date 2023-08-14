@@ -531,6 +531,19 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         }
         else
         {
+            #if SRM_PAR_CPY == 1
+            if (buffer->core->copyThreadsCount)
+            {
+                srmCoreCopy(buffer->core, (UInt8*)pixels, dst, stride, buffer->strides[0], dstWidth * buffer->pixelSize, dstHeight);
+
+                recheck:
+                for (UInt8 i = 0; i < buffer->core->copyThreadsCount; i++)
+                    if (!buffer->core->copyThreads[i].finished)
+                        goto recheck;
+            }
+            else
+            #endif
+
             for (UInt32 i = 0; i < dstHeight; i++)
             {
                 memcpy(dst,

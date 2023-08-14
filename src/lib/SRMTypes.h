@@ -1,6 +1,9 @@
 #ifndef SRMTYPES_H
 #define SRMTYPES_H
 
+#define SRM_PAR_CPY 0
+#define SRM_MAX_COPY_THREADS 32
+
 #include <stdint.h>
 #include <drm/drm_fourcc.h>
 

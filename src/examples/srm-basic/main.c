@@ -3,7 +3,7 @@
  *
  * Auth: Eduardo Hopperdietzel
  *
- * Desc: This changes the background color each frame to all
+ * Desc: This example changes the background color each frame to all
  *       avaliable connectors until CTRL+C is pressed.
  */
 

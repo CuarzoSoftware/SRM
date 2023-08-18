@@ -42,6 +42,7 @@ struct SRMPlaneStruct;
 typedef struct SRMPlaneStruct SRMPlane;
 
 struct SRMConnectorStruct;
+/// @ingroup SRMConnector
 typedef struct SRMConnectorStruct SRMConnector;
 
 struct SRMConnectorModeStruct;
@@ -57,6 +58,7 @@ struct SRMListenerStruct;
 typedef struct SRMListenerStruct SRMListener;
 
 struct SRMBufferStruct;
+/// @ingroup SRMBuffer
 typedef struct SRMBufferStruct SRMBuffer;
 
 struct SRMEGLCoreExtensionsStruct;
@@ -96,16 +98,6 @@ struct SRMInterfaceStruct
     void (*closeRestricted)(int fd, void *data);
 };
 typedef struct SRMInterfaceStruct SRMInterface;
-
-struct SRMConnectorInterfaceStruct
-{
-    void (*initializeGL)(SRMConnector *connector, void *data);
-    void (*paintGL)(SRMConnector *connector, void *data);
-    void (*pageFlipped)(SRMConnector *connector, void *data);
-    void (*resizeGL)(SRMConnector *connector, void *data);
-    void (*uninitializeGL)(SRMConnector *connector, void *data);
-};
-typedef struct SRMConnectorInterfaceStruct SRMConnectorInterface;
 
 enum SRM_RENDER_MODE_ENUM
 {

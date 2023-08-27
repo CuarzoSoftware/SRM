@@ -185,20 +185,24 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
 UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
 {
     pthread_mutex_lock(&connector->repaintMutex);
+
     if (!connector->repaintRequested && !connector->atomicCursorHasChanges)
-    {
         pthread_cond_wait(&connector->repaintCond, &connector->repaintMutex);
-    }
+
     pthread_mutex_unlock(&connector->repaintMutex);
 
-
+    pthread_mutex_lock(&connector->stateMutex);
     if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING)
     {
+        pthread_mutex_unlock(&connector->stateMutex);
         connector->interface->uninitializeGL(connector, connector->interfaceData);
         connector->renderInterface.uninitialize(connector);
+        pthread_mutex_lock(&connector->stateMutex);
         connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
+        pthread_mutex_unlock(&connector->stateMutex);
         return 0;
     }
+    pthread_mutex_unlock(&connector->stateMutex);
 
     return 1;
 }
@@ -369,6 +373,7 @@ Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags,
     // -EBUSY
     if (ret == -16)
     {
+        SRMError("[connector] Atomic commit failed. -EBUSY.");
         usleep(100);
         goto retry;
     }
@@ -391,6 +396,102 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
             req = drmModeAtomicAlloc();
 
             UInt32 modeID;
+
+            // Unset mode
+
+            drmModeCreatePropertyBlob(connector->device->fd,
+                                      &connector->currentMode->info,
+                                      0,
+                                      &modeID);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCrtc->id,
+                                     connector->currentCrtc->propIDs.MODE_ID,
+                                     modeID);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentCrtc->id,
+                                     connector->currentCrtc->propIDs.ACTIVE,
+                                     0);
+
+            // Connector
+
+            drmModeAtomicAddProperty(req,
+                                     connector->id,
+                                     connector->propIDs.CRTC_ID,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->id,
+                                     connector->propIDs.link_status,
+                                     DRM_MODE_LINK_STATUS_BAD);
+
+            // Plane
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.CRTC_ID,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.CRTC_X,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.CRTC_Y,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.CRTC_W,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.CRTC_H,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.FB_ID,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.SRC_X,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.SRC_Y,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.SRC_W,
+                                     0);
+
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.SRC_H,
+                                     0);
+
+            srmRenderModeCommitCursorChanges(connector, req);
+
+            srmRenderModeAtomicCommit(connector->device->fd,
+                                      req,
+                                      DRM_MODE_ATOMIC_ALLOW_MODESET,
+                                      connector);
+
+            drmModeDestroyPropertyBlob(connector->device->fd, modeID);
+
+            drmModeAtomicFree(req);
+
+            // Set mode
+
+            req = drmModeAtomicAlloc();
 
             drmModeCreatePropertyBlob(connector->device->fd,
                                       &connector->currentMode->info,
@@ -484,7 +585,19 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
         }
         else
         {
+            int ret;
+
             drmModeSetCrtc(connector->device->fd,
+                           connector->currentCrtc->id,
+                           0,
+                           0,
+                           0,
+                           NULL,
+                           0,
+                           NULL);
+
+            retry:
+            ret = drmModeSetCrtc(connector->device->fd,
                                connector->currentCrtc->id,
                                fb,
                                0,
@@ -492,6 +605,8 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
                                &connector->id,
                                1,
                                &connector->currentMode->info);
+            if (ret < 0)
+                goto retry;
         }
 
         connector->interface->resizeGL(connector,

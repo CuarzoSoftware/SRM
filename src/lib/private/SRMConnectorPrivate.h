@@ -111,7 +111,7 @@ void srmConnectorSetCursorPlaneToNeededConnector(SRMPlane *cursorPlane);
 SRMConnectorMode *srmConnectorFindPreferredMode(SRMConnector *connector);
 UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane);
 void *srmConnectorRenderThread(void *conn);
-void srmConnectorUnlockRenderThread(SRMConnector *connector);
+void srmConnectorUnlockRenderThread(SRMConnector *connector, UInt8 repaint);
 
 #ifdef __cplusplus
 }

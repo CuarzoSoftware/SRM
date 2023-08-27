@@ -318,7 +318,6 @@ UInt8 srmConnectorUpdateModes(SRMConnector *connector)
 
         if (connectorMode)
             connectorMode->connectorLink = srmListAppendData(connector->modes, connectorMode);
-
     }
 
     connector->preferredMode = srmConnectorFindPreferredMode(connector);
@@ -507,6 +506,7 @@ void *srmConnectorRenderThread(void *conn)
             break;
 
         pthread_mutex_lock(&connector->stateMutex);
+
         if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
         {
             if (connector->repaintRequested)
@@ -522,37 +522,44 @@ void *srmConnectorRenderThread(void *conn)
                 srmRenderModeCommonPageFlip(connector, connector->lastFb);
             }
         }
-        pthread_mutex_unlock(&connector->stateMutex);
-
 
         if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {
+            SRMWarning("[connector] Changing mode started.");
+
             if (connector->renderInterface.updateMode(connector))
+            {
                 connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
+                pthread_mutex_unlock(&connector->stateMutex);
+                SRMWarning("[connector] Changing mode finished.");
+                continue;
+            }
             else
             {
-                SRMFatal("Changing mode failed");
+                SRMFatal("[connector] Changing mode failed");
                 connector->state = SRM_CONNECTOR_STATE_REVERTING_MODE;
+                pthread_mutex_unlock(&connector->stateMutex);
+                continue;
             }
-        }
-        else if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING)
-        {
-            connector->renderInterface.uninitialize(connector);
-            connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
-            break;
         }
         else if (connector->state == SRM_CONNECTOR_STATE_PAUSING)
         {
             connector->state = SRM_CONNECTOR_STATE_PAUSED;
+            pthread_mutex_unlock(&connector->stateMutex);
             connector->renderInterface.pause(connector);
             SRMDebug("[%s] Connector %d paused.", connector->device->rendererDevice->name, connector->id);
+            continue;
         }
         else if (connector->state == SRM_CONNECTOR_STATE_RESUMING)
         {
             connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
+            pthread_mutex_unlock(&connector->stateMutex);
             connector->renderInterface.resume(connector);
             SRMDebug("[%s] Connector %d resumed.", connector->device->rendererDevice->name, connector->id);
+            continue;
         }
+
+        pthread_mutex_unlock(&connector->stateMutex);
     }
 
 fail:
@@ -565,9 +572,9 @@ repaintMutexFail:
     return NULL;
 }
 
-void srmConnectorUnlockRenderThread(SRMConnector *connector)
+void srmConnectorUnlockRenderThread(SRMConnector *connector, UInt8 repaint)
 {
-    connector->repaintRequested = 1;
+    connector->repaintRequested = repaint;
     pthread_cond_signal(&connector->repaintCond);
 }
 

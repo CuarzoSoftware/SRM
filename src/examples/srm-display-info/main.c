@@ -30,15 +30,12 @@
 static int openRestricted(const char *path, int flags, void *userData)
 {
     SRM_UNUSED(userData);
-
-    // Here something like libseat could be used instead
     return open(path, flags);
 }
 
 static void closeRestricted(int fd, void *userData)
 {
     SRM_UNUSED(userData);
-
     close(fd);
 }
 
@@ -47,37 +44,6 @@ SRMInterface srmInterface =
     .openRestricted = &openRestricted,
     .closeRestricted = &closeRestricted
 };
-
-void deviceCreatedEventHandler(SRMListener *listener, SRMDevice *device)
-{
-    SRM_UNUSED(listener);
-
-    SRMDebug("DRM device (GPU) created: %s.", srmDeviceGetName(device));
-}
-
-void deviceRemovedEventHandler(SRMListener *listener, SRMDevice *device)
-{
-    SRM_UNUSED(listener);
-
-    SRMDebug("DRM device (GPU) removed: %s.", srmDeviceGetName(device));
-}
-
-void connectorPluggedEventHandler(SRMListener *listener, SRMConnector *connector)
-{
-    /*
-    SRMDebug("DRM connector plugged (%d): %s.",
-                  connector->id(),
-                  connector->model());
-                  */
-}
-
-void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *connector)
-{
-    /*
-    SRMLog::debug("DRM connector unplugged (%d): %s.",
-                  connector->id(),
-                  connector->model());*/
-}
 
 void printJSON(SRMCore *core, const char *auth, const char *desc)
 {
@@ -237,39 +203,6 @@ void printJSON(SRMCore *core, const char *auth, const char *desc)
     if (item1 != srmListGetBack(devices))
         printf(",");
 
-    /*
-
-        printf("Connectors:\n");
-
-        for (SRMConnector *connector : device->connectors())
-        {
-            printf("- Connector (%d):\n", connector->id());
-            printf("\tConnected: %s\n", connector->connected() ? YES : NO);
-            printf("\tStatus: %s\n", getConnectorStateString(connector->state()));
-            printf("\tName: %s\n", connector->name());
-            printf("\tModel: %s\n", connector->model());
-            printf("\tManufacturer: %s\n", connector->manufacturer());
-            printf("\tPhysical Size: %dx%d mm\n", connector->mmWidth(), connector->mmHeight());
-
-            printf("\tEncoders: [");
-
-            for (SRMEncoder *encoder : connector->encoders())
-            {
-                if (encoder == connector->encoders().back())
-                    printf("%d]\n", encoder->id());
-                else
-                    printf("%d, ", encoder->id());
-            }
-
-            printf("\tModes:\n");
-
-            for (SRMConnectorMode *connectorMode : connector->modes())
-            {
-                printf("\t - %dx%d@%dHz\n", connectorMode->width(), connectorMode->height(), connectorMode->refreshRate());
-            }
-        }
-        */
-
     }
     SRMLog("    ]");
     SRMLog("}");
@@ -287,35 +220,10 @@ int main(void)
         return 1;
     }
 
-    // Subscribe to DRM events
-    SRMListener *deviceCreatedEventListener = srmCoreAddDeviceCreatedEventListener(core, &deviceCreatedEventHandler, NULL);
-    SRMListener *deviceRemovedEventListener = srmCoreAddDeviceRemovedEventListener(core, &deviceRemovedEventHandler, NULL);
-    SRMListener *connectorPluggedEventListener = srmCoreAddConnectorPluggedEventListener(core, &connectorPluggedEventHandler, NULL);
-    SRMListener *connectorUnpluggedEventListener = srmCoreAddConnectorUnpluggedEventListener(core, &connectorUnpluggedEventHandler, NULL);
-
     printJSON(core,
-              "Eduardo Hopperdietzel",
+              "Your fullname",
               "Here you can add any additional information");
 
-    while (1)
-    {
-        // Poll DRM devices/connectors hotplugging events (0 disables timeout)
-        if (srmCoreProccessMonitor(core, -1) < 0)
-            break;
-    }
-
-
-    // Unsubscribe to DRM events
-    //
-    // These listeners are automatically destroyed when calling srmCoreDestroy()
-    // so there is no need to free them manually.
-    // This is here just to show how to unsubscribe to events on the fly.
-    srmListenerDestroy(deviceCreatedEventListener);
-    srmListenerDestroy(deviceRemovedEventListener);
-    srmListenerDestroy(connectorPluggedEventListener);
-    srmListenerDestroy(connectorUnpluggedEventListener);
-
-    // Finish SRM
     srmCoreDestroy(core);
 
     return 0;

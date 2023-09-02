@@ -22,7 +22,7 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
 {
     // REF 1
     SRMDevice *device = calloc(1, sizeof(SRMDevice));
-    strncpy(device->name, name, sizeof(device->name));
+    strncpy(device->name, name, sizeof(device->name) - 1);
     device->core = core;
     device->enabled = 1;
     device->eglDevice = EGL_NO_DEVICE_EXT;
@@ -117,7 +117,7 @@ void srmDeviceDestroy(SRMDevice *device)
         while (!srmListIsEmpty(device->connectors))
             srmConnectorDestroy(srmListItemGetData(srmListGetBack(device->connectors)));
 
-        srmListDestoy(device->connectors);
+        srmListDestroy(device->connectors);
     }
 
     // UNREF 11
@@ -126,7 +126,7 @@ void srmDeviceDestroy(SRMDevice *device)
         while (!srmListIsEmpty(device->planes))
             srmPlaneDestroy(srmListItemGetData(srmListGetBack(device->planes)));
 
-        srmListDestoy(device->planes);
+        srmListDestroy(device->planes);
     }
 
     // UNREF 10
@@ -135,7 +135,7 @@ void srmDeviceDestroy(SRMDevice *device)
         while (!srmListIsEmpty(device->encoders))
             srmEncoderDestroy(srmListItemGetData(srmListGetBack(device->encoders)));
 
-        srmListDestoy(device->encoders);
+        srmListDestroy(device->encoders);
     }
 
     // UNREF 9
@@ -144,7 +144,7 @@ void srmDeviceDestroy(SRMDevice *device)
         while (!srmListIsEmpty(device->crtcs))
             srmCrtcDestroy(srmListItemGetData(srmListGetBack(device->crtcs)));
 
-        srmListDestoy(device->crtcs);
+        srmListDestroy(device->crtcs);
     }
 
     // UNREF 8

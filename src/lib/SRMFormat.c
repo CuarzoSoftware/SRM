@@ -139,7 +139,7 @@ void srmFormatsListDestroy(SRMList **formatsList)
         while (!srmListIsEmpty(*formatsList))
             free(srmListPopBack(*formatsList));
 
-        srmListDestoy(*formatsList);
+        srmListDestroy(*formatsList);
         *formatsList = NULL;
     }
 }

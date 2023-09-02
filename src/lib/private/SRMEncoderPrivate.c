@@ -27,7 +27,7 @@ void srmEncoderDestroy(SRMEncoder *encoder)
     if (encoder->deviceLink)
         srmListRemoveItem(encoder->device->encoders, encoder->deviceLink);
 
-    srmListDestoy(encoder->crtcs);
+    srmListDestroy(encoder->crtcs);
     free(encoder);
 }
 

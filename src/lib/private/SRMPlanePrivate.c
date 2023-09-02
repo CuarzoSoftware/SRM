@@ -39,7 +39,7 @@ void srmPlaneDestroy(SRMPlane *plane)
         srmListRemoveItem(plane->device->planes, plane->deviceLink);
 
     if (plane->crtcs)
-        srmListDestoy(plane->crtcs);
+        srmListDestroy(plane->crtcs);
 
     srmPlaneDestroyInFormats(plane);
 
@@ -179,7 +179,7 @@ void srmPlaneDestroyInFormats(SRMPlane *plane)
             srmListPopBack(plane->inFormats);
         }
 
-        srmListDestoy(plane->inFormats);
+        srmListDestroy(plane->inFormats);
         plane->inFormats = NULL;
     }
 }

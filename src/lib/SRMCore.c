@@ -98,7 +98,7 @@ void srmCoreDestroy(SRMCore *core)
         while (!srmListIsEmpty(core->devices))
             srmDeviceDestroy(srmListItemGetData(srmListGetBack(core->devices)));
 
-        srmListDestoy(core->devices);
+        srmListDestroy(core->devices);
     }
 
     // UNREF 3
@@ -107,7 +107,7 @@ void srmCoreDestroy(SRMCore *core)
         while (!srmListIsEmpty(core->connectorPluggedListeners))
             srmListenerDestroy(srmListItemGetData(srmListGetBack(core->connectorPluggedListeners)));
 
-        srmListDestoy(core->connectorPluggedListeners);
+        srmListDestroy(core->connectorPluggedListeners);
     }
 
     // UNREF 4
@@ -116,7 +116,7 @@ void srmCoreDestroy(SRMCore *core)
         while (!srmListIsEmpty(core->connectorUnpluggedListeners))
             srmListenerDestroy(srmListItemGetData(srmListGetBack(core->connectorUnpluggedListeners)));
 
-        srmListDestoy(core->connectorUnpluggedListeners);
+        srmListDestroy(core->connectorUnpluggedListeners);
     }
 
     // UNREF 5
@@ -125,7 +125,7 @@ void srmCoreDestroy(SRMCore *core)
         while (!srmListIsEmpty(core->deviceCreatedListeners))
             srmListenerDestroy(srmListItemGetData(srmListGetBack(core->deviceCreatedListeners)));
 
-        srmListDestoy(core->deviceCreatedListeners);
+        srmListDestroy(core->deviceCreatedListeners);
     }
 
     // UNREF 6
@@ -134,7 +134,7 @@ void srmCoreDestroy(SRMCore *core)
         while (!srmListIsEmpty(core->deviceRemovedListeners))
             srmListenerDestroy(srmListItemGetData(srmListGetBack(core->deviceRemovedListeners)));
 
-        srmListDestoy(core->deviceRemovedListeners);
+        srmListDestroy(core->deviceRemovedListeners);
     }
 
     // UNREF 9

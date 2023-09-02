@@ -21,7 +21,7 @@ static int test_01()
     if (srmListGetFront(list))
         return 4;
 
-    srmListDestoy(list);
+    srmListDestroy(list);
 
     return -1;
 }
@@ -65,7 +65,7 @@ static int test_02()
     if (srmListItemGetPrev(item))
         return 8;
 
-    srmListDestoy(list);
+    srmListDestroy(list);
 
     return -1;
 }
@@ -109,7 +109,7 @@ static int test_03()
     if (srmListItemGetPrev(item))
         return 8;
 
-    srmListDestoy(list);
+    srmListDestroy(list);
 
     return -1;
 }
@@ -153,7 +153,7 @@ static int test_04()
     if (srmListItemGetPrev(item))
         return 8;
 
-    srmListDestoy(list);
+    srmListDestroy(list);
 
     return -1;
 }
@@ -185,7 +185,7 @@ static int test_05()
     if (i != 100)
         return 101;
 
-    srmListDestoy(list);
+    srmListDestroy(list);
 
     return -1;
 }

@@ -591,7 +591,7 @@ UInt8 srmCoreInitDeallocator(SRMCore *core)
         SRMFatal("[core] Could not start render thread for device %s connector %d.");
         pthread_mutex_destroy(&core->deallocatorMutex);
         pthread_cond_destroy(&core->deallocatorCond);
-        srmListDestoy(core->deallocatorMessages);
+        srmListDestroy(core->deallocatorMessages);
         core->deallocatorMessages = NULL;
         core->deallocatorRunning = 0;
         return 0;
@@ -613,7 +613,7 @@ void srmCoreUnitDeallocator(SRMCore *core)
         while (core->deallocatorRunning)
             usleep(1000);
 
-        srmListDestoy(core->deallocatorMessages);
+        srmListDestroy(core->deallocatorMessages);
         pthread_cond_destroy(&core->deallocatorCond);
         pthread_mutex_destroy(&core->deallocatorMutex);
     }

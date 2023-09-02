@@ -475,10 +475,15 @@ void srmBufferDestroy(SRMBuffer *buffer)
             free(texture);
         }
 
-        srmListDestoy(buffer->textures);
+        srmListDestroy(buffer->textures);
     }
 
-    while (!srmListIsEmpty(buffer->core->deallocatorMessages)) { usleep(1); }
+    struct timespec delay;
+    delay.tv_sec = 0;
+    delay.tv_nsec = 32;
+
+    while (!srmListIsEmpty(buffer->core->deallocatorMessages))
+        nanosleep(&delay, NULL);
 
     for (UInt32 i = 0; i < buffer->planesCount; i++)
     {
@@ -517,7 +522,8 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
     if (buffer->map)
     {
         const UInt8 *src = pixels;
-        UInt8 *dst = &buffer->map[buffer->offsets[0] + dstY*buffer->strides[0] + dstX*buffer->pixelSize];
+        UInt8 *dst = buffer->map;
+        dst = &dst[buffer->offsets[0] + dstY*buffer->strides[0] + dstX*buffer->pixelSize];
 
         pthread_mutex_lock(&buffer->mutex);
         buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_WRITE;
@@ -558,17 +564,6 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
         ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
         pthread_mutex_unlock(&buffer->mutex);
-
-        /* Disable EGL image recreation
-        SRMListForeach(texIt, buffer->textures)
-        {
-            struct SRMBufferTexture *tex = srmListItemGetData(texIt);
-            tex->updated = 1;
-        }
-        */
-
-        /* SRMDebug("[%s] Buffer written using mapping.", buffer->core->allocatorDevice->name); */
-
         return 1;
     }
     else
@@ -583,9 +578,6 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
         glFlush();
-
-        /* SRMDebug("[%s] Buffer written using glTexSubImage2D.", buffer->core->allocatorDevice->name); */
-
         return 1;
     }
 
@@ -701,12 +693,13 @@ UInt8 srmBufferRead(SRMBuffer *buffer, Int32 srcX, Int32 srcY, Int32 srcW, Int32
         buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
         ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
 
+        UInt8 *src = buffer->map;
+
         for (Int32 i = 0; i < srcH; i++)
         {
             memcpy(&dstBuffer[(i + dstY)*dstStride + buffer->pixelSize*dstX],
-                   &buffer->map[(i + srcY)*buffer->strides[0] + buffer->pixelSize*srcX],
+                   &src[(i + srcY)*buffer->strides[0] + buffer->pixelSize*srcX],
                    srcW*buffer->pixelSize);
-
         }
 
         buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;

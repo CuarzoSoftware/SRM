@@ -353,7 +353,7 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
 
     if (data->buffersCount == 0)
     {
-        srmListDestoy(bos);
+        srmListDestroy(bos);
         SRMError("Failed to get BOs from gbm_surface for connector %d device %s.", connector->id, connector->device->name);
         return 0;
     }
@@ -369,7 +369,7 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
         i++;
     }
 
-    srmListDestoy(bos);
+    srmListDestroy(bos);
 
     /* Renderer */
 
@@ -406,7 +406,7 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
 
     if (data->buffersCount == 0)
     {
-        srmListDestoy(bos);
+        srmListDestroy(bos);
         SRMError("Failed to get BOs from gbm_surface for connector %d device %s.", connector->id, connector->device->name);
         return 0;
     }
@@ -422,7 +422,7 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
         i++;
     }
 
-    srmListDestoy(bos);
+    srmListDestroy(bos);
     return 1;
 }
 

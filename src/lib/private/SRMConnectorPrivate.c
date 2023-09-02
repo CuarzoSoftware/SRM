@@ -294,7 +294,7 @@ void srmConnectorDestroyEncoders(SRMConnector *connector)
 {
     if (connector->encoders)
     {
-        srmListDestoy(connector->encoders);
+        srmListDestroy(connector->encoders);
         connector->encoders = NULL;
     }
 }
@@ -340,7 +340,7 @@ void srmConnectorDestroyModes(SRMConnector *connector)
             srmConnectorModeDestroy(mode);
         }
 
-        srmListDestoy(connector->modes);
+        srmListDestroy(connector->modes);
         connector->modes = NULL;
     }
 }

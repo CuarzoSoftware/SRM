@@ -16,7 +16,7 @@ void srmListClear(SRMList *list)
         srmListPopBack(list);
 }
 
-void srmListDestoy(SRMList *list)
+void srmListDestroy(SRMList *list)
 {
     srmListClear(list);
     free(list);

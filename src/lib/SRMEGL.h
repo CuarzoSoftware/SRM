@@ -11,8 +11,21 @@
 extern "C" {
 #endif
 
-/* Common EGL extensions */
-struct SRMEGLCoreExtensionsStruct
+/**
+ * @defgroup SRMEGL SRMEGL
+ *
+ * @brief Module for managing EGL (Embedded Graphics Library) extensions and functions.
+ *
+ * EGL is an interface between Khronos rendering APIs and the underlying native platform windowing system.
+ * This module provides access to common and device-specific EGL extensions and functions.
+ *
+ * @{
+ */
+
+/**
+ * @brief Structure representing common EGL extensions.
+ */
+typedef struct SRMEGLCoreExtensionsStruct
 {
     UInt8 EXT_platform_base;
     UInt8 KHR_platform_gbm;
@@ -23,10 +36,24 @@ struct SRMEGLCoreExtensionsStruct
     UInt8 EXT_device_enumeration;
     UInt8 EXT_device_query;
     UInt8 KHR_debug;
-};
+} SRMEGLCoreExtensions;
 
-/* Device specific EGL extensions */
-struct SRMEGLDeviceExtensionsStruct
+/**
+ * @brief Structure representing common EGL functions.
+ */
+typedef struct SRMEGLCoreFunctionsStruct
+{
+    PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT;
+    PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT;
+    PFNEGLQUERYDEVICESTRINGEXTPROC eglQueryDeviceStringEXT;
+    PFNEGLQUERYDISPLAYATTRIBEXTPROC eglQueryDisplayAttribEXT;
+    PFNEGLDEBUGMESSAGECONTROLKHRPROC eglDebugMessageControlKHR;
+} SRMEGLCoreFunctions;
+
+/**
+ * @brief Structure representing device-specific EGL extensions.
+ */
+typedef struct SRMEGLDeviceExtensionsStruct
 {
     UInt8 KHR_image;
     UInt8 KHR_image_base;
@@ -43,30 +70,42 @@ struct SRMEGLDeviceExtensionsStruct
     UInt8 MESA_configless_context;
     UInt8 KHR_surfaceless_context;
     UInt8 IMG_context_priority;
-};
+} SRMEGLDeviceExtensions;
 
-/* Common EGL functions */
-struct SRMEGLCoreFunctionsStruct
-{
-    PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT;
-    PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT;
-    PFNEGLQUERYDEVICESTRINGEXTPROC eglQueryDeviceStringEXT;
-    PFNEGLQUERYDISPLAYATTRIBEXTPROC eglQueryDisplayAttribEXT;
-    PFNEGLDEBUGMESSAGECONTROLKHRPROC eglDebugMessageControlKHR;
-};
-
-/* Device specific EG functions */
-struct SRMEGLDeviceFunctionsStruct
+/**
+ * @brief Structure representing device-specific EGL functions.
+ */
+typedef struct SRMEGLDeviceFunctionsStruct
 {
     PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR;
     PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR;
     PFNEGLQUERYDMABUFFORMATSEXTPROC eglQueryDmaBufFormatsEXT;
     PFNEGLQUERYDMABUFMODIFIERSEXTPROC eglQueryDmaBufModifiersEXT;
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
-};
+} SRMEGLDeviceFunctions;
 
+/**
+ * @brief Get a human-readable error string for an EGL error code.
+ *
+ * @param error An EGL error code.
+ *
+ * @return A pointer to a string describing the EGL error.
+ */
 const char *srmEGLGetErrorString(EGLint error);
+
+/**
+ * @brief Check if an EGL extension is supported.
+ *
+ * @param extensions A string containing EGL extensions.
+ * @param extension The name of the extension to check.
+ *
+ * @return 1 if the extension is supported, 0 otherwise.
+ */
 UInt8 srmEGLHasExtension(const char *extensions, const char *extension);
+
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }

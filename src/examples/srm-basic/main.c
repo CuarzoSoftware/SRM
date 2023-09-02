@@ -168,7 +168,7 @@ int main(void)
         return 1;
     }
 
-    // Subscribe to Evdev events
+    // Subscribe to Udev events
     SRMListener *connectorPluggedEventListener = srmCoreAddConnectorPluggedEventListener(core, &connectorPluggedEventHandler, NULL);
     SRMListener *connectorUnpluggedEventListener = srmCoreAddConnectorUnpluggedEventListener(core, &connectorUnpluggedEventHandler, NULL);
 
@@ -195,7 +195,7 @@ int main(void)
 
     while (1)
     {
-        /* Evdev monitor poll DRM devices/connectors hotplugging events (-1 disables timeout).
+        /* Udev monitor poll DRM devices/connectors hotplugging events (-1 disables timeout).
          * To get a pollable FD use srmCoreGetMonitorFD() */
 
         if (srmCoreProccessMonitor(core, -1) < 0)

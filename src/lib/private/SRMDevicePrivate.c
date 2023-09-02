@@ -405,6 +405,7 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
                     free(externalOnly);
                     modifiers = NULL;
                     externalOnly = NULL;
+                    free(formats);
                     return -1;
             }
 

@@ -11,134 +11,159 @@
 extern "C" {
 #endif
 
-/* ENV VARS
+/**
+ * @defgroup SRMTypes SRMTypes
  *
- * SRM_DEBUG = [0,1,2,3,4]
- * SRM_EGL_DEBUG = [0,1,2,3,4]
+ * @brief SRM data types
+ *
+ * @{
  */
 
+/**
+ * @def SRM_UNUSED(var)
+ * @brief Macro to suppress "unused parameter" warnings.
+ *
+ * This macro is used to indicate that a function parameter is intentionally not used in the
+ * current implementation, thereby suppressing any "unused parameter" warnings from the compiler.
+ *
+ * Usage:
+ * ```
+ * void myFunction(int a, int b) {
+ *     SRM_UNUSED(a); // Suppress "unused parameter 'a'" warning
+ *     // Your code here
+ * }
+ * ```
+ *
+ * @param var The variable (parameter) to mark as unused.
+ */
 #define SRM_UNUSED(var) (void)var
 
+/**
+ * @typedef Int8
+ * @brief Alias for a signed 8-bit integer (int8_t).
+ */
 typedef int8_t   Int8;
+
+/**
+ * @typedef UInt8
+ * @brief Alias for an unsigned 8-bit integer (uint8_t).
+ */
 typedef uint8_t  UInt8;
+
+/**
+ * @typedef Int32
+ * @brief Alias for a signed 32-bit integer (int32_t).
+ */
 typedef int32_t  Int32;
+
+/**
+ * @typedef UInt32
+ * @brief Alias for an unsigned 32-bit integer (uint32_t).
+ */
 typedef uint32_t UInt32;
+
+/**
+ * @typedef Int64
+ * @brief Alias for a signed 64-bit integer (int64_t).
+ */
 typedef int64_t  Int64;
+
+/**
+ * @typedef UInt64
+ * @brief Alias for an unsigned 64-bit integer (uint64_t).
+ */
 typedef uint64_t UInt64;
 
-struct SRMCoreStruct;
+/// @ingroup SRMCore
 typedef struct SRMCoreStruct SRMCore;
 
-struct SRMDeviceStruct;
+/// @ingroup SRMDevice
 typedef struct SRMDeviceStruct SRMDevice;
 
-struct SRMCrtcStruct;
+/// @ingroup SRMCrtc
 typedef struct SRMCrtcStruct SRMCrtc;
 
-struct SRMEncoderStruct;
+/// @ingroup SRMEncoder
 typedef struct SRMEncoderStruct SRMEncoder;
 
-struct SRMPlaneStruct;
+/// @ingroup SRMPlane
 typedef struct SRMPlaneStruct SRMPlane;
 
-struct SRMConnectorStruct;
 /// @ingroup SRMConnector
 typedef struct SRMConnectorStruct SRMConnector;
 
-struct SRMConnectorModeStruct;
+/// @ingroup SRMConnectorMode
 typedef struct SRMConnectorModeStruct SRMConnectorMode;
 
-struct SRMListStruct;
+/// @ingroup SRMList
 typedef struct SRMListStruct SRMList;
-
-struct SRMListItemStruct;
+/// @ingroup SRMList
 typedef struct SRMListItemStruct SRMListItem;
 
-struct SRMListenerStruct;
+/// @ingroup SRMListener
 typedef struct SRMListenerStruct SRMListener;
 
-struct SRMBufferStruct;
 /// @ingroup SRMBuffer
 typedef struct SRMBufferStruct SRMBuffer;
+typedef UInt32 SRM_BUFFER_FORMAT; ///< A DRM format defined in drm_fourcc.h.
+typedef UInt64 SRM_BUFFER_MODIFIER; ///< A DRM format modifier defined in drm_fourcc.h.
 
-struct SRMEGLCoreExtensionsStruct;
-typedef struct SRMEGLCoreExtensionsStruct SRMEGLCoreExtensions;
-
-struct SRMEGLCoreFunctionsStruct;
-typedef struct SRMEGLCoreFunctionsStruct SRMEGLCoreFunctions;
-
-struct SRMEGLDeviceExtensionsStruct;
-typedef struct SRMEGLDeviceExtensionsStruct SRMEGLDeviceExtensions;
-
-struct SRMEGLDeviceFunctionsStruct;
-typedef struct SRMEGLDeviceFunctionsStruct SRMEGLDeviceFunctions;
-
-struct SRMFormatStruct;
-typedef struct SRMFormatStruct SRMFormat;
-
-struct SRMGLFormatStruct;
-typedef struct SRMGLFormatStruct SRMGLFormat;
-
-struct SRMBufferDMADataStruct;
-typedef struct SRMBufferDMADataStruct SRMBufferDMAData;
-
-struct SRMRectStruct
+/**
+ * @brief Structure representing a rectangle with integer coordinates.
+ */
+typedef struct SRMRectStruct
 {
-    Int32 x;
-    Int32 y;
-    Int32 width;
-    Int32 height;
-};
+    Int32 x;       ///< The x-coordinate of the top-left corner of the rectangle.
+    Int32 y;       ///< The y-coordinate of the top-left corner of the rectangle.
+    Int32 width;   ///< The width of the rectangle.
+    Int32 height;  ///< The height of the rectangle.
+} SRMRect;
 
-typedef struct SRMRectStruct SRMRect;
-
-struct SRMInterfaceStruct
-{
-    int (*openRestricted)(const char *path, int flags, void *data);
-    void (*closeRestricted)(int fd, void *data);
-};
-typedef struct SRMInterfaceStruct SRMInterface;
-
-enum SRM_RENDER_MODE_ENUM
-{
-    SRM_RENDER_MODE_ITSELF = 0,
-    SRM_RENDER_MODE_DUMB = 1,
-    SRM_RENDER_MODE_CPU = 2,
-    SRM_RENDER_MODE_NONE = 3
-};
 typedef enum SRM_RENDER_MODE_ENUM SRM_RENDER_MODE;
 
+/**
+ * @brief Get a string representation of a rendering mode.
+ *
+ * @param mode The rendering mode to retrieve the string for.
+ *
+ * @return A pointer to the string representation of the rendering mode.
+ */
 const char *srmGetRenderModeString(SRM_RENDER_MODE mode);
 
-enum SRM_PLANE_TYPE_ENUM
-{
-    SRM_PLANE_TYPE_OVERLAY = 0,
-    SRM_PLANE_TYPE_PRIMARY = 1,
-    SRM_PLANE_TYPE_CURSOR = 2
-};
 typedef enum SRM_PLANE_TYPE_ENUM SRM_PLANE_TYPE;
 
+/**
+ * @brief Get a string representation of a plane type.
+ *
+ * @param type The plane type to retrieve the string for.
+ *
+ * @return A pointer to the string representation of the plane type.
+ */
 const char *srmGetPlaneTypeString(SRM_PLANE_TYPE type);
 
-enum SRM_CONNECTOR_STATE_ENUM
-{
-    SRM_CONNECTOR_STATE_UNINITIALIZED = 0,
-    SRM_CONNECTOR_STATE_INITIALIZED = 1,
-    SRM_CONNECTOR_STATE_UNINITIALIZING = 2,
-    SRM_CONNECTOR_STATE_INITIALIZING = 3,
-    SRM_CONNECTOR_STATE_CHANGING_MODE = 4,
-    SRM_CONNECTOR_STATE_REVERTING_MODE = 5, // Special case when changing mode fails
-    SRM_CONNECTOR_STATE_PAUSING = 6,
-    SRM_CONNECTOR_STATE_PAUSED = 7,
-    SRM_CONNECTOR_STATE_RESUMING = 8
-};
 typedef enum SRM_CONNECTOR_STATE_ENUM SRM_CONNECTOR_STATE;
 
-typedef UInt32 SRM_BUFFER_FORMAT;
-typedef UInt64 SRM_BUFFER_MODIFIER;
-
+/**
+ * @brief Get a string representation of a connector state.
+ *
+ * @param state The connector state to retrieve the string for.
+ *
+ * @return A pointer to the string representation of the connector state.
+ */
 const char *srmGetConnectorStateString(SRM_CONNECTOR_STATE state);
+
+/**
+ * @brief Get a string representation of a connector type.
+ *
+ * @param type The connector type to retrieve the string for.
+ *
+ * @return A pointer to the string representation of the connector type.
+ */
 const char *srmGetConnectorTypeString(UInt32 type);
+
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }

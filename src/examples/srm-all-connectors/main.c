@@ -403,7 +403,7 @@ int main(void)
     // Here we update the shared background texture every sec
     while (1)
     {
-        /* Evdev monitor poll DRM devices/connectors hotplugging events (-1 disables timeout).
+        /* Udev monitor poll DRM devices/connectors hotplugging events (-1 disables timeout).
          * To get a pollable FD use srmCoreGetMonitorFD() */
 
         if (srmCoreProccessMonitor(core, 1000) < 0)

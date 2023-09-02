@@ -24,10 +24,9 @@ extern "C" {
 #define SRM_MAX_PLANES 4
 
 /**
- * @enum SRM_BUFFER_CAP
- * Enumerates the capabilities of an SRMBuffer.
+ * @brief Enumerates the capabilities of an SRMBuffer.
  */
-enum SRM_BUFFER_CAP
+typedef enum SRM_BUFFER_CAP_ENUM
 {
     /**
      * Capability to read from the buffer.
@@ -43,7 +42,7 @@ enum SRM_BUFFER_CAP
      * Capability to map the buffer.
      */
     SRM_BUFFER_CAP_MAP = 4
-};
+} SRM_BUFFER_CAP;
 
 /**
  * @enum SRM_BUFFER_SRC
@@ -73,10 +72,9 @@ enum SRM_BUFFER_SRC
 };
 
 /**
- * @struct SRMBufferDMADataStruct
  * Structure containing DMA-related data for an SRM buffer.
  */
-struct SRMBufferDMADataStruct
+typedef struct SRMBufferDMADataStruct
 {
     /**
      * Width of the buffer.
@@ -117,7 +115,7 @@ struct SRMBufferDMADataStruct
      * Array of modifier values for each plane of the buffer.
      */
     UInt64 modifiers[SRM_MAX_PLANES];
-};
+} SRMBufferDMAData;
 
 /**
  * @brief Creates an SRMBuffer from a Graphics Buffer Manager (GBM) gbm_bo.
@@ -125,6 +123,8 @@ struct SRMBufferDMADataStruct
  * This function creates an SRMBuffer object using the provided GBM buffer object.
  * 
  * @warning The gbm_bo must remain valid during the buffer lifetime. It is not destroyed when the buffer is destroyed and must be destroyed manually.
+ *
+ * @note Depending on the backing storage of the bo, the buffer may not be shareable between all devices.
  *
  * @param core Pointer to the SRMCore instance.
  * @param bo Pointer to the GBM buffer object.
@@ -139,7 +139,7 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo);
  * about width, height, format, memory planes, and more.
  * 
  * @param core Pointer to the SRMCore instance.
- * @param allocator Pointer to the SRMDevice responsible for memory allocation. Use NULL to make the texture shareable between all devices (GPUs).
+ * @param allocator Pointer to the SRMDevice responsible for memory allocation. Use NULL to enable texture sharing across all devices (GPUs).
  * @param dmaPlanes Pointer to the SRMBufferDMAData containing DMA planes data.
  * @return A pointer to the created SRMBuffer, or NULL on failure.
  */
@@ -152,7 +152,7 @@ SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMDevice *allocator, SRMBuffer
  * the buffer's width, height, stride, pixel data, and format.
  * 
  * @param core Pointer to the SRMCore instance.
- * @param allocator Pointer to the SRMDevice responsible for memory allocation. Use NULL to make the texture shareable between all devices (GPUs).
+ * @param allocator Pointer to the SRMDevice responsible for memory allocation. Use NULL to enable texture sharing across all devices (GPUs).
  * @param width Width of the src buffer.
  * @param height Height of the src buffer.
  * @param stride Stride (row pitch) of the src buffer in bytes.
@@ -164,12 +164,13 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
                                   UInt32 width, UInt32 height, UInt32 stride,
                                   const void *pixels, SRM_BUFFER_FORMAT format);
 
-
 /**
  * @brief Creates an SRMBuffer from a Wayland wl_drm buffer.
  *
  * This function creates an SRMBuffer object using the provided Wayland wl_drm buffer.
- * 
+ *
+ * @note Depending on the backing storage of the bo, the buffer may not be shared across all devices.
+ *
  * @param core Pointer to the SRMCore instance.
  * @param wlBuffer Pointer to the Wayland DRM buffer.
  * @return A pointer to the created SRMBuffer, or NULL on failure.
@@ -215,7 +216,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
  * @return 1 on success, or 0 on failure.
  */
 UInt8 srmBufferWrite(SRMBuffer *buffer,
-                     UInt32 stride, // src stride
+                     UInt32 stride,
                      UInt32 dstX,
                      UInt32 dstY,
                      UInt32 dstWidth,

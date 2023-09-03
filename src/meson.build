@@ -109,10 +109,12 @@ SRM = library(
     install : true, 
     install_dir : library_install_dir)
 
-srm_dep = declare_dependency(
-    dependencies: [], 
-    include_directories : include_paths,
-    link_with : SRM)
+if get_option('build_examples') or get_option('build_tests')
+    srm_dep = declare_dependency(
+        dependencies: [], 
+        include_directories : include_paths,
+        link_with : SRM)
+endif 
 
 if get_option('build_examples')
 

@@ -19,17 +19,6 @@ extern "C" {
  */
 
 /**
- * @enum SRM_PLANE_TYPE
- * @brief Enumeration of plane types.
- */
-typedef enum SRM_PLANE_TYPE_ENUM
-{
-    SRM_PLANE_TYPE_OVERLAY = 0, ///< The plane type is "OVERLAY."
-    SRM_PLANE_TYPE_PRIMARY = 1, ///< The plane type is "PRIMARY."
-    SRM_PLANE_TYPE_CURSOR = 2   ///< The plane type is "CURSOR."
-} SRM_PLANE_TYPE;
-
-/**
  * @brief Get the unique identifier of a DRM plane.
  *
  * @param plane A pointer to the SRMPlane instance.

@@ -21,17 +21,6 @@ extern "C" {
  */
 
 /**
- * @brief Enumeration of devices rendering modes.
- */
-typedef enum SRM_RENDER_MODE_ENUM
-{
-    SRM_RENDER_MODE_ITSELF = 0, ///< The device is in "ITSELF" rendering mode.
-    SRM_RENDER_MODE_DUMB = 1,   ///< The device is in "DUMB" rendering mode.
-    SRM_RENDER_MODE_CPU = 2,    ///< The device is in "CPU" rendering mode.
-    SRM_RENDER_MODE_NONE = 3    ///< No rendering mode is defined.
-} SRM_RENDER_MODE;
-
-/**
  * @brief Get the SRMCore instance to which this device belongs.
  *
  * @param device A pointer to the SRMDevice instance.

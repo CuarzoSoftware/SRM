@@ -74,35 +74,47 @@ typedef int64_t  Int64;
  */
 typedef uint64_t UInt64;
 
+struct SRMCoreStruct;
 /// @ingroup SRMCore
 typedef struct SRMCoreStruct SRMCore;
 
+struct SRMDeviceStruct;
 /// @ingroup SRMDevice
 typedef struct SRMDeviceStruct SRMDevice;
 
+struct SRMCrtcStruct;
 /// @ingroup SRMCrtc
 typedef struct SRMCrtcStruct SRMCrtc;
 
+struct SRMEncoderStruct;
 /// @ingroup SRMEncoder
 typedef struct SRMEncoderStruct SRMEncoder;
 
+struct SRMPlaneStruct;
 /// @ingroup SRMPlane
 typedef struct SRMPlaneStruct SRMPlane;
 
+struct SRMConnectorStruct;
 /// @ingroup SRMConnector
 typedef struct SRMConnectorStruct SRMConnector;
 
+struct SRMConnectorModeStruct;
 /// @ingroup SRMConnectorMode
 typedef struct SRMConnectorModeStruct SRMConnectorMode;
 
+struct SRMListStruct;
 /// @ingroup SRMList
 typedef struct SRMListStruct SRMList;
+
+struct SRMListItemStruct;
 /// @ingroup SRMList
 typedef struct SRMListItemStruct SRMListItem;
 
+struct SRMListenerStruct;
 /// @ingroup SRMListener
 typedef struct SRMListenerStruct SRMListener;
 
+struct SRMBufferStruct;
 /// @ingroup SRMBuffer
 typedef struct SRMBufferStruct SRMBuffer;
 typedef UInt32 SRM_BUFFER_FORMAT; ///< A DRM format defined in drm_fourcc.h.
@@ -119,7 +131,17 @@ typedef struct SRMRectStruct
     Int32 height;  ///< The height of the rectangle.
 } SRMRect;
 
-typedef enum SRM_RENDER_MODE_ENUM SRM_RENDER_MODE;
+/**
+ * @ingroup SRMDevice
+ * @brief Enumeration of devices rendering modes.
+ */
+typedef enum SRM_RENDER_MODE_ENUM
+{
+    SRM_RENDER_MODE_ITSELF = 0, ///< The device is in "ITSELF" rendering mode.
+    SRM_RENDER_MODE_DUMB = 1,   ///< The device is in "DUMB" rendering mode.
+    SRM_RENDER_MODE_CPU = 2,    ///< The device is in "CPU" rendering mode.
+    SRM_RENDER_MODE_NONE = 3    ///< No rendering mode is defined.
+} SRM_RENDER_MODE;
 
 /**
  * @brief Get a string representation of a rendering mode.
@@ -130,7 +152,16 @@ typedef enum SRM_RENDER_MODE_ENUM SRM_RENDER_MODE;
  */
 const char *srmGetRenderModeString(SRM_RENDER_MODE mode);
 
-typedef enum SRM_PLANE_TYPE_ENUM SRM_PLANE_TYPE;
+/**
+ * @ingroup SRMPlane
+ * @brief Enumeration of plane types.
+ */
+typedef enum SRM_PLANE_TYPE_ENUM
+{
+    SRM_PLANE_TYPE_OVERLAY = 0, ///< The plane type is "OVERLAY."
+    SRM_PLANE_TYPE_PRIMARY = 1, ///< The plane type is "PRIMARY."
+    SRM_PLANE_TYPE_CURSOR = 2   ///< The plane type is "CURSOR."
+} SRM_PLANE_TYPE;
 
 /**
  * @brief Get a string representation of a plane type.
@@ -141,7 +172,22 @@ typedef enum SRM_PLANE_TYPE_ENUM SRM_PLANE_TYPE;
  */
 const char *srmGetPlaneTypeString(SRM_PLANE_TYPE type);
 
-typedef enum SRM_CONNECTOR_STATE_ENUM SRM_CONNECTOR_STATE;
+/**
+ * @ingroup SRMConnector
+ * @brief Enumeration of connector states.
+ */
+typedef enum SRM_CONNECTOR_STATE_ENUM
+{
+    SRM_CONNECTOR_STATE_UNINITIALIZED = 0, ///< The connector is uninitialized.
+    SRM_CONNECTOR_STATE_INITIALIZED = 1,   ///< The connector is initialized.
+    SRM_CONNECTOR_STATE_UNINITIALIZING = 2, ///< The connector is in the process of uninitializing.
+    SRM_CONNECTOR_STATE_INITIALIZING = 3,   ///< The connector is in the process of initializing.
+    SRM_CONNECTOR_STATE_CHANGING_MODE = 4,  ///< The connector is changing display mode.
+    SRM_CONNECTOR_STATE_REVERTING_MODE = 5, ///< Special case when changing mode fails and reverts.
+    SRM_CONNECTOR_STATE_PAUSING = 6,       ///< The connector is pausing operation.
+    SRM_CONNECTOR_STATE_PAUSED = 7,        ///< The connector is paused.
+    SRM_CONNECTOR_STATE_RESUMING = 8       ///< The connector is resuming operation.
+} SRM_CONNECTOR_STATE;
 
 /**
  * @brief Get a string representation of a connector state.

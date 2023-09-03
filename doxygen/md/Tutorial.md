@@ -388,7 +388,7 @@ int main()
         return 0;
     }
 
-    // Subscribe to Uvdev events
+    // Subscribe to Udev events
     srmCoreAddConnectorPluggedEventListener(core, &connectorPluggedEventHandler, NULL);
     srmCoreAddConnectorUnpluggedEventListener(core, &connectorUnpluggedEventHandler, NULL);
 
@@ -437,7 +437,7 @@ int main()
 
 Now, each time a new connector becomes available, `connectorPluggedEventHandler()` will be invoked, allowing us to initialize the new connector. Similarly, we can detect when a connector is disconnected using `connectorUnpluggedEventHandler()`. If an initialized connector gets disconnected, it is automatically uninitialized, triggering the `uninitializeGL()` function.
 
-One notable change is the replacement of the `usleep()` function with an infinite `while` loop. Within this loop, we poll a `uvdev` monitor file descriptor using the `srmCoreProcessMonitor()` function. This change is necessary to allow SRM to invoke hotplugging events.
+One notable change is the replacement of the `usleep()` function with an infinite `while` loop. Within this loop, we poll a `udev` monitor file descriptor using the `srmCoreProcessMonitor()` function. This change is necessary to allow SRM to invoke hotplugging events.
 
 To test these changes, recompile the program and try connecting and disconnecting an external display on the fly. You should observe that it is automatically initialized and uninitialized each time, reflecting the hotplugging events.
 

@@ -32,6 +32,7 @@ If the [hwinfo](https://github.com/vcrhonek/hwdata) or [libdisplay-info](https:/
 Next, execute the following commands:
 
 ```bash
+$ git clone https://github.com/CuarzoSoftware/SRM.git
 $ cd SRM/src
 $ meson setup build -Dbuildtype=custom
 $ cd build
@@ -42,7 +43,24 @@ To ensure that everything is functioning correctly, you can test one of the avai
 
 ## RedHat (Fedora, CentOS, openSUSE, etc)
 
-(TODO)
+To build SRM from a RedHat based distribution please install the following packages:
+
+```bash
+$ sudo dnf install @development-tools
+$ sudo dnf install meson hwinfo libseat-devel mesa-libEGL-devel libglvnd-devel libudev-devel libdrm-devel libgbm-devel libdisplay-info-devel libinput-devel
+```
+
+Next, execute the following commands:
+
+```bash
+$ git clone https://github.com/CuarzoSoftware/SRM.git
+$ cd SRM/src
+$ meson setup build -Dbuildtype=custom
+$ cd build
+$ sudo meson install
+```
+
+To ensure that everything is functioning correctly, you can test one of the available [examples](https://cuarzosoftware.github.io/SRM/md_md__examples.html).
 
 ## Arch (Manjaro, Artix, etc)
 

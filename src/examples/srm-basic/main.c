@@ -1,33 +1,26 @@
 /*
- * Proj: srm-basic example
+ * Project: srm-basic Example
  *
- * Auth: Eduardo Hopperdietzel
+ * Author: Eduardo Hopperdietzel
  *
- * Desc: This example changes the background color each frame to all
- *       avaliable connectors until CTRL+C is pressed.
+ * Description: This example changes the background color each frame to all
+ *              avaliable connectors until CTRL+C is pressed.
  */
 
 #include <SRMCore.h>
 #include <SRMDevice.h>
-#include <SRMListener.h>
-#include <SRMCrtc.h>
-#include <SRMEncoder.h>
-#include <SRMPlane.h>
 #include <SRMConnector.h>
 #include <SRMConnectorMode.h>
-#include <SRMBuffer.h>
+#include <SRMListener.h>
 
 #include <SRMList.h>
 #include <SRMLog.h>
 
 #include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
 
 #include <math.h>
-#include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <stdlib.h>
 
 float color = 0.f;
 
@@ -157,9 +150,6 @@ static void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *
 
 int main(void)
 {
-    setenv("SRM_DEBUG", "4", 1);
-    setenv("SRM_EGL_DEBUG", "4", 1);
-
     SRMCore *core = srmCoreCreate(&srmInterface, NULL);
 
     if (!core)

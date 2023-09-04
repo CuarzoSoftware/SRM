@@ -108,7 +108,7 @@ int main()
     if (!core)
     {
         SRMFatal("[srm-example] Failed to create SRMCore.");
-        return 0;
+        return 1;
     }
 
     srmCoreDestroy(core);
@@ -300,7 +300,7 @@ int main()
     if (!core)
     {
         SRMFatal("[srm-example] Failed to create SRMCore.");
-        return 0;
+        return 1;
     }
 
     // Loop each GPU (device)
@@ -385,7 +385,7 @@ int main()
     if (!core)
     {
         SRMFatal("[srm-example] Failed to create SRMCore.");
-        return 0;
+        return 1;
     }
 
     // Subscribe to Udev events

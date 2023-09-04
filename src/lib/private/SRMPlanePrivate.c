@@ -146,7 +146,6 @@ UInt8 srmPlaneUpdateCrtcs(SRMPlane *plane)
     return 1;
 }
 
-
 void srmPlaneUpdateInFormats(SRMPlane *plane, UInt64 blobID)
 {
     if (plane->device->capAddFb2Modifiers)

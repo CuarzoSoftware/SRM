@@ -287,19 +287,25 @@ Int32 srmCoreProccessMonitor(SRMCore *core, Int32 msTimeout)
                 // GPU added
                 else if (strcmp(action, "add") == 0)
                 {
-                    /*
+                    SRMDebug("[core] DRM device added: %s.", devnode);
+
+                    /* TODO: Should ask user to re-init or simply add connectors in a non optimal way if possible?
                     for (SRMListener *listener : imp()->deviceCreatedListeners)
                     {
                         void (*callback)(SRMListener *, SRMDevice *) = (void(*)(SRMListener *, SRMDevice *))listener->callback();
                         callback(listener, nullptr);
-                    }
-                    */
+                    } */
                 }
 
                 // GPU removed
                 else if (strcmp(action, "remove") == 0)
                 {
-                    // printf("DRM device removed: %s\n", devnode);
+                    /* The kernel does not permit driver removal while it is in use, 
+                    so this action may not be meaningful. 
+                    It could potentially be more relevant in the context of physically 
+                    unplugging hardware tho. */
+
+                    SRMDebug("[core] DRM device removed: %s.", devnode);
                 }
             }
 

@@ -16,7 +16,6 @@
 
 static int level = 0;
 
-
 void SRMLogInit()
 {
     char *env = getenv("SRM_DEBUG");
@@ -26,7 +25,6 @@ void SRMLogInit()
     else
         level = 0;
 }
-
 
 void SRMFatal(const char *format, ...)
 {

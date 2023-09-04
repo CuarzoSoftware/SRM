@@ -31,7 +31,6 @@ void srmCrtcDestroy(SRMCrtc *crtc)
     free(crtc);
 }
 
-
 UInt8 srmCrtcUpdateProperties(SRMCrtc *crtc)
 {
     drmModeObjectPropertiesPtr props = drmModeObjectGetProperties(crtc->device->fd, crtc->id, DRM_MODE_OBJECT_CRTC);
@@ -69,7 +68,6 @@ UInt8 srmCrtcUpdateProperties(SRMCrtc *crtc)
     }
 
     drmModeFreeObjectProperties(props);
-
 
     return 1;
 }

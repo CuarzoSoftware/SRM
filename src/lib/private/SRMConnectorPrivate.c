@@ -33,8 +33,7 @@ SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
 
     srmConnectorUpdateProperties(connector);
 
-    // This is called after its device is added to the core devices list
-    // srmConnectorUpdateNames(connector);
+    // srmConnectorUpdateNames(connector) is called after its device is added to the core devices list
 
     srmConnectorUpdateEncoders(connector);
     srmConnectorUpdateModes(connector);

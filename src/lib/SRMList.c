@@ -115,7 +115,6 @@ SRMListItem *srmListInsertData(SRMList *list, SRMListItem *prev, void *data)
     pthread_mutex_unlock(&mutex);
 
     return item;
-
 }
 
 void *srmListPopFront(SRMList *list)
@@ -182,7 +181,6 @@ void *srmListPopBack(SRMList *list)
     return data;
 }
 
-
 void *srmListRemoveItem(SRMList *list, SRMListItem *item)
 {
     pthread_mutex_lock(&mutex);
@@ -214,7 +212,6 @@ void *srmListRemoveItem(SRMList *list, SRMListItem *item)
 
     return data;
 }
-
 
 UInt32 srmListGetLength(SRMList *list)
 {

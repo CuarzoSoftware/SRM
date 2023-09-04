@@ -156,7 +156,6 @@ UInt8 srmCoreInitMonitor(SRMCore *core)
         close(core->monitorFd.fd);
 
     return 0;
-
 }
 
 UInt32 dmaFormatsHaveInCommon(SRMList *formatsA, SRMList *formatsB)
@@ -222,7 +221,6 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
                 currentScore += 10;
                 continue;
             }
-
         }
 
         if (currentScore > bestScore)
@@ -230,7 +228,6 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
             bestScore = currentScore;
             bestAllocatorDev = allocDev;
         }
-
     }
 
     return bestAllocatorDev;
@@ -296,7 +293,6 @@ void srmCoreAssignRendererDevices(SRMCore *core)
         }
 
         dev->rendererDevice = bestRendererForDev;
-
     }
 }
 
@@ -315,7 +311,7 @@ UInt8 srmCoreUpdateBestConfiguration(SRMCore *core)
                    EGL_NO_SURFACE,
                    bestAllocatorDevice->eglSharedContext);
 
-    /*
+    /* This should be invoked upon GPU hotplug events, but it may affect user resources.
     if (allocatorDevice && allocatorDevice != bestAllocatorDevice)
     {
         // TODO may require update
@@ -323,7 +319,6 @@ UInt8 srmCoreUpdateBestConfiguration(SRMCore *core)
     */
 
     core->allocatorDevice = bestAllocatorDevice;
-
     srmCoreAssignRendererDevices(core);
     srmCoreUpdateSharedDMATextureFormats(core);
 
@@ -396,10 +391,10 @@ void srmCoreUpdateSharedDMATextureFormats(SRMCore *core)
 
     printFormats:
 
-
     if (SRMLogGetLevel() > 3)
     {
         SRMDebug("[core] Supported shared DMA formats:");
+
         UInt32 prevFmt = 0;
         SRMListForeach(fmtIt, core->sharedDMATextureFormats)
         {
@@ -656,8 +651,6 @@ static void *srmCoreCopyThreadLoop(void *data)
     else
         SRMDebug("[core] New copy thread assigned to CPU %d.", thread->cpu);
 
-    //pthread_setschedprio(thread->thread, 100);
-
     thread->state = 1;
 
     while (1)
@@ -676,14 +669,6 @@ static void *srmCoreCopyThreadLoop(void *data)
                 memmove(&thread->dst[ (thread->offsetY + i) * thread->dstStride],
                        &thread->src[ (thread->offsetY + i) * thread->srcStride],
                        thread->size);
-                /*
-                a = (thread->offsetY + i) * thread->dstStride;
-                b = (thread->offsetY + i) * thread->srcStride;
-                for (Int32 x = 0; x < thread->size; x++)
-                {
-                    thread->dst[a + x] = thread->src[b + x];
-
-                }*/
             }
 
             thread->finished = 1;
@@ -724,7 +709,7 @@ void srmCoreInitCopyThreads(SRMCore *core)
     pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
 
     // Set the priority using sched_param
-    param.sched_priority = 99; // Example priority value (1-99 for SCHED_FIFO)
+    param.sched_priority = 99;
     pthread_attr_setschedparam(&attr, &param);
 
     for (UInt8 i = 0; i < core->copyThreadsCount; i++)

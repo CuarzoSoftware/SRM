@@ -1,7 +1,7 @@
 project(
     'SRM',
     'c', 
-    version : '0.1.0',
+    version : run_command('cat', '../VERSION').stdout(),
     meson_version: '>= 0.56.0',
     default_options: [
         'warning_level=2',
@@ -10,7 +10,7 @@ project(
 )
 
 if get_option('buildtype') == 'custom'
-    add_project_arguments('-Ofast', '-g3',  language : 'c')
+    add_project_arguments('-Ofast', '-g3', '-s', language : 'c')
 endif
 
 little_endian = target_machine.endian() == 'little'
@@ -119,10 +119,13 @@ endif
 if get_option('build_examples')
 
     m_dep = c.find_library('m', dirs: library_paths, required: true)
+    libinput_dep = c.find_library('input', dirs: library_paths, required: true)
+    libseat_dep = c.find_library('libseat', dirs: library_paths, required: true)
 
     subdir('examples/srm-basic')
     subdir('examples/srm-display-info')
     subdir('examples/srm-all-connectors')
+    subdir('examples/srm-multi-seat')
 endif
 
 if get_option('build_tests')

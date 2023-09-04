@@ -10,22 +10,24 @@ SRM depends on the following libraries:
 * libEGL
 * libGLESv2
 
+The **srm-multi-seat** example also require:
+
+* libseat
+* libinput
+
 ## Debian (Ubuntu, Linux Mint, etc)
 
-#### Pre-built Binaries
-
-To access the latest SRM .deb packages, please visit [releases (TODO)](/).
-
-If the [libdisplay-info](https://gitlab.freedesktop.org/emersion/libdisplay-info) package is not available in your distribution, please download and install the following packages in the specified order:
-
-1. [libdisplay-info0](https://packages.ubuntu.com/lunar/libdisplay-info0)
-2. [libdisplay-info-dev](https://packages.ubuntu.com/lunar/libdisplay-info-dev)
-
-For those interested in manually building SRM, please install the following packages:
+To build SRM from a Debian based distribution please install the following packages:
 
 ```bash
-$ sudo apt install libdisplay-info-dev libudev-dev libdrm-dev libgbm-dev libegl1-mesa-dev libgles2-mesa-dev
+$ sudo apt install build-essential meson hwinfo libdisplay-info-dev libinput-dev libudev-dev libdrm-dev libgbm-dev libegl1-mesa-dev libgles2-mesa-dev
 ```
+
+If the [hwinfo](https://github.com/vcrhonek/hwdata) or [libdisplay-info](https://gitlab.freedesktop.org/emersion/libdisplay-info) packages are not available in your distribution, please download and install them manually in the specified order:
+
+1. [hwinfo](https://packages.ubuntu.com/focal/hwdata)
+2. [libdisplay-info0](https://packages.ubuntu.com/lunar/libdisplay-info0)
+3. [libdisplay-info-dev](https://packages.ubuntu.com/lunar/libdisplay-info-dev)
 
 Next, execute the following commands:
 
@@ -36,6 +38,12 @@ $ cd build
 $ sudo meson install
 ```
 
-## TODO: RedHat (Fedora, CentOS, openSUSE, etc)
-## TODO: Arch (Manjaro, Artix, etc)
+To ensure that everything is functioning correctly, you can test one of the available [examples](https://cuarzosoftware.github.io/SRM/md_md__examples.html).
 
+## RedHat (Fedora, CentOS, openSUSE, etc)
+
+(TODO)
+
+## Arch (Manjaro, Artix, etc)
+
+(TODO)

@@ -1,2 +1,2 @@
 option('build_examples', type : 'boolean', value : true)
-option('build_tests', type : 'boolean', value : true)
+option('build_tests', type : 'boolean', value : false)

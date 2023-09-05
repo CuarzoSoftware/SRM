@@ -61,7 +61,3 @@ $ sudo meson install
 ```
 
 To ensure that everything is functioning correctly, you can test one of the available [examples](https://cuarzosoftware.github.io/SRM/md_md__examples.html).
-
-## Arch (Manjaro, Artix, etc)
-
-(TODO)

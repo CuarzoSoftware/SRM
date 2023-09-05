@@ -17,3 +17,9 @@ Those examples are included when installing SRM. To run them, follow these steps
 4. **srm-display-info:** This example outputs the current machine's configuration in JSON format, providing a snapshot of display-related information.
 
 To run any of these examples, switch to a free TTY by pressing `CTRL + ALT + F[1, 2, 3, ... 10]`, `fn + CTRL + ALT + F[1, 2, 3, ... 10]`, or using the `chvt N` command (replace `N` with the desired virtual terminal number). Then, simply execute the desired example's command.
+
+The **srm-basic** and **srm-all-connectors** examples may necessitate elevated privileges for execution. Alternatively, you can include your user in the video group.
+
+In contrast, **srm-multi-seat** doesn't demand superuser privileges but relies on your system being multi-seat compatible.
+
+Similarly, **srm-display-info** doesn't mandate superuser privileges, as it solely retrieves information from DRM devices without performing any KMS operations.

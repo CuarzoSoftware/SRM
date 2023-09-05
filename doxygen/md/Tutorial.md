@@ -94,9 +94,11 @@ static SRMInterface srmInterface =
 };
 ```
 
-This interface primarily involves managing the opening and closing of DRM file descriptors. Instead of relying solely on the open() and close() functions, you might consider incorporating a library like [libseat](https://github.com/kennylevinsen/seatd) to enhance your program's compatibility with multi-seat setups, enabling seamless tty switching.
+This interface handles the management of DRM file descriptors during SRMCore's device scanning process and when you call srmCoreDestroy(). 
 
-Let's proceed by creating an SRMCore instance using this interface, which will handle the setup and configuration of all devices on your behalf. In case the creation of SRMCore encounters an error, we will gracefully exit the program.
+Instead of relying solely on the open() and close() functions, you might consider incorporating a library like [libseat](https://github.com/kennylevinsen/seatd) to enhance your program's compatibility with multi-seat setups, enabling seamless TTY switching (like in the [srm-multi-seat](https://github.com/CuarzoSoftware/SRM/tree/main/src/examples/srm-multi-seat) example).
+
+Let's proceed by creating an SRMCore instance using this interface. If any errors arise during the SRMCore creation process, we will ensure a graceful program exit.
 
 ```c
 // ...
@@ -158,8 +160,9 @@ int main()
     return 0;
 }
 ```
+Here, we are simply iterating over each SRMDevice (GPU/DRM device) and its associated SRMConnectors (screens/displays), printing the DRM id, name, model, and manufacturer of each. Afterward, we conclude the program.
 
-Lets compile the program by running the following:
+Lets compile the program by running:
 
 ```bash
 cd builddir
@@ -172,7 +175,7 @@ If there are no errors during the build process, you should find a new executabl
 ./srm-example
 ```
 
-The output should display a list of devices along with their respective connector information. For example, on my machine, the output appears as follows:
+The output should display one or more devices along with their respective connector information. For example, on my machine, which has a single GPU, the output appears as follows:
 
 ```bash
 [srm-example] Device /dev/dri/card0 connectors:
@@ -184,11 +187,15 @@ The output should display a list of devices along with their respective connecto
 [srm-example] - Connector 108 HDMI-A-0 Unknown Unknown.
 ```
 
-Please note that in the output, you may see connectors listed as "Unknown" for model and manufacturer if no display is attached to those connectors, which is expected behavior.
+Please note that in the output, connectors may appear as "Unknown" for model and manufacturer if no display is attached to those connectors. This is the expected behavior.
+
+In my case, you can observe that there is only one connected connector, which corresponds to my laptop screen (eDP-0). You can check the connectivity status of any connector with the srmConnectorIsConnected() function, which we will demonstrate in the upcoming sections.
 
 #### Rendering
 
-Now, let's explore rendering to the available connectors. To do this, we'll set up a common interface to handle OpenGL rendering events, which will be shared across all connectors.
+Now, let's delve into the process of rendering to the available connectors. Our approach involves setting up a unified interface for managing OpenGL rendering events, which will be shared across all connectors. While it's possible to employ distinct interfaces for each connector, for the sake of simplicity, we'll use a single interface here.
+
+It's of utmost importance to underscore that these events are initiated by SRM itself and should not be manually triggered by you. Additionally, it's essential to recognize that all these events are executed within the rendering thread of each connector, operating independently from the main thread.
 
 ```c
 // ...
@@ -275,18 +282,19 @@ static SRMConnectorInterface connectorInterface =
 // ...
 ```
 
-Lets see what each function does:
+Lets see what each event does:
 
-* **initializeGL:** This function is called once after a connector is initialized. Its purpose is to set up all the necessary OpenGL resources, such as shaders, texture loading, etc. In this specific case, it configures the viewport using the dimensions of the current connector mode. A connector can have multiple modes, each defining resolution and refresh rate. Additionally, it calls srmConnectorRepaint(), which schedules a new rendering frame.
+* **initializeGL:** This event is called once after a connector is initialized with srmConnectorInitialize(). Here you should set up all your necessary OpenGL resources, such as shaders, texture loading, etc. In this specific case, it configures the viewport using the dimensions of the current connector mode (SRMConnectorMode). A connector can have multiple modes, each defining resolution and refresh rate. Additionally, it calls srmConnectorRepaint(), which schedules a new rendering frame (paintGL() call) asynchronously.
 
-* **resizeGL:** This function is triggered when the current connector mode changes, typically when the resolution is adjusted. Here, the main task is to update the viewport to match the new dimensions.
+* **resizeGL:** This function is triggered when the current connector mode changes (set with srmConnectorSetMode()). Here, the main task is to update the viewport to match the new dimensions.
 
 * **paintGL:** In this function, you should perform all the OpenGL rendering operations required for the current frame. In the provided example, the screen is cleared with a random color in each frame.
 
-* **pageFlipped:** This function is called when the last rendered frame is being displayed on the screen.
+* **pageFlipped:** This function is called when the last rendered frame is being displayed on the screen (check [Multiple Buffering](https://en.wikipedia.org/wiki/Multiple_buffering)).
 
-* **uninitializeGL:** This is called just before a connector is uninitialized. Here you should free the resources created in initializeGL.
+* **uninitializeGL:** This is called just before a connector is uninitialized. Here you should free the resources created in initializeGL().
 
+This is extremely important: you must never initialize, uninitialize, or set the mode of a connector from its rendering thread. Doing so could lead to a deadlock or even cause your program to crash. Please be aware that this behavior is slated for correction in the upcoming SRM release.
 
 Now lets use this interface to initialize all connected connectors.
 
@@ -344,13 +352,19 @@ int main()
 
 Now, we're checking each connector's display attachment status using srmConnectorIsConnected() and initializing them with srmConnectorInitialize().
 
-Additionally, note that we've included a usleep() call at the end to wait for 10 seconds. This delay is necessary because each connector performs its rendering in its own thread. Blocking the main thread ensures that it doesn't exit immediately.
+Additionally, note that we've included a usleep() call at the end to wait for 10 seconds. This delay is necessary because, as said before, each connector performs its rendering in its own thread. Blocking the main thread ensures that it doesn't exit immediately.
 
-Before running the program again, switch to a free terminal (tty) and launch it from there. You should observe your displays changing colors rapidly for 10 seconds.
+Before running the program again, switch to a free virtual terminal (TTY) by pressing `CTRL + ALT + F[1, 2, 3 ..., 10]` or with the `chvt N` command and launch it from there. You should observe your displays changing colors rapidly for 10 seconds.
+
+If you encounter issues, please attempt to run the program with superuser privileges or by adding your user to the video group. This may resolve any potential permission-related problems.
+
+Additionally, you have the option to set the **SRM_DEBUG** environment variable to 3 in order to enable fatal, error and warning logging messages.
 
 ### Hotplugging Events
 
-We've previously covered how to check for available connectors during startup. However, what if one of those connectors becomes disconnected while the program is running, such as unplugging an HDMI display? To handle connector hotplugging events, you'll need to add the following event listeners:
+Thus far, we've discussed the process of identifying available connectors and initializing them at program startup. However, a critical consideration is what happens if one of these connectors becomes disconnected while the program is running, such as unplugging an HDMI display.
+
+In such scenarios, the connectors are programmed to undergo automatic uninitialization when they become disconnected, triggering the execution of their corresponding uninitializeGL() events. However, you do have the flexibility to include listeners to detect and respond to connectors plugging and unplugging events, as exemplified below:
 
 ```c
 // ...
@@ -375,7 +389,7 @@ static void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *
     /* This is called when a connector is no longer avaliable (E.g. Unplugging an HDMI display). */
 
     /* The connnector is automatically uninitialized after this event (if initialized)
-     * so calling srmConnectorUninitialize() is a no-op. */
+     * so calling srmConnectorUninitialize() is not necessary. */
 }
 
 int main()
@@ -437,7 +451,7 @@ int main()
 
 Now, each time a new connector becomes available, `connectorPluggedEventHandler()` will be invoked, allowing us to initialize the new connector. Similarly, we can detect when a connector is disconnected using `connectorUnpluggedEventHandler()`. If an initialized connector gets disconnected, it is automatically uninitialized, triggering the `uninitializeGL()` function.
 
-One notable change is the replacement of the `usleep()` function with an infinite `while` loop. Within this loop, we poll a `udev` monitor file descriptor using the `srmCoreProcessMonitor()` function. This change is necessary to allow SRM to invoke hotplugging events.
+One notable change is the replacement of the `usleep()` function with an infinite `while` loop. Within this loop, we poll a `udev` monitor file descriptor using the `srmCoreProcessMonitor()` function. This change is necessary to allow SRM to check and invoke the hotplugging events.
 
 To test these changes, recompile the program and try connecting and disconnecting an external display on the fly. You should observe that it is automatically initialized and uninitialized each time, reflecting the hotplugging events.
 
@@ -452,7 +466,7 @@ Let's see how to create a buffer from main memory:
 
 // ...
 
-// A 128 x 256 RGBA image in main memory
+// A 128 x 256 ARGB8 image in main memory
 UInt8 pixelsSource[128 * 256 * 4];
 
 // Pass NULL as the allocator device to share the buffer across all devices
@@ -490,4 +504,6 @@ if (textureId == 0)
 // ...
 ```
 
-It's important to note that all buffers are shared across all devices, except for those created from GBM buffers or Wayland DRM buffers, which may not always be supported by all devices.
+It's essential to acknowledge that all buffers are shared across all devices, with the exception of those created from GBM buffers or Wayland DRM buffers, which may not always be supported by all devices.
+
+Furthermore, you have the option to read from and write to these buffers, and they are automatically synchronized across all devices. For more in-depth information, please refer to the SRMBuffer documentation.

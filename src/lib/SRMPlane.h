@@ -15,6 +15,8 @@ extern "C" {
  * The SRMPlane module provides functions for querying information about planes associated with DRM devices.
  * These planes can be used for various purposes, such as displaying content on connectors.
  *
+ * @note This module is primarily used by SRM internally and may not be of much use to users.
+ * 
  * @{
  */
 
@@ -37,7 +39,7 @@ UInt32 srmPlaneGetID(SRMPlane *plane);
 SRMDevice *srmPlaneGetDevice(SRMPlane *plane);
 
 /**
- * @brief Get a list of CRTCs (scanout engines) associated with a DRM plane.
+ * @brief Get a list of CRTCs associated with a DRM plane.
  *
  * @param plane A pointer to the SRMPlane instance.
  *

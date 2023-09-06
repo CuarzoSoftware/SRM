@@ -15,7 +15,7 @@ extern "C" {
  * A Cathode Ray Tube Controller (CRTC) is responsible for controlling the display timings and attributes
  * for a connected display device. This module provides functions to work with CRTCs in a SRM context.
  *
- * @note This module is primarily used by SRM internally and may not be of much use to external users.
+ * @note This module is primarily used by SRM internally and may not be of much use to users.
  *
  * @{
  */

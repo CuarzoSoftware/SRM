@@ -66,7 +66,7 @@ enum SRM_BUFFER_SRC
     SRM_BUFFER_SRC_WL_DRM,
 
     /**
-     * The buffer source is a bo from the Graphics Buffer Manager (GBM).
+     * The buffer source is a bo from the Generic Buffer Manager (GBM) library.
      */
     SRM_BUFFER_SRC_GBM
 };
@@ -118,7 +118,7 @@ typedef struct SRMBufferDMADataStruct
 } SRMBufferDMAData;
 
 /**
- * @brief Creates an SRMBuffer from a Graphics Buffer Manager (GBM) gbm_bo.
+ * @brief Creates an SRMBuffer from a Generic Buffer Manager (GBM) gbm_bo.
  *
  * This function creates an SRMBuffer object using the provided GBM buffer object.
  * 

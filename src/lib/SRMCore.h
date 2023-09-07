@@ -48,7 +48,7 @@ extern "C" {
  */
 
 /**
- * @brief Structure representing an interface for restricted operations.
+ * @brief Interface for opening and closing DRM devices (/dev/dri/card*).
  */
 typedef struct SRMInterfaceStruct
 {

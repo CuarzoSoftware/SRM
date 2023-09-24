@@ -188,7 +188,7 @@ int main(void)
         /* Udev monitor poll DRM devices/connectors hotplugging events (-1 disables timeout).
          * To get a pollable FD use srmCoreGetMonitorFD() */
 
-        if (srmCoreProccessMonitor(core, -1) < 0)
+        if (srmCoreProcessMonitor(core, -1) < 0)
             break;
     }
 

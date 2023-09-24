@@ -173,7 +173,7 @@ Int32 srmCoreGetMonitorFD(SRMCore *core)
     return core->monitorFd.fd;
 }
 
-Int32 srmCoreProccessMonitor(SRMCore *core, Int32 msTimeout)
+Int32 srmCoreProcessMonitor(SRMCore *core, Int32 msTimeout)
 {
     int ret = poll(&core->monitorFd, 1, msTimeout);
 

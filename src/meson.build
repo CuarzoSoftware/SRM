@@ -106,7 +106,7 @@ if get_option('build_examples') or get_option('build_tests')
         dependencies: [],
         include_directories : include_paths,
         link_with : SRM)
-endif 
+endif
 
 if get_option('build_examples')
     m_dep = c.find_library('m')

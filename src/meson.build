@@ -26,7 +26,6 @@ c = meson.get_compiler('c')
 # ------------ INSTALL CONFIG ------------
 
 # Install directories
-library_install_dir = '/usr/lib'
 headers_install_dir = '/usr/include/SRM'
 examples_install_dir = '/usr/bin'
 
@@ -57,20 +56,6 @@ endforeach
 
 # ------------ DEPENDENCIES ------------
 
-library_paths_str = [
-    '/lib',
-    '/lib64',
-    '/usr/lib',
-    '/usr/lib64',
-    '/usr/local/lib',
-    '/usr/local/lib64',
-
-    # Multiarch support
-    '/lib/x86_64-linux-gnu',
-    '/usr/lib/x86_64-linux-gnu',
-    '/usr/local/lib/x86_64-linux-gnu',
-]
-
 egl_dep          = c.find_library('EGL')
 glesv2_dep       = c.find_library('GLESv2')
 udev_dep         = c.find_library('udev')
@@ -78,7 +63,6 @@ pthread_dep      = c.find_library('pthread')
 drm_dep          = c.find_library('drm')
 gbm_dep          = c.find_library('gbm')
 display_info_dep = c.find_library('display-info')
-
 
 # ------------ SOURCE CODE FILES ------------
 
@@ -98,8 +82,7 @@ SRM = library(
         drm_dep,
         gbm_dep
     ],
-    install : true,
-    install_dir : library_install_dir)
+    install : true)
 
 if get_option('build_examples') or get_option('build_tests')
     srm_dep = declare_dependency(

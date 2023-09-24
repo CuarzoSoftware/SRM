@@ -2,7 +2,7 @@
 
 In this tutorial, you will learn the basics of SRM to kickstart your journey into creating DRM/KMS applications with OpenGL ES 2.0. 
 
-Let's begin by creating an empty project directory, with a `main.c` and `meson.build` file inside. In this example, we will use Meson for our build system.
+Let's begin by creating an empty project directory, with a `main.c` and `meson.build` file inside. In this example, we will use Meson as our build system.
 
 ### main.c
 
@@ -22,10 +22,8 @@ project('srm-example',
 
 c = meson.get_compiler('c')
 
-library_paths = ['/usr/lib']
-
-glesv2_dep = c.find_library('GLESv2', dirs: library_paths, required: true)
-srm_dep = c.find_library('SRM', dirs: library_paths, required: true)
+glesv2_dep = c.find_library('GLESv2')
+srm_dep = c.find_library('SRM')
 
 sources = ['main.c']
 
@@ -97,9 +95,9 @@ static SRMInterface srmInterface =
 
 This interface handles the management of DRM file descriptors during SRMCore's device scanning process and when you call srmCoreDestroy(). 
 
-Instead of relying solely on the open() and close() functions, you might consider incorporating a library like [libseat](https://github.com/kennylevinsen/seatd) to enhance your program's compatibility with multi-seat setups, enabling seamless TTY switching (like in the [srm-multi-seat](https://github.com/CuarzoSoftware/SRM/tree/main/src/examples/srm-multi-seat) example).
+Instead of relying solely on the `open()` and `close()` functions, you might consider incorporating a library like [libseat](https://github.com/kennylevinsen/seatd) to enhance your program's compatibility with multi-seat setups, enabling seamless TTY switching (like in the [srm-multi-seat](https://github.com/CuarzoSoftware/SRM/tree/main/src/examples/srm-multi-seat) example).
 
-Let's proceed by creating an SRMCore instance using this interface. If any errors arise during the SRMCore creation process, we will ensure a graceful program exit.
+Let's proceed by creating an `SRMCore` instance using this interface. If any errors arise during the `SRMCore` creation process, we will ensure a graceful program exit.
 
 ```c
 // ...
@@ -161,7 +159,7 @@ int main()
     return 0;
 }
 ```
-Here, we are simply iterating over each SRMDevice (GPU/DRM device) and its associated SRMConnectors (screens/displays), printing the DRM id, name, model, and manufacturer of each. Afterward, we conclude the program.
+Here, we are simply iterating over each `SRMDevice` (GPU/DRM device) and its associated SRMConnectors (screens/displays), printing the DRM id, name, model, and manufacturer of each. Afterward, we conclude the program.
 
 Lets compile the program by running:
 
@@ -285,15 +283,15 @@ static SRMConnectorInterface connectorInterface =
 
 Lets see what each event does:
 
-* **initializeGL:** This event is called once after a connector is initialized with srmConnectorInitialize(). Here you should set up all your necessary OpenGL resources, such as shaders, texture loading, etc. In this specific case, it configures the viewport using the dimensions of the current connector mode (SRMConnectorMode). A connector can have multiple modes, each defining resolution and refresh rate. Additionally, it calls srmConnectorRepaint(), which schedules a new rendering frame (paintGL() call) asynchronously.
+* **initializeGL:** This event is called once after a connector is initialized with srmConnectorInitialize(). Here you should set up all your necessary OpenGL resources, such as shaders, texture loading, etc. In this specific case, it configures the viewport using the dimensions of the current connector mode (`SRMConnectorMode`). A connector can have multiple modes, each defining resolution and refresh rate. Additionally, it calls srmConnectorRepaint(), which schedules a new rendering frame (`paintGL()` call) asynchronously.
 
 * **resizeGL:** This event is triggered when the current connector mode changes (set with srmConnectorSetMode()). Here, the main task is to update the viewport to match the new dimensions.
 
 * **paintGL:** Inside this event handler, you should perform all the OpenGL rendering operations required for the current frame. In the provided example, the screen is simply cleared with a random color and a new frame is scheduled with srmConnectorRepaint().
 
-* **pageFlipped:** This event is triggered when the last rendered frame (in paintGL()) is now being displayed on the screen (check [Multiple Buffering](https://en.wikipedia.org/wiki/Multiple_buffering)).
+* **pageFlipped:** This event is triggered when the last rendered frame (in `paintGL()`) is now being displayed on the screen (check [Multiple Buffering](https://en.wikipedia.org/wiki/Multiple_buffering)).
 
-* **uninitializeGL:** This event is triggered just before the connector is uninitialized. Here you should free the resources created in initializeGL().
+* **uninitializeGL:** This event is triggered just before the connector is uninitialized. Here you should free the resources created in `initializeGL()`.
 
 Important Note: It is imperative that you avoid initializing, uninitializing, or changing a connector's mode within its rendering thread, that is, from any of the event handlers. Doing so could lead to a deadlock or even cause your program to crash. Please be aware that this behavior is slated for correction in the upcoming SRM release.
 
@@ -353,7 +351,7 @@ int main()
 
 Now, we're checking each connector's display attachment status using srmConnectorIsConnected() and initializing them with srmConnectorInitialize().
 
-Additionally, note that we've included a usleep() call at the end to wait for 10 seconds. This delay is necessary because, as said before, each connector performs its rendering in its own thread. Blocking the main thread ensures that the program doesn't exit immediately.
+Additionally, note that we've included a `usleep()` call at the end to wait for 10 seconds. This delay is necessary because, as said before, each connector performs its rendering in its own thread. Blocking the main thread ensures that the program doesn't exit immediately.
 
 Re-compile with `meson compile` and before running the program, switch to a free virtual terminal (TTY) by pressing `CTRL + ALT + F[1, 2, 3 ..., 10]` or with the `chvt N` command and launch it from there. You should observe your displays changing colors rapidly for 10 seconds.
 
@@ -365,7 +363,7 @@ Additionally, you have the option to set the **SRM_DEBUG** environment variable 
 
 Thus far, we've discussed the process of identifying available connectors and initializing them at program startup. However, a critical consideration is what happens if one of these connectors becomes disconnected while the program is running, such as unplugging an HDMI display.
 
-In such scenarios, the connectors are programmed to undergo automatic uninitialization when they become disconnected, triggering their corresponding uninitializeGL() event. However, you do have the flexibility to include listeners to detect and respond to connectors plugging and unplugging events, as exemplified below:
+In such scenarios, the connectors are programmed to undergo automatic uninitialization when they become disconnected, triggering their corresponding `uninitializeGL()` event. However, you do have the flexibility to include listeners to detect and respond to connectors plugging and unplugging events, as exemplified below:
 
 ```c
 // ...
@@ -467,7 +465,7 @@ Let's see how to create a buffer from main memory:
 
 // ...
 
-// A 128 x 256 ARGB8 image in main memory
+// 128 x 256 ARGB8 image in main memory
 UInt8 pixelsSource[128 * 256 * 4];
 
 // Pass NULL as the allocator device to share the buffer across all devices
@@ -488,9 +486,9 @@ if (!buffer)
 
 // ...
 
-// Use the buffer in a connector rendering thread (paintGL())
+// Use the buffer in a connector rendering thread (paintGL() call)
 
-// First, get the device this connector belongs to
+// First, get the device the connector belongs to
 SRMDevice *connectorDevice = srmConnectorGetDevice(connector);
 
 // Then, get the device responsible for rendering for the connector device (usually the same device)

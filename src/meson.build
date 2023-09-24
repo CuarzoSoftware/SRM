@@ -1,6 +1,6 @@
 project(
     'SRM',
-    'c', 
+    'c',
     version : run_command('cat', '../VERSION').stdout(),
     meson_version: '>= 0.59.0',
     default_options: [
@@ -98,12 +98,12 @@ SRM = library(
         drm_dep,
         gbm_dep
     ],
-    install : true, 
+    install : true,
     install_dir : library_install_dir)
 
 if get_option('build_examples') or get_option('build_tests')
     srm_dep = declare_dependency(
-        dependencies: [], 
+        dependencies: [],
         include_directories : include_paths,
         link_with : SRM)
 endif 

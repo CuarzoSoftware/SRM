@@ -129,7 +129,7 @@ Int32 srmCoreGetMonitorFD(SRMCore *core);
  *
  * @return The result of event processing. Typically, 0 on success, or -1 on error.
  */
-Int32 srmCoreProccessMonitor(SRMCore *core, Int32 msTimeout);
+Int32 srmCoreProcessMonitor(SRMCore *core, Int32 msTimeout);
 
 /**
  * @brief Registers a new listener to be invoked when a new device (GPU) becomes available.

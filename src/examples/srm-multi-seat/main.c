@@ -466,7 +466,7 @@ int main(void)
 
         // SRM
         if (fds[0].revents & POLLIN)
-            srmCoreProccessMonitor(core, 0);
+            srmCoreProcessMonitor(core, 0);
 
         // SEAT
         if (fds[1].revents & POLLIN)

@@ -2,7 +2,7 @@ project(
     'SRM',
     'c', 
     version : run_command('cat', '../VERSION').stdout(),
-    meson_version: '>= 0.56.0',
+    meson_version: '>= 0.59.0',
     default_options: [
         'warning_level=2',
         'buildtype=debug'
@@ -71,21 +71,13 @@ library_paths_str = [
     '/usr/local/lib/x86_64-linux-gnu',
 ]
 
-library_paths = []
-
-foreach p : library_paths_str
-    if run_command('[', '-d', p, ']').returncode() == 0
-      library_paths += p
-    endif
-endforeach
-
-egl_dep             = c.find_library('EGL', dirs: library_paths, required: true)
-glesv2_dep          = c.find_library('GLESv2', dirs: library_paths, required: true)
-udev_dep            = c.find_library('udev', dirs: library_paths, required: true)
-pthread_dep         = c.find_library('pthread', dirs: library_paths, required: true)
-drm_dep             = c.find_library('drm', dirs: library_paths, required: true)
-gbm_dep             = c.find_library('gbm', dirs: library_paths, required: true)
-display_info_dep    = c.find_library('display-info', dirs: library_paths, required: true)
+egl_dep          = c.find_library('EGL')
+glesv2_dep       = c.find_library('GLESv2')
+udev_dep         = c.find_library('udev')
+pthread_dep      = c.find_library('pthread')
+drm_dep          = c.find_library('drm')
+gbm_dep          = c.find_library('gbm')
+display_info_dep = c.find_library('display-info')
 
 
 # ------------ SOURCE CODE FILES ------------
@@ -117,10 +109,9 @@ if get_option('build_examples') or get_option('build_tests')
 endif 
 
 if get_option('build_examples')
-
-    m_dep = c.find_library('m', dirs: library_paths, required: true)
-    libinput_dep = c.find_library('input', dirs: library_paths, required: true)
-    libseat_dep = c.find_library('libseat', dirs: library_paths, required: true)
+    m_dep = c.find_library('m')
+    libinput_dep = c.find_library('input')
+    libseat_dep = c.find_library('seat')
 
     subdir('examples/srm-basic')
     subdir('examples/srm-display-info')
@@ -133,4 +124,3 @@ if get_option('build_tests')
     subdir('tests/srm-test-memory')
     subdir('tests/srm-test-memcpy')
 endif
-

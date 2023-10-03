@@ -5,6 +5,7 @@
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMConnectorModePrivate.h>
 
+#include <SRMCore.h>
 #include <SRMLog.h>
 #include <stdlib.h>
 #include <xf86drmMode.h>
@@ -185,6 +186,12 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
 UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
 {
     pthread_mutex_lock(&connector->repaintMutex);
+
+    if (srmCoreIsSuspended(connector->device->core))
+    {
+        connector->repaintRequested = 0;
+        connector->atomicCursorHasChanges = 0;
+    }
 
     if (!connector->repaintRequested && !connector->atomicCursorHasChanges)
         pthread_cond_wait(&connector->repaintCond, &connector->repaintMutex);

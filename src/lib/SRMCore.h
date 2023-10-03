@@ -72,6 +72,44 @@ typedef struct SRMInterfaceStruct
 SRMCore *srmCoreCreate(SRMInterface *interface, void *userData);
 
 /**
+ * @brief Temporarily suspend SRM.
+ *
+ * This function temporarily suspends all connector rendering threads and evdev events within SRM.\n
+ * It should be used when switching to another session in a multi-seat system.\n
+ * While the core is suspended, SRM no longer acts as the DRM master, and KMS operations cannot be performed.\n
+ * For guidance on enabling multi-seat functionality using libseat, please refer to the srm-multi-seat example.
+ *
+ * @note Pending hotplugging events will be emitted once the core is resumed.
+ *
+ * @param core A pointer to the SRMCore instance.
+ * @return Returns 1 on success and 0 if the operation fails.
+ */
+UInt8 srmCoreSuspend(SRMCore *core);
+
+/**
+ * @brief Resume SRM.
+ *
+ * This function resumes a previously suspended SRMCore, allowing connectors rendering threads
+ * and evdev events to continue processing. It should be used after calling @c srmCoreSuspend
+ * to bring the SRMCore back to an active state.
+ *
+ * @param core A pointer to the SRMCore instance to resume.
+ * @return Returns 1 on success and 0 if the operation fails.
+ */
+UInt8 srmCoreResume(SRMCore *core);
+
+/**
+ * @brief Check if SRMCore is currently suspended.
+ *
+ * This function checks whether an SRMCore instance is currently in a suspended state,
+ * meaning that connector rendering threads and evdev events are temporarily halted.
+ *
+ * @param core A pointer to the SRMCore instance to check.
+ * @return Returns 1 if the SRMCore is suspended, and 0 if it is active.
+ */
+UInt8 srmCoreIsSuspended(SRMCore *core);
+
+/**
  * @brief Get the user-defined data associated with the SRMCore instance.
  *
  * @param core A pointer to the SRMCore instance.

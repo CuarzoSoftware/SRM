@@ -434,49 +434,81 @@ UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)
 
 UInt8 srmConnectorPause(SRMConnector *connector)
 {
+    if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED)
+        return 0;
+
+    pthread_mutex_lock(&connector->stateMutex);
+
     switch (connector->state)
     {
         case SRM_CONNECTOR_STATE_PAUSED:
+        {
+            pthread_mutex_unlock(&connector->stateMutex);
             return 1;
+        }
         case SRM_CONNECTOR_STATE_UNINITIALIZED:
         case SRM_CONNECTOR_STATE_UNINITIALIZING:
+        {
+            pthread_mutex_unlock(&connector->stateMutex);
             return 0;
+        }
         case SRM_CONNECTOR_STATE_INITIALIZED:
         {
             connector->state = SRM_CONNECTOR_STATE_PAUSING;
+            connector->atomicCursorHasChanges = 0;
+            pthread_mutex_unlock(&connector->stateMutex);
             return srmConnectorPause(connector);
         }
         default:
         {
             srmConnectorUnlockRenderThread(connector, 1);
+            connector->atomicCursorHasChanges = 0;
+            pthread_mutex_unlock(&connector->stateMutex);
             usleep(10000);
             return srmConnectorPause(connector);
         }
     }
+
+    pthread_mutex_unlock(&connector->stateMutex);
     return 0;
 }
 
 UInt8 srmConnectorResume(SRMConnector *connector)
 {
+    if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED)
+        return 0;
+
+    pthread_mutex_lock(&connector->stateMutex);
+
     switch (connector->state)
     {
         case SRM_CONNECTOR_STATE_INITIALIZED:
+        {
+            pthread_mutex_unlock(&connector->stateMutex);
             return 1;
+        }
         case SRM_CONNECTOR_STATE_UNINITIALIZED:
         case SRM_CONNECTOR_STATE_UNINITIALIZING:
+        {
+            pthread_mutex_unlock(&connector->stateMutex);
             return 0;
+        }
         case SRM_CONNECTOR_STATE_PAUSED:
         {
             connector->state = SRM_CONNECTOR_STATE_RESUMING;
+            pthread_mutex_unlock(&connector->stateMutex);
             return srmConnectorResume(connector);
         }
         default:
         {
-            srmConnectorUnlockRenderThread(connector, 1);
+            srmConnectorUnlockRenderThread(connector, 0);
+            pthread_mutex_unlock(&connector->stateMutex);
             usleep(10000);
             return srmConnectorResume(connector);
         }
     }
+
+    pthread_mutex_unlock(&connector->stateMutex);
     return 0;
 }
 

@@ -57,7 +57,7 @@ struct SRMConnectorStruct
     SRMEncoder *currentEncoder;
     SRMCrtc *currentCrtc;
     SRMPlane *currentPrimaryPlane, *currentCursorPlane;
-    SRM_CONNECTOR_STATE state;
+    volatile SRM_CONNECTOR_STATE state;
 
     // Used to
     Int8 renderInitResult;
@@ -69,7 +69,7 @@ struct SRMConnectorStruct
     UInt32 cursorFB, cursorFBPending;
     Int32 cursorX, cursorY;
     UInt8 cursorVisible;
-    UInt8 atomicCursorHasChanges;
+    volatile UInt8 atomicCursorHasChanges;
 
     // Interface for OpenGL events
     SRMConnectorInterface *interface;
@@ -82,7 +82,7 @@ struct SRMConnectorStruct
     UInt8 pendingPageFlip;
     pthread_cond_t repaintCond;
     pthread_mutex_t repaintMutex;
-    UInt8 repaintRequested;
+    volatile UInt8 repaintRequested;
     pthread_mutex_t stateMutex;
     SRMRect *damageRects;
     Int32 damageRectsCount;

@@ -15,6 +15,7 @@
 #include <SRMList.h>
 
 #include <stdio.h>
+#include <unistd.h>
 #include <xf86drmMode.h>
 #include <libdisplay-info/edid.h>
 #include <libdisplay-info/info.h>
@@ -521,6 +522,11 @@ void *srmConnectorRenderThread(void *conn)
                 srmRenderModeCommonPageFlip(connector, connector->lastFb);
             }
         }
+        else
+        {
+            connector->repaintRequested = 0;
+            connector->atomicCursorHasChanges = 0;
+        }
 
         if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {
@@ -544,16 +550,18 @@ void *srmConnectorRenderThread(void *conn)
         else if (connector->state == SRM_CONNECTOR_STATE_PAUSING)
         {
             connector->state = SRM_CONNECTOR_STATE_PAUSED;
-            pthread_mutex_unlock(&connector->stateMutex);
             connector->renderInterface.pause(connector);
+            pthread_mutex_unlock(&connector->stateMutex);
+            usleep(1000);
             SRMDebug("[%s] Connector %d paused.", connector->device->rendererDevice->name, connector->id);
             continue;
         }
         else if (connector->state == SRM_CONNECTOR_STATE_RESUMING)
         {
             connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
-            pthread_mutex_unlock(&connector->stateMutex);
             connector->renderInterface.resume(connector);
+            pthread_mutex_unlock(&connector->stateMutex);
+            usleep(1000);
             SRMDebug("[%s] Connector %d resumed.", connector->device->rendererDevice->name, connector->id);
             continue;
         }

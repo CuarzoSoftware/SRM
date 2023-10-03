@@ -206,6 +206,10 @@ static void enableSeat(struct libseat *seat, void *userdata)
     SRM_UNUSED(seat);
     SRM_UNUSED(userdata);
 
+    SRMDebug("[srm-multiseat] Seat enabled.");
+
+    srmCoreResume(core);
+
     SRMListForeach (deviceIt, srmCoreGetDevices(core))
     {
         SRMDevice *device = srmListItemGetData(deviceIt);
@@ -213,7 +217,6 @@ static void enableSeat(struct libseat *seat, void *userdata)
         SRMListForeach (connectorIt, srmDeviceGetConnectors(device))
         {
             SRMConnector *connector = srmListItemGetData(connectorIt);
-            srmConnectorResume(connector);
 
             // You may also need to restore the hardware cursor
             // if it was used in other sessions
@@ -231,19 +234,9 @@ static void enableSeat(struct libseat *seat, void *userdata)
  * Libinput. */
 static void disableSeat(struct libseat *seat, void *userdata)
 {
+    SRMDebug("[srm-multiseat] Seat disabled.");
     SRM_UNUSED(userdata);
-
-    SRMListForeach (deviceIt, srmCoreGetDevices(core))
-    {
-        SRMDevice *device = srmListItemGetData(deviceIt);
-
-        SRMListForeach (connectorIt, srmDeviceGetConnectors(device))
-        {
-            SRMConnector *connector = srmListItemGetData(connectorIt);
-            srmConnectorPause(connector);
-        }
-    }
-
+    srmCoreSuspend(core);
     libinput_suspend(input);
     libseat_disable_seat(seat);
 }
@@ -343,10 +336,10 @@ static void handleInputEvents()
                 UInt32 keyCode = libinput_event_keyboard_get_key(keyEvent);
 
                 if (keyCode >= KEY_F1 && keyCode <= KEY_F10)
-                {
-                    libseat_switch_session(seat, keyCode - 58);
+                {  
                     libinput_event_destroy(ev);
                     libinput_dispatch(input);
+                    libseat_switch_session(seat, keyCode - 58);
                     return;
                 }
             }

@@ -7,6 +7,7 @@
 #include <SRMLog.h>
 #include <xf86drmMode.h>
 #include <sys/poll.h>
+#include <sys/epoll.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -144,6 +145,9 @@ void srmCoreDestroy(SRMCore *core)
     // UNREF 8
     srmCoreUnitDeallocator(core);
 
+    if (core->udevMonitorFd >= 0)
+        close(core->udevMonitorFd);
+
     if (core->monitorFd.fd >= 0)
         close(core->monitorFd.fd);
 
@@ -156,6 +160,69 @@ void srmCoreDestroy(SRMCore *core)
 
     // UNREF 1
     free(core);
+}
+
+UInt8 srmCoreSuspend(SRMCore *core)
+{
+    if (core->isSuspended)
+        return 0;
+
+    SRMListForeach (deviceIt, srmCoreGetDevices(core))
+    {
+        SRMDevice *device = srmListItemGetData(deviceIt);
+
+        SRMListForeach (connectorIt, srmDeviceGetConnectors(device))
+        {
+            SRMConnector *connector = srmListItemGetData(connectorIt);
+            srmConnectorPause(connector);
+        }
+    }
+
+    core->isSuspended = 1;
+
+    if (epoll_ctl(core->monitorFd.fd, EPOLL_CTL_DEL, core->udevMonitorFd, NULL) != 0)
+    {
+        SRMError("[core] Failed to remove udev monitor fd from epoll.");
+        return 0;
+    }
+
+    return 1;
+}
+
+UInt8 srmCoreResume(SRMCore *core)
+{
+    if (!core->isSuspended)
+        return 0;
+
+    SRMListForeach (deviceIt, srmCoreGetDevices(core))
+    {
+        SRMDevice *device = srmListItemGetData(deviceIt);
+
+        SRMListForeach (connectorIt, srmDeviceGetConnectors(device))
+        {
+            SRMConnector *connector = srmListItemGetData(connectorIt);
+            srmConnectorResume(connector);
+        }
+    }
+
+    core->isSuspended = 0;
+
+    struct epoll_event event;
+    event.events = EPOLLIN | EPOLLHUP;
+    event.data.fd = core->udevMonitorFd;
+
+    if (epoll_ctl(core->monitorFd.fd, EPOLL_CTL_ADD, core->udevMonitorFd, &event) != 0)
+    {
+        SRMError("[core] Failed to add udev monitor fd to epoll.");
+        return 0;
+    }
+
+    return 1;
+}
+
+UInt8 srmCoreIsSuspended(SRMCore *core)
+{
+    return core->isSuspended;
 }
 
 SRMList *srmCoreGetDevices(SRMCore *core)
@@ -177,7 +244,7 @@ Int32 srmCoreProcessMonitor(SRMCore *core, Int32 msTimeout)
 {
     int ret = poll(&core->monitorFd, 1, msTimeout);
 
-    if (ret > 0 && core->monitorFd.revents & POLLIN)
+    if (!core->isSuspended && ret > 0 && core->monitorFd.revents & POLLIN)
     {
         struct udev_device *dev = udev_monitor_receive_device(core->monitor);
 
@@ -361,3 +428,4 @@ void srmCoreSetUserData(SRMCore *core, void *userData)
 {
     core->interfaceUserData = userData;
 }
+

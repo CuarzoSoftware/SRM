@@ -32,9 +32,11 @@ struct SRMCoreStruct
     SRMInterface *interface;
     void *interfaceUserData;
 
+    UInt8 isSuspended;
     struct udev *udev;
     struct udev_monitor *monitor;
     struct pollfd monitorFd;
+    Int32 udevMonitorFd;
 
     SRMList *devices;
     SRMList *sharedDMATextureFormats;

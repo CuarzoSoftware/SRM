@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/epoll.h>
 
 UInt8 srmCoreUpdateEGLExtensions(SRMCore *core)
 {
@@ -115,42 +116,66 @@ UInt8 srmCoreEnumerateDevices(SRMCore *core)
 
 UInt8 srmCoreInitMonitor(SRMCore *core)
 {
+    core->monitorFd.fd = -1;
+    core->udevMonitorFd = -1;
+
     core->monitor = udev_monitor_new_from_netlink(core->udev, "udev");
 
     if (!core->monitor)
     {
-        SRMFatal("Failed to create udev monitor.");
+        SRMFatal("[core] Failed to create udev monitor.");
         return 0;
     }
 
     if (udev_monitor_filter_add_match_subsystem_devtype(core->monitor, "drm", "drm_minor") < 0)
     {
-        SRMFatal("Failed to add udev monitor filter.");
+        SRMFatal("[core] Failed to add udev monitor filter.");
         goto fail;
     }
 
     if (udev_monitor_enable_receiving(core->monitor) < 0)
     {
-        SRMFatal("Failed to enable udev monitor receiving.");
+        SRMFatal("[core] Failed to enable udev monitor receiving.");
         goto fail;
     }
 
-    core->monitorFd.fd = udev_monitor_get_fd(core->monitor);
+    core->udevMonitorFd = udev_monitor_get_fd(core->monitor);
+
+    if (core->udevMonitorFd < 0)
+    {
+        SRMFatal("[core] Failed to get udev monitor fd.");
+        goto fail;
+    }
+
+    core->monitorFd.fd = epoll_create1(0);
 
     if (core->monitorFd.fd < 0)
     {
-        SRMFatal("Failed to get udev monitor fd.");
+        SRMFatal("[core] Failed to create udev epoll fd.");
         goto fail;
     }
 
     core->monitorFd.events = POLLIN | POLLHUP;
     core->monitorFd.revents = 0;
 
+    struct epoll_event event;
+    event.events = EPOLLIN | EPOLLHUP;
+    event.data.fd = core->udevMonitorFd;
+
+    if (epoll_ctl(core->monitorFd.fd, EPOLL_CTL_ADD, core->udevMonitorFd, &event) != 0)
+    {
+        SRMFatal("[core] Failed to add udev monitor fd to epoll fd.");
+        goto fail;
+    }
+
     return 1;
 
     fail:
     udev_monitor_unref(core->monitor);
     core->monitor = NULL;
+
+    if (core->udevMonitorFd >= 0)
+        close(core->udevMonitorFd);
 
     if (core->monitorFd.fd >= 0)
         close(core->monitorFd.fd);

@@ -9,69 +9,80 @@ extern "C" {
 
 /**
  * @defgroup SRMConnector SRMConnector
- * @brief Represents a display screen with associated rendering capabilities and modes.
+ * 
+ * @brief Display with associated rendering capabilities and modes.
  *
- * An SRMConnector represents a screen where content is displayed, ranging from laptop screens to HDMI monitors.
+ * An @ref SRMConnector represents a screen where content is displayed, such as a laptop display, an HDMI monitor, and more.
  * 
  * ### Rendering
  * 
- * Each connector has its own dedicated rendering thread, which manages fundamental OpenGL methods like `initializeGL()`, `paintGL()`, and `resizeGL()`.
- * You can initialize a connector using the `srmConnectorInitialize()` method.
+ * Each connector has its own dedicated rendering thread, which manages common OpenGL events like `initializeGL()`, `paintGL()`, and `resizeGL()`.
+ * You can initialize a connector using the srmConnectorInitialize() method.
  *
  * ### Modes
- * Connectors support multiple display modes that define factors such as refresh rate and resolution.
- * These modes can be enumerated using `srmConnectorGetModes()` and selected using `srmConnectorSetMode()`.
+ * 
+ * Connectors support multiple display modes (@ref SRMConnectorMode), which define their refresh rate and resolution.\n
+ * These modes can be enumerated using srmConnectorGetModes() and selected using srmConnectorSetMode().
  * 
  * @addtogroup SRMConnector
  * @{
  */
 
 /**
- * @brief Structure defining the interface for handling OpenGL-related operations on an SRMConnector.
+ * @brief Interface for OpenGL event handling.
  *
- * The SRMConnectorInterfaceStruct defines a set of function pointers that allow customization of
- * OpenGL-related operations on an SRMConnector. These operations include initialization, rendering,
- * handling page flipping, resizing, and uninitialization.
+ * The @ref SRMConnectorInterface defines a set of functions for managing various OpenGL events, 
+ * including initialization, rendering, page flipping, resizing, and uninitialization.
  */
 typedef struct SRMConnectorInterfaceStruct
 {
     /**
-     * @brief Function to initialize OpenGL on a connector.
+     * @brief Notifies that the connector has been initialized.
      * 
-     * @param connector Pointer to the SRMConnector.
-     * @param data Additional data for customization.
+     * In this event, you should set up shaders, load textures, and perform any necessary setup.
+     * 
+     * @param connector Pointer to the @ref SRMConnector.
+     * @param data User data passed in srmConnectorInitialize().
      */
     void (*initializeGL)(SRMConnector *connector, void *data);
     
     /**
-     * @brief Function to perform OpenGL rendering on a connector.
+     * @brief Render event.
      * 
-     * @param connector Pointer to the SRMConnector.
-     * @param data Additional data for customization.
+     * During this event, you should handle all rendering for the current frame.
+     * 
+     * @param connector Pointer to the @ref SRMConnector.
+     * @param data User data passed in srmConnectorInitialize().
      */
     void (*paintGL)(SRMConnector *connector, void *data);
     
     /**
-     * @brief Function to handle page flipping on a connector.
+     * @brief Notifies a page flip.
      * 
-     * @param connector Pointer to the SRMConnector.
-     * @param data Additional data for customization.
+     * This event is triggered when the framebuffer being displayed on the screen changes.
+     * 
+     * @param connector Pointer to the @ref SRMConnector.
+     * @param data User data passed in srmConnectorInitialize().
      */
     void (*pageFlipped)(SRMConnector *connector, void *data);
     
     /**
-     * @brief Function to handle resizing of OpenGL resources on a connector.
+     * @brief Notifies a change in the framebuffer's dimensions.
      * 
-     * @param connector Pointer to the SRMConnector.
-     * @param data Additional data for customization.
+     * This event is invoked when the current connector mode changes.
+     * 
+     * @param connector Pointer to the @ref SRMConnector.
+     * @param data User data passed in srmConnectorInitialize().
      */
     void (*resizeGL)(SRMConnector *connector, void *data);
     
     /**
-     * @brief Function to uninitialize OpenGL on a connector.
+     * @brief Notifies the connector's uninitialization.
      * 
-     * @param connector Pointer to the SRMConnector.
-     * @param data Additional data for customization.
+     * In this method, you should release resources created during initialization.
+     * 
+     * @param connector Pointer to the @ref SRMConnector.
+     * @param data User data passed in srmConnectorInitialize().
      */
     void (*uninitializeGL)(SRMConnector *connector, void *data);
 } SRMConnectorInterface;
@@ -79,9 +90,11 @@ typedef struct SRMConnectorInterfaceStruct
 /**
  * @brief Sets the connector user data.
  *
- * This function sets the user data associated with the given SRMConnector.
+ * This function sets the user data associated with the given @ref SRMConnector.
+ * 
+ * @note This user data is distinct from the one passed in srmConnectorInitialize().
  *
- * @param connector Pointer to the SRMConnector whose user data is to be set.
+ * @param connector Pointer to the @ref SRMConnector whose user data is to be set.
  * @param userData Pointer to the user data to be associated with the connector.
  */
 void srmConnectorSetUserData(SRMConnector *connector, void *userData);
@@ -89,9 +102,11 @@ void srmConnectorSetUserData(SRMConnector *connector, void *userData);
 /**
  * @brief Retrieves the connector user data.
  *
- * This function retrieves the user data associated with the given SRMConnector.
+ * This function retrieves the user data associated with the given @ref SRMConnector.
  *
- * @param connector Pointer to the SRMConnector from which to retrieve the user data.
+ * @note This user data is distinct from the one passed in srmConnectorInitialize().
+* 
+ * @param connector Pointer to the @ref SRMConnector from which to retrieve the user data.
  * @return Pointer to the user data associated with the connector.
  */
 void *srmConnectorGetUserData(SRMConnector *connector);
@@ -101,10 +116,10 @@ void *srmConnectorGetUserData(SRMConnector *connector);
  *
  * This function returns the device to which the connector belongs.
  *
- * @param connector Pointer to the SRMConnector for which to retrieve the device.
- * @return Pointer to the SRMDevice to which the connector belongs.
+ * @param connector Pointer to the @ref SRMConnector for which to retrieve the device.
+ * @return Pointer to the @ref SRMDevice to which the connector belongs.
  *
- * @note The device may not always be the same as the renderer device in cases different to the ITSELF render mode.
+ * @note The device may not always be the same as the renderer device.
  */
 SRMDevice *srmConnectorGetDevice(SRMConnector *connector);
 
@@ -113,17 +128,17 @@ SRMDevice *srmConnectorGetDevice(SRMConnector *connector);
  *
  * This function returns the DRM connector ID associated with the connector.
  *
- * @param connector Pointer to the SRMConnector for which to retrieve the connector ID.
+ * @param connector Pointer to the @ref SRMConnector for which to retrieve the connector ID.
  * @return The DRM connector ID of the connector.
  */
 UInt32 srmConnectorGetID(SRMConnector *connector);
 
 /**
- * @brief Get the current state of the connector rendering.
+ * @brief Get the current state of the connector.
  *
- * This function returns the current state of the rendering for the given SRMConnector.
+ * This function returns the current state for the given @ref SRMConnector.
  *
- * @param connector Pointer to the SRMConnector for which to retrieve the rendering state.
+ * @param connector Pointer to the @ref SRMConnector for which to retrieve the state.
  * @return The current rendering state (e.g., initialized, uninitialized, etc).
  */
 SRM_CONNECTOR_STATE srmConnectorGetState(SRMConnector *connector);
@@ -131,9 +146,11 @@ SRM_CONNECTOR_STATE srmConnectorGetState(SRMConnector *connector);
 /**
  * @brief Check if the connector is connected.
  *
- * This function checks whether the given SRMConnector is connected.
+ * This function checks whether the given @ref SRMConnector is connected.
+ * 
+ * @note Only connected connectors can be initialized. Calling srmConnectorInitialize() on a disconnected connector has no effect.
  *
- * @param connector Pointer to the SRMConnector to check for connection.
+ * @param connector Pointer to the @ref SRMConnector to check for connection.
  * @return 1 if the connector is connected, 0 otherwise.
  */
 UInt8 srmConnectorIsConnected(SRMConnector *connector);
@@ -143,7 +160,7 @@ UInt8 srmConnectorIsConnected(SRMConnector *connector);
  *
  * This function returns the physical width of the connector in millimeters.
  *
- * @param connector Pointer to the SRMConnector for which to retrieve the width.
+ * @param connector Pointer to the @ref SRMConnector for which to retrieve the width.
  * @return The physical width of the connector in millimeters.
  */
 UInt32 srmConnectorGetmmWidth(SRMConnector *connector);
@@ -153,7 +170,7 @@ UInt32 srmConnectorGetmmWidth(SRMConnector *connector);
  *
  * This function returns the physical height of the connector in millimeters.
  *
- * @param connector Pointer to the SRMConnector for which to retrieve the height.
+ * @param connector Pointer to the @ref SRMConnector for which to retrieve the height.
  * @return The physical height of the connector in millimeters.
  */
 UInt32 srmConnectorGetmmHeight(SRMConnector *connector);
@@ -161,9 +178,9 @@ UInt32 srmConnectorGetmmHeight(SRMConnector *connector);
 /**
  * @brief Get the DRM type of the connector.
  *
- * This function returns the DRM type associated with the connector.
+ * This function returns the DRM type associated with the connector (**DRM_MODE_CONNECTOR_xx** macros defined in `drm_mode.h`).
  *
- * @param connector Pointer to the SRMConnector for which to retrieve the type.
+ * @param connector Pointer to the @ref SRMConnector for which to retrieve the type.
  * @return The DRM type of the connector.
  */
 UInt32 srmConnectorGetType(SRMConnector *connector);
@@ -172,9 +189,9 @@ UInt32 srmConnectorGetType(SRMConnector *connector);
  * @brief Get the name of the connector.
  *
  * This function returns the name of the connector. The name is always unique, even across devices.
- * For example, if there are two HDMI-A connectors, one will be called HDMI-A-0, and the other HDMI-A-1.
+ * For example, if there are two **HDMI-A** connectors, one will be called **HDMI-A-0**, and the other **HDMI-A-1**.
  *
- * @param connector Pointer to the SRMConnector for which to retrieve the name.
+ * @param connector Pointer to the @ref SRMConnector for which to retrieve the name.
  * @return The name of the connector.
  */
 const char *srmConnectorGetName(SRMConnector *connector);
@@ -184,7 +201,7 @@ const char *srmConnectorGetName(SRMConnector *connector);
  *
  * This function returns the manufacturer of the connector.
  *
- * @param connector Pointer to the SRMConnector for which to retrieve the manufacturer.
+ * @param connector Pointer to the @ref SRMConnector for which to retrieve the manufacturer.
  * @return The manufacturer of the connector.
  */
 const char *srmConnectorGetManufacturer(SRMConnector *connector);
@@ -194,7 +211,7 @@ const char *srmConnectorGetManufacturer(SRMConnector *connector);
  *
  * This function returns the model of the connector.
  *
- * @param connector Pointer to the SRMConnector for which to retrieve the model.
+ * @param connector Pointer to the @ref SRMConnector for which to retrieve the model.
  * @return The model of the connector.
  */
 const char *srmConnectorGetModel(SRMConnector *connector);
@@ -202,10 +219,10 @@ const char *srmConnectorGetModel(SRMConnector *connector);
 /**
  * @brief Get a list of available connector encoders.
  *
- * This function returns a list of available encoders for the given SRMConnector.
+ * This function returns a list of available encoders for the given @ref SRMConnector.
  *
- * @param connector Pointer to the SRMConnector for which to retrieve the encoders.
- * @return A list of available connector encoders (SRMEncoder*).
+ * @param connector Pointer to the @ref SRMConnector for which to retrieve the encoders.
+ * @return A list of available connector encoders (@ref SRMEncoder *).
  */
 SRMList *srmConnectorGetEncoders(SRMConnector *connector);
 

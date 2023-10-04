@@ -1,3 +1,29 @@
+SRM (0.2.0-1)
+
+  # Additions
+
+  * Introduce srmCoreSuspend() and srmCoreResume() functions to manage libseat session switching.
+
+  # Internal Changes
+
+  * Transition from using poll to epoll for handling udev monitor events.
+
+  # Bug Fixes
+
+  * Udev hotplugging events are now queued while SRM is suspended and emitted upon restoration. 
+    This resolves the issue where connectors failed to initialize when connected while the session was suspended.
+  * Fixed the bug where connectors rendering threads did not block when suspended.
+  
+-- Eduardo Hopperdietzel ehopperdietzel@gmail.com Tue, 03 Oct 2023 20:11:15 -0300
+
+SRM (0.1.0-2)
+
+  * Clean up meson.build, thanks to @godalming123
+  * Fix srmCoreProccessMonitor > srmCoreProcessMonitor typo, thanks to @godalming123
+
+-- Eduardo Hopperdietzel ehopperdietzel@gmail.com Sun, 24 Sep 2023 12:25:07 -0300
+
+
 SRM (0.1.0-1)
 
   * First release.

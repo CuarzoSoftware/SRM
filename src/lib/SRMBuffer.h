@@ -11,20 +11,24 @@ extern "C" {
 
 /**
  * @defgroup SRMBuffer SRMBuffer
- * @brief Represents an OpenGL ES 2.0 texture shared across GPUs and created from various sources.
+ * 
+ * @brief OpenGL texture shared across GPUs.
  *
- * The SRMBuffer class encapsulates an OpenGL ES 2.0 texture that is shared across multiple GPUs.
+ * An @ref SRMBuffer encapsulates an OpenGL ES 2.0 texture that is shared across multiple GPUs.
  * It can be created from a variety of sources including DMA planes, main memory, GBM bo buffers,
- * and more. This class provides a unified interface to manage and utilize such shared textures.
+ * and more. This module provides a unified interface to manage and utilize such shared textures.
  *
  * @addtogroup SRMBuffer
  * @{
  */
 
+/**
+ * @brief Max number of planes supported by a DMA buffer.
+ */
 #define SRM_MAX_PLANES 4
 
 /**
- * @brief Enumerates the capabilities of an SRMBuffer.
+ * @brief Enumerates the capabilities of an @ref SRMBuffer.
  */
 typedef enum SRM_BUFFER_CAP_ENUM
 {
@@ -45,8 +49,7 @@ typedef enum SRM_BUFFER_CAP_ENUM
 } SRM_BUFFER_CAP;
 
 /**
- * @enum SRM_BUFFER_SRC
- * Enumerates the possible sources of an SRM buffer.
+ * @brief Enumerates the possible sources of an @ref SRMBuffer.
  */
 enum SRM_BUFFER_SRC
 {
@@ -61,7 +64,7 @@ enum SRM_BUFFER_SRC
     SRM_BUFFER_SRC_DMA,
 
     /**
-     * The buffer source is a Wayland wl_drm buffer.
+     * The buffer source is a Wayland `wl_drm` buffer.
      */
     SRM_BUFFER_SRC_WL_DRM,
 
@@ -72,7 +75,7 @@ enum SRM_BUFFER_SRC
 };
 
 /**
- * Structure containing DMA-related data for an SRM buffer.
+ * @brief Structure containing DMA-related data for an @ref SRMBuffer.
  */
 typedef struct SRMBufferDMADataStruct
 {
@@ -118,95 +121,106 @@ typedef struct SRMBufferDMADataStruct
 } SRMBufferDMAData;
 
 /**
- * @brief Creates an SRMBuffer from a Generic Buffer Manager (GBM) gbm_bo.
+ * @brief Creates an @ref SRMBuffer from a GBM bo.
  *
- * This function creates an SRMBuffer object using the provided GBM buffer object.
+ * This function creates an @ref SRMBuffer object using the provided Generic Buffer Manager (GBM) buffer object.
  * 
- * @warning The gbm_bo must remain valid during the buffer lifetime. It is not destroyed when the buffer is destroyed and must be destroyed manually.
+ * @warning The `gbm_bo` must remain valid during the buffer lifetime. It is not destroyed when 
+ *          the buffer is destroyed and must be destroyed manually.
  *
- * @note Depending on the backing storage of the bo, the buffer may not be shareable between all devices.
+ * @note Depending on the backing storage of the bo, the buffer may not be shareable across all devices.
  *
- * @param core Pointer to the SRMCore instance.
+ * @param core Pointer to the @ref SRMCore instance.
  * @param bo Pointer to the GBM buffer object.
- * @return A pointer to the created SRMBuffer, or NULL on failure.
+ * @return A pointer to the created @ref SRMBuffer, or `NULL` on failure.
  */
 SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo);
 
 /**
- * @brief Creates an SRMBuffer from Direct Memory Access (DMA) planes.
+ * @brief Creates an @ref SRMBuffer from Direct Memory Access (DMA) planes.
  *
- * This function creates an SRMBuffer object using the provided DMA planes data, which includes information
+ * This function creates an @ref SRMBuffer object using the provided DMA planes data, which includes information
  * about width, height, format, memory planes, and more.
  * 
- * @param core Pointer to the SRMCore instance.
- * @param allocator Pointer to the SRMDevice responsible for memory allocation. Use NULL to enable texture sharing across all devices (GPUs).
- * @param dmaPlanes Pointer to the SRMBufferDMAData containing DMA planes data.
- * @return A pointer to the created SRMBuffer, or NULL on failure.
+ * @param core Pointer to the @ref SRMCore instance.
+ * @param allocator Pointer to the @ref SRMDevice responsible for memory allocation. 
+ *                  Use `NULL` to enable texture sharing across all devices (GPUs).
+ * @param dmaPlanes Pointer to the @ref SRMBufferDMAData containing DMA planes data.
+ * 
+ * @note When `NULL` is passed as the allocator device, srmCoreGetAllocatorDevice() is used.\n
+ *       Buffers created from this device are shared across all GPUs and can be used for rendering in all connectors.
+ * 
+ * @return A pointer to the created @ref SRMBuffer, or `NULL` on failure.
  */
 SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMDevice *allocator, SRMBufferDMAData *dmaPlanes);
 
 /**
- * @brief Creates an SRMBuffer from main memory buffer.
+ * @brief Creates an @ref SRMBuffer from main memory buffer.
  *
- * This function creates an SRMBuffer object using a main memory buffer, allowing you to define
+ * This function creates an @ref SRMBuffer object using a main memory buffer, allowing you to define
  * the buffer's width, height, stride, pixel data, and format.
  * 
- * @param core Pointer to the SRMCore instance.
- * @param allocator Pointer to the SRMDevice responsible for memory allocation. Use NULL to enable texture sharing across all devices (GPUs).
+ * @param core Pointer to the @ref SRMCore instance.
+ * @param allocator Pointer to the @ref SRMDevice responsible for memory allocation. 
+ *                  Use `NULL` to enable texture sharing across all devices (GPUs).
  * @param width Width of the src buffer.
  * @param height Height of the src buffer.
  * @param stride Stride (row pitch) of the src buffer in bytes.
  * @param pixels Pointer to the pixel data.
  * @param format Format of the pixel data.
- * @return A pointer to the created SRMBuffer, or NULL on failure.
+ * 
+ * @note When `NULL` is passed as the allocator device, srmCoreGetAllocatorDevice() is used.\n
+ *       Buffers created from this device are shared across all GPUs and can be used for rendering in all connectors.
+ * 
+ * @return A pointer to the created @ref SRMBuffer, or `NULL` on failure.
  */
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
                                   UInt32 width, UInt32 height, UInt32 stride,
                                   const void *pixels, SRM_BUFFER_FORMAT format);
 
 /**
- * @brief Creates an SRMBuffer from a Wayland wl_drm buffer.
+ * @brief Creates an @ref SRMBuffer from a Wayland `wl_drm` buffer.
  *
- * This function creates an SRMBuffer object using the provided Wayland wl_drm buffer.
+ * This function creates an @ref SRMBuffer object using the provided Wayland wl_drm buffer.
  *
  * @note Depending on the backing storage of the bo, the buffer may not be shared across all devices.
  *
- * @param core Pointer to the SRMCore instance.
+ * @param core Pointer to the @ref SRMCore instance.
  * @param wlBuffer Pointer to the Wayland DRM buffer.
- * @return A pointer to the created SRMBuffer, or NULL on failure.
+ * @return A pointer to the created @ref SRMBuffer, or `NULL` on failure.
  */
 SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer);
 
 /**
  * @brief Destroys an SRMBuffer.
  *
- * This function destroys an SRMBuffer object, freeing associated resources.
+ * This function destroys an @ref SRMBuffer, freeing associated resources.
  * 
- * @param buffer Pointer to the SRMBuffer to be destroyed.
+ * @param buffer Pointer to the @ref SRMBuffer to be destroyed.
  */
 void srmBufferDestroy(SRMBuffer *buffer);
 
 /**
- * @brief Retrieves an OpenGL texture ID associated with an SRMBuffer for a specific device (GPU).
+ * @brief Retrieves an OpenGL texture ID associated with an @ref SRMBuffer for a specific device (GPU).
  *
- * This function retrieves the OpenGL texture ID that corresponds to the given SRMBuffer
+ * This function retrieves the OpenGL texture ID that corresponds to the given @ref SRMBuffer
  * for the specified device (GPU).
  * 
  * @note You probably will call this function when doing rendering on a connector.
  *       To get the connector's renderer device, use `srmDeviceGetRendererDevice(srmConnectorGetDevice(connector))`.
  *
- * @param device Pointer to the SRMDevice representing the specific device (GPU).
- * @param buffer Pointer to the SRMBuffer for which the texture ID is requested.
- * @return The OpenGL texture ID associated with the SRMBuffer and device, or 0 on failure.
+ * @param device Pointer to the @ref SRMDevice representing the specific device (GPU).
+ * @param buffer Pointer to the @ref SRMBuffer for which the texture ID is requested.
+ * @return The OpenGL texture ID associated with the @ref SRMBuffer and device, or 0 on failure.
  */
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
 
 /**
- * @brief Writes pixel data to an SRMBuffer.
+ * @brief Writes pixel data to an @ref SRMBuffer.
  *
- * This function writes pixel data to the specified region of an SRMBuffer.
+ * This function writes pixel data to the specified region of an @ref SRMBuffer.
  * 
- * @param buffer Pointer to the SRMBuffer to write data to.
+ * @param buffer Pointer to the @ref SRMBuffer to write data to.
  * @param stride Stride (row pitch) of the source pixel data.
  * @param dstX X-coordinate of the top-left corner of the destination region.
  * @param dstY Y-coordinate of the top-left corner of the destination region.
@@ -224,11 +238,11 @@ UInt8 srmBufferWrite(SRMBuffer *buffer,
                      const void *pixels);
 
 /**
- * @brief Reads pixel data from an SRMBuffer.
+ * @brief Reads pixel data from an @ref SRMBuffer.
  *
- * This function reads pixel data from the specified region of an SRMBuffer and copies it to the destination buffer.
+ * This function reads pixel data from the specified region of an @ref SRMBuffer and copies it to the destination buffer.
  * 
- * @param buffer Pointer to the SRMBuffer to read data from.
+ * @param buffer Pointer to the @ref SRMBuffer to read data from.
  * @param srcX X-coordinate of the top-left corner of the source region.
  * @param srcY Y-coordinate of the top-left corner of the source region.
  * @param srcW Width of the source region.
@@ -244,43 +258,43 @@ UInt8 srmBufferRead(SRMBuffer *buffer,
                     Int32 dstX, Int32 dstY, Int32 dstStride, UInt8 *dstBuffer);
 
 /**
- * @brief Retrieves the width of an SRMBuffer.
+ * @brief Retrieves the width of an @ref SRMBuffer.
  *
- * This function retrieves the width of the specified SRMBuffer.
+ * This function retrieves the width of the specified @ref SRMBuffer.
  * 
- * @param buffer Pointer to the SRMBuffer.
- * @return The width of the SRMBuffer.
+ * @param buffer Pointer to the @ref SRMBuffer.
+ * @return The width of the @ref SRMBuffer.
  */
 UInt32 srmBufferGetWidth(SRMBuffer *buffer);
 
 /**
- * @brief Retrieves the height of an SRMBuffer.
+ * @brief Retrieves the height of an @ref SRMBuffer.
  *
- * This function retrieves the height of the specified SRMBuffer.
+ * This function retrieves the height of the specified @ref SRMBuffer.
  * 
- * @param buffer Pointer to the SRMBuffer.
- * @return The height of the SRMBuffer.
+ * @param buffer Pointer to the @ref SRMBuffer.
+ * @return The height of the @ref SRMBuffer.
  */
 UInt32 srmBufferGetHeight(SRMBuffer *buffer);
 
 /**
- * @brief Retrieves the format of an SRMBuffer.
+ * @brief Retrieves the format of an @ref SRMBuffer.
  *
- * This function retrieves the pixel format of the specified SRMBuffer.
+ * This function retrieves the pixel format of the specified @ref SRMBuffer.
  * 
- * @param buffer Pointer to the SRMBuffer.
- * @return The SRM_BUFFER_FORMAT representing the pixel format of the SRMBuffer.
+ * @param buffer Pointer to the @ref SRMBuffer.
+ * @return The @ref SRM_BUFFER_FORMAT representing the pixel format of the @ref SRMBuffer.
  */
 SRM_BUFFER_FORMAT srmBufferGetFormat(SRMBuffer *buffer);
 
 /**
- * @brief Retrieves the allocator device associated with an SRMBuffer.
+ * @brief Retrieves the allocator device associated with an @ref SRMBuffer.
  *
- * This function retrieves the SRMDevice responsible for memory allocation associated
- * with the specified SRMBuffer.
+ * This function retrieves the @ref SRMDevice responsible for memory allocation associated
+ * with the specified @ref SRMBuffer.
  * 
- * @param buffer Pointer to the SRMBuffer.
- * @return Pointer to the SRMDevice responsible for memory allocation, or NULL on failure.
+ * @param buffer Pointer to the @ref SRMBuffer.
+ * @return Pointer to the @ref SRMDevice responsible for memory allocation, or `NULL` on failure.
  */
 SRMDevice *srmBufferGetAllocatorDevice(SRMBuffer *buffer);
 

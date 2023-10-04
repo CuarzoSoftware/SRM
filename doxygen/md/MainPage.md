@@ -1,6 +1,6 @@
 # Simple Rendering Manager
 
-SRM is a C library that simplifies the development of Linux DRM/KMS API applications.
+SRM is a C library that simplifies the development of Linux DRM/KMS applications.
 
 The main problem that this library aims to solve is the ability to render on all displays connected to a machine, regardless of whether their are controlled by different GPUs, and share textures between them from a single allocation. This is particularly useful, for example, in Wayland compositors where it is usually necessary to display the graphic buffers of applications on multiple screens at a time.
 
@@ -20,7 +20,7 @@ SRM allows you to use multiple GPUs simultaneously and automatically finds the m
 * Automatic optimal GPUs/connectors configuration
 * Automatic texture sharing between GPUs
 * Texture allocation from CPU buffers, DMA buffers, GBM BOs, Flink Handles, Wayland DRM buffers.
-* Multi seat support (libseat can be used to open DRM devices for example)
+* Multi seat support ([libseat](https://github.com/kennylevinsen/seatd) can be used to open DRM devices for example)
 * GPU hot-plugging event listener
 * Connectors hot-plugging event listener
 * Hardware cursor compositing

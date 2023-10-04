@@ -145,7 +145,7 @@ static void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *
     /* This is called when a connector is no longer avaliable (E.g. Unplugging an HDMI display). */
 
     /* The connnector is automatically uninitialized after this event (if initialized)
-     * so calling srmConnectorUninitialize() is a no-op. */
+     * so calling srmConnectorUninitialize() here is not required. */
 }
 
 int main(void)

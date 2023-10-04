@@ -5,11 +5,11 @@
     <img src="https://img.shields.io/badge/license-GPL_v3.0-blue.svg" alt="SRM is released under the GPL v3.0 license." />
   </a>
   <a href="https://github.com/CuarzoSoftware/SRM">
-    <img src="https://img.shields.io/badge/version-0.1.0-brightgreen" alt="Current SRM version." />
+    <img src="https://img.shields.io/badge/version-0.2.0-brightgreen" alt="Current SRM version." />
   </a>
 </p>
 
-SRM is a C library that simplifies the development of Linux DRM/KMS API applications.
+SRM is a C library that simplifies the development of Linux DRM/KMS applications.
 
 With SRM, you can focus on the OpenGL ES 2.0 logic of your application. For each available display, you can start a rendering thread that triggers common events like **initializeGL()**, **paintGL()**, **resizeGL()**, **pageFlipped()** and **uninitializeGL()**.
 
@@ -30,7 +30,7 @@ SRM allows you to use multiple GPUs simultaneously and automatically finds the m
 * Automatic optimal GPUs/connectors configuration
 * Automatic texture sharing between GPUs
 * Texture allocation from CPU buffers, DMA buffers, GBM BOs, Flink Handles, Wayland DRM buffers.
-* Multi seat support (libseat can be used to open DRM devices for example)
+* Multi seat support ([libseat](https://github.com/kennylevinsen/seatd) can be used to open DRM devices for example)
 * GPU hot-plugging event listener
 * Connectors hot-plugging event listener
 * Hardware cursor compositing
@@ -185,7 +185,7 @@ static void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *
     /* This is called when a connector is no longer avaliable (E.g. Unplugging an HDMI display). */
 
     /* The connnector is automatically uninitialized after this event (if initialized)
-     * so calling srmConnectorUninitialize() is a no-op. */
+     * so calling srmConnectorUninitialize() here is not required. */
 }
 
 int main(void)

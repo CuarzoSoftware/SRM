@@ -206,7 +206,7 @@ static void enableSeat(struct libseat *seat, void *userdata)
     SRM_UNUSED(seat);
     SRM_UNUSED(userdata);
 
-    SRMDebug("[srm-multiseat] Seat enabled.");
+    SRMDebug("[srm-multi-seat] Seat enabled.");
 
     srmCoreResume(core);
 
@@ -234,7 +234,7 @@ static void enableSeat(struct libseat *seat, void *userdata)
  * Libinput. */
 static void disableSeat(struct libseat *seat, void *userdata)
 {
-    SRMDebug("[srm-multiseat] Seat disabled.");
+    SRMDebug("[srm-multi-seat] Seat disabled.");
     SRM_UNUSED(userdata);
     srmCoreSuspend(core);
     libinput_suspend(input);
@@ -266,7 +266,7 @@ static void handleInputEvents()
 
     if (ret != 0)
     {
-        SRMError("[Libinput Backend] Failed to dispatch libinput %s.", strerror(-ret));
+        SRMError("[libinput] Failed to dispatch libinput %s.", strerror(-ret));
         return;
     }
 

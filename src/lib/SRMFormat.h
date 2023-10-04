@@ -24,8 +24,8 @@ extern "C" {
  */
 typedef struct SRMFormatStruct
 {
-    UInt32 format;   /**< The format code. */
-    UInt64 modifier; /**< The modifier associated with the format. */
+    UInt32 format;   /**< The DRM format code. */
+    UInt64 modifier; /**< The DRM modifier associated with the format. */
 } SRMFormat;
 
 /**
@@ -34,9 +34,9 @@ typedef struct SRMFormatStruct
 typedef struct SRMGLFormatStruct
 {
     UInt32 drmFormat;      /**< DRM buffer format code. */
-    GLint glInternalFormat; /**< OpenGL internal format. */
-    GLint glFormat;         /**< OpenGL format. */
-    GLint glType;           /**< OpenGL data type. */
+    GLint glInternalFormat; /**< OpenGL internal texture format. */
+    GLint glFormat;         /**< OpenGL texture format. */
+    GLint glType;           /**< OpenGL texture pixel type. */
     UInt8 hasAlpha;         /**< Flag indicating whether the format has an alpha channel. */
 } SRMGLFormat;
 
@@ -45,7 +45,7 @@ typedef struct SRMGLFormatStruct
  *
  * @param format The DRM buffer format code to convert.
  *
- * @return A pointer to the SRMGLFormat structure representing the equivalent OpenGL format.
+ * @return A pointer to the @ref SRMGLFormat structure representing the equivalent OpenGL format.
  */
 const SRMGLFormat *srmFormatDRMToGL(SRM_BUFFER_FORMAT format);
 
@@ -56,7 +56,7 @@ const SRMGLFormat *srmFormatDRMToGL(SRM_BUFFER_FORMAT format);
  * @param format The buffer format code to add.
  * @param modifier The modifier associated with the format.
  *
- * @return A pointer to the newly added SRMFormat structure.
+ * @return A pointer to the newly added @ref SRMFormat structure.
  */
 SRMListItem *srmFormatsListAddFormat(SRMList *formatsList, UInt32 format, UInt64 modifier);
 
@@ -66,7 +66,7 @@ SRMListItem *srmFormatsListAddFormat(SRMList *formatsList, UInt32 format, UInt64
  * @param formatsList A list of formats to search in.
  * @param format The buffer format code to match.
  *
- * @return A pointer to the first SRMFormat structure matching the format code, or NULL if not found.
+ * @return A pointer to the first @ref SRMFormat structure matching the format code, or `NULL` if not found.
  */
 SRMFormat *srmFormatListFirstMatchFormat(SRMList *formatsList, UInt32 format);
 
@@ -93,7 +93,7 @@ SRMList *srmFormatsListCopy(SRMList *formatsList);
 /**
  * @brief Destroy a list of formats and free associated resources.
  *
- * @param formatsList A pointer to the list of formats to destroy. The pointer is set to NULL after destruction.
+ * @param formatsList A pointer to the list of formats to destroy. The pointer is set to `NULL` after destruction.
  */
 void srmFormatsListDestroy(SRMList **formatsList);
 

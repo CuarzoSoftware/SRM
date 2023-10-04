@@ -16,7 +16,7 @@ extern "C" {
  *
  * An @ref SRMBuffer encapsulates an OpenGL ES 2.0 texture that is shared across multiple GPUs.
  * It can be created from a variety of sources including DMA planes, main memory, GBM bo buffers,
- * and more. This module provides a unified interface to manage and utilize such shared textures.
+ * and more. This module provides functions to manage and use such shared textures.
  *
  * @addtogroup SRMBuffer
  * @{
@@ -75,7 +75,12 @@ enum SRM_BUFFER_SRC
 };
 
 /**
- * @brief Structure containing DMA-related data for an @ref SRMBuffer.
+ * @brief Structure holding DMA planes data for an @ref SRMBuffer.
+ * 
+ * Use this structure to create SRM buffers from DMA planes data using the srmBufferCreateFromDMA() function.
+ * 
+ * @note It's important to clarify that DMA planes are distinct from DRM planes (@ref SRMPlane). 
+ *       Be cautious not to conflate these concepts.
  */
 typedef struct SRMBufferDMADataStruct
 {
@@ -123,7 +128,8 @@ typedef struct SRMBufferDMADataStruct
 /**
  * @brief Creates an @ref SRMBuffer from a GBM bo.
  *
- * This function creates an @ref SRMBuffer object using the provided Generic Buffer Manager (GBM) buffer object.
+ * This function creates an @ref SRMBuffer object using the provided 
+ * [Generic Buffer Management (GBM)](https://en.wikipedia.org/wiki/Mesa_(computer_graphics)#Generic_Buffer_Management) buffer object.
  * 
  * @warning The `gbm_bo` must remain valid during the buffer lifetime. It is not destroyed when 
  *          the buffer is destroyed and must be destroyed manually.
@@ -140,12 +146,12 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo);
  * @brief Creates an @ref SRMBuffer from Direct Memory Access (DMA) planes.
  *
  * This function creates an @ref SRMBuffer object using the provided DMA planes data, which includes information
- * about width, height, format, memory planes, and more.
+ * about width, height, format, stride of planes, and more.
  * 
  * @param core Pointer to the @ref SRMCore instance.
  * @param allocator Pointer to the @ref SRMDevice responsible for memory allocation. 
  *                  Use `NULL` to enable texture sharing across all devices (GPUs).
- * @param dmaPlanes Pointer to the @ref SRMBufferDMAData containing DMA planes data.
+ * @param dmaPlanes Pointer to the SRMBufferDMAData containing DMA planes data.
  * 
  * @note When `NULL` is passed as the allocator device, srmCoreGetAllocatorDevice() is used.\n
  *       Buffers created from this device are shared across all GPUs and can be used for rendering in all connectors.
@@ -181,7 +187,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 /**
  * @brief Creates an @ref SRMBuffer from a Wayland `wl_drm` buffer.
  *
- * This function creates an @ref SRMBuffer object using the provided Wayland wl_drm buffer.
+ * This function creates an @ref SRMBuffer object using the provided Wayland `wl_drm` buffer.
  *
  * @note Depending on the backing storage of the bo, the buffer may not be shared across all devices.
  *
@@ -207,7 +213,7 @@ void srmBufferDestroy(SRMBuffer *buffer);
  * for the specified device (GPU).
  * 
  * @note You probably will call this function when doing rendering on a connector.
- *       To get the connector's renderer device, use `srmDeviceGetRendererDevice(srmConnectorGetDevice(connector))`.
+ *       To get the connector's renderer device, use srmConnectorGetRendererDevice().
  *
  * @param device Pointer to the @ref SRMDevice representing the specific device (GPU).
  * @param buffer Pointer to the @ref SRMBuffer for which the texture ID is requested.

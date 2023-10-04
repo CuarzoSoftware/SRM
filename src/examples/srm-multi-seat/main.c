@@ -340,6 +340,7 @@ static void handleInputEvents()
                     libinput_event_destroy(ev);
                     libinput_dispatch(input);
                     libseat_switch_session(seat, keyCode - 58);
+                    while (libseat_dispatch(seat, 2000) > 0) {}
                     return;
                 }
             }

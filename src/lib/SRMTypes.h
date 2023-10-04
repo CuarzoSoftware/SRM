@@ -178,15 +178,15 @@ const char *srmGetPlaneTypeString(SRM_PLANE_TYPE type);
  */
 typedef enum SRM_CONNECTOR_STATE_ENUM
 {
-    SRM_CONNECTOR_STATE_UNINITIALIZED = 0, ///< The connector is uninitialized.
-    SRM_CONNECTOR_STATE_INITIALIZED = 1,   ///< The connector is initialized.
+    SRM_CONNECTOR_STATE_UNINITIALIZED = 0,  ///< The connector is uninitialized.
+    SRM_CONNECTOR_STATE_INITIALIZED = 1,    ///< The connector is initialized.
     SRM_CONNECTOR_STATE_UNINITIALIZING = 2, ///< The connector is in the process of uninitializing.
     SRM_CONNECTOR_STATE_INITIALIZING = 3,   ///< The connector is in the process of initializing.
     SRM_CONNECTOR_STATE_CHANGING_MODE = 4,  ///< The connector is changing display mode.
-    SRM_CONNECTOR_STATE_REVERTING_MODE = 5, ///< Special case when changing mode fails and reverts.
-    SRM_CONNECTOR_STATE_PAUSING = 6,       ///< The connector is pausing operation.
-    SRM_CONNECTOR_STATE_PAUSED = 7,        ///< The connector is paused.
-    SRM_CONNECTOR_STATE_RESUMING = 8       ///< The connector is resuming operation.
+    SRM_CONNECTOR_STATE_REVERTING_MODE = 5, ///< Special case when changing mode fails and reverts to its previous mode.
+    SRM_CONNECTOR_STATE_SUSPENDING = 6,     ///< The connector state is changing from initialized to suspended.
+    SRM_CONNECTOR_STATE_SUSPENDED = 7,      ///< The connector is suspended.
+    SRM_CONNECTOR_STATE_RESUMING = 8        ///< The connector state is changing from suspended to initialized.
 } SRM_CONNECTOR_STATE;
 
 /**

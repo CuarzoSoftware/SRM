@@ -23,7 +23,7 @@ extern "C" {
 /**
  * @brief Get the DRM ID of this CRTC.
  *
- * @param crtc A pointer to the SRMCrtc instance.
+ * @param crtc A pointer to the @ref SRMCrtc instance.
  *
  * @return The DRM ID of the CRTC.
  */
@@ -32,19 +32,19 @@ UInt32 srmCrtcGetID(SRMCrtc *crtc);
 /**
  * @brief Get the device this CRTC belongs to.
  *
- * @param crtc A pointer to the SRMCrtc instance.
+ * @param crtc A pointer to the @ref SRMCrtc instance.
  *
- * @return A pointer to the SRMDevice that this CRTC belongs to.
+ * @return A pointer to the @ref SRMDevice that this CRTC belongs to.
  */
 SRMDevice *srmCrtcGetDevice(SRMCrtc *crtc);
 
 /**
- * @brief Returns a pointer to the SRMConnector that is currently using this CRTC,
- *        or NULL if it is not used by any connector.
+ * @brief Returns a pointer to the @ref SRMConnector that is currently using this CRTC,
+ *        or `NULL` if it is not used by any connector.
  *
- * @param crtc A pointer to the SRMCrtc instance.
+ * @param crtc A pointer to the @ref SRMCrtc instance.
  *
- * @return A pointer to the SRMConnector currently using this CRTC, or NULL if not in use.
+ * @return A pointer to the @ref SRMConnector currently using this CRTC, or `NULL` if not in use.
  */
 SRMConnector *srmCrtcGetCurrentConnector(SRMCrtc *crtc);
 

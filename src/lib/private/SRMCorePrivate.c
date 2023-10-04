@@ -155,11 +155,11 @@ UInt8 srmCoreInitMonitor(SRMCore *core)
         goto fail;
     }
 
-    core->monitorFd.events = POLLIN | POLLHUP;
+    core->monitorFd.events = POLLIN;
     core->monitorFd.revents = 0;
 
     struct epoll_event event;
-    event.events = EPOLLIN | EPOLLHUP;
+    event.events = EPOLLIN;
     event.data.fd = core->udevMonitorFd;
 
     if (epoll_ctl(core->monitorFd.fd, EPOLL_CTL_ADD, core->udevMonitorFd, &event) != 0)

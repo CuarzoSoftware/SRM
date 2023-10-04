@@ -22,6 +22,7 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
     SRMCore *core = calloc(1, sizeof(SRMCore));
     core->interface = interface;
     core->interfaceUserData = userData;
+    core->isSuspended = 0;
 
     // REF -
     if (!srmCoreUpdateEGLExtensions(core))
@@ -174,7 +175,7 @@ UInt8 srmCoreSuspend(SRMCore *core)
         SRMListForeach (connectorIt, srmDeviceGetConnectors(device))
         {
             SRMConnector *connector = srmListItemGetData(connectorIt);
-            srmConnectorPause(connector);
+            srmConnectorSuspend(connector);
         }
     }
 
@@ -208,7 +209,7 @@ UInt8 srmCoreResume(SRMCore *core)
     core->isSuspended = 0;
 
     struct epoll_event event;
-    event.events = EPOLLIN | EPOLLHUP;
+    event.events = EPOLLIN;
     event.data.fd = core->udevMonitorFd;
 
     if (epoll_ctl(core->monitorFd.fd, EPOLL_CTL_ADD, core->udevMonitorFd, &event) != 0)

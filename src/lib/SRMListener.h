@@ -15,12 +15,12 @@ extern "C" {
  * The SRMListener module provides functions for creating, setting, and managing event listeners.
  * Event listeners are used to handle events or callbacks in response to specific actions or changes.
  *
+ * @see srmCoreAddDeviceCreatedEventListener()
+ * @see srmCoreAddDeviceRemovedEventListener()
+ * @see srmCoreAddConnectorPluggedEventListener()
+ * @see srmCoreAddConnectorUnpluggedEventListener()
+ * 
  * @{
- */
-
-/**
- * @struct SRMListener
- * @brief Structure representing an event listener.
  */
 
 /**

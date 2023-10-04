@@ -3,6 +3,8 @@ SRM (0.2.0-1)
   # Additions
 
   * Introduce srmCoreSuspend() and srmCoreResume() functions to manage libseat session switching.
+  * Add srmConnectorGetRendererDevice() function to simplify the retrieval of SRMBuffer OpenGL texture IDs, 
+    reducing the need for repetitive calls to srmDeviceGetRendererDevice(srmConnectorGetDevice(connector)).
 
   # Internal Changes
 
@@ -15,6 +17,7 @@ SRM (0.2.0-1)
   * Fixed the bug where connectors rendering threads did not block when suspended.
   
 -- Eduardo Hopperdietzel ehopperdietzel@gmail.com Tue, 03 Oct 2023 20:11:15 -0300
+
 
 SRM (0.1.0-2)
 

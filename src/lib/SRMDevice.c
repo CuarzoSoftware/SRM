@@ -152,3 +152,13 @@ EGLContext *srmDeviceGetEGLContext(SRMDevice *device)
 {
     return device->eglSharedContext;
 }
+
+const SRMEGLDeviceExtensions *srmDeviceGetEGLExtensions(SRMDevice *device)
+{
+    return &device->eglExtensions;
+}
+
+const SRMEGLDeviceFunctions *srmDeviceGetEGLFunctions(SRMDevice *device)
+{
+    return &device->eglFunctions;
+}

@@ -522,11 +522,6 @@ void *srmConnectorRenderThread(void *conn)
                 srmRenderModeCommonPageFlip(connector, connector->lastFb);
             }
         }
-        else
-        {
-            connector->repaintRequested = 0;
-            connector->atomicCursorHasChanges = 0;
-        }
 
         if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {
@@ -547,9 +542,9 @@ void *srmConnectorRenderThread(void *conn)
                 continue;
             }
         }
-        else if (connector->state == SRM_CONNECTOR_STATE_PAUSING)
+        else if (connector->state == SRM_CONNECTOR_STATE_SUSPENDING)
         {
-            connector->state = SRM_CONNECTOR_STATE_PAUSED;
+            connector->state = SRM_CONNECTOR_STATE_SUSPENDED;
             connector->renderInterface.pause(connector);
             pthread_mutex_unlock(&connector->stateMutex);
             usleep(1000);

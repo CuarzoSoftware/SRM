@@ -14,11 +14,15 @@ extern "C" {
 /**
  * @defgroup SRMEGL SRMEGL
  *
- * @brief Module for managing EGL (Embedded Graphics Library) extensions and functions.
+ * @brief Utility EGL functions
  *
  * EGL is an interface between Khronos rendering APIs and the underlying native platform windowing system.
  * This module provides access to common and device-specific EGL extensions and functions.
  *
+ * @see srmCoreGetEGLExtensions()
+ * @see srmCoreGetEGLFunctions()
+ * @see srmDeviceGetEGLExtensions()
+ * @see srmDeviceGetEGLFunctions()
  * @{
  */
 

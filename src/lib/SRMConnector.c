@@ -26,6 +26,11 @@ SRMDevice *srmConnectorGetDevice(SRMConnector *connector)
     return connector->device;
 }
 
+SRMDevice *srmConnectorGetRendererDevice(SRMConnector *connector)
+{
+    return srmDeviceGetRendererDevice(connector->device);
+}
+
 UInt32 srmConnectorGetID(SRMConnector *connector)
 {
     return connector->id;
@@ -432,7 +437,7 @@ UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)
     return connector->renderInterface.getCurrentBufferIndex(connector);
 }
 
-UInt8 srmConnectorPause(SRMConnector *connector)
+UInt8 srmConnectorSuspend(SRMConnector *connector)
 {
     if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED)
         return 0;
@@ -441,7 +446,7 @@ UInt8 srmConnectorPause(SRMConnector *connector)
 
     switch (connector->state)
     {
-        case SRM_CONNECTOR_STATE_PAUSED:
+        case SRM_CONNECTOR_STATE_SUSPENDED:
         {
             pthread_mutex_unlock(&connector->stateMutex);
             return 1;
@@ -454,10 +459,10 @@ UInt8 srmConnectorPause(SRMConnector *connector)
         }
         case SRM_CONNECTOR_STATE_INITIALIZED:
         {
-            connector->state = SRM_CONNECTOR_STATE_PAUSING;
+            connector->state = SRM_CONNECTOR_STATE_SUSPENDING;
             connector->atomicCursorHasChanges = 0;
             pthread_mutex_unlock(&connector->stateMutex);
-            return srmConnectorPause(connector);
+            return srmConnectorSuspend(connector);
         }
         default:
         {
@@ -465,7 +470,7 @@ UInt8 srmConnectorPause(SRMConnector *connector)
             connector->atomicCursorHasChanges = 0;
             pthread_mutex_unlock(&connector->stateMutex);
             usleep(10000);
-            return srmConnectorPause(connector);
+            return srmConnectorSuspend(connector);
         }
     }
 
@@ -493,7 +498,7 @@ UInt8 srmConnectorResume(SRMConnector *connector)
             pthread_mutex_unlock(&connector->stateMutex);
             return 0;
         }
-        case SRM_CONNECTOR_STATE_PAUSED:
+        case SRM_CONNECTOR_STATE_SUSPENDED:
         {
             connector->state = SRM_CONNECTOR_STATE_RESUMING;
             pthread_mutex_unlock(&connector->stateMutex);

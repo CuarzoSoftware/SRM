@@ -62,7 +62,6 @@ static const char *fragmentShaderSource = "precision mediump float; uniform samp
 
 struct ConnectorUserData
 {
-    SRMDevice *rendererDevice;
     GLuint vertexShader;
     GLuint fragmentShader;
     GLuint program;
@@ -201,7 +200,14 @@ static void paintGL(SRMConnector *connector, void *userData)
          * (connector->device->rendererDevice).
          * The texture is only created the first time this method is called.
          * Calling srmBufferGetTextureID() again returns the same texture ID.*/
-        GLuint textureId = srmBufferGetTextureID(data->rendererDevice, buffer);
+        GLuint textureId = srmBufferGetTextureID(srmConnectorGetRendererDevice(connector), buffer);
+
+        if (!textureId)
+        {
+            SRMFatal("[srm-all-connectors] Failed to get the texture ID.");
+            exit(1);
+        }
+
         glBindTexture(GL_TEXTURE_2D, textureId);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -305,8 +311,6 @@ static SRMConnectorInterface connectorInterface =
 static void initConnector(SRMConnector *connector)
 {
     struct ConnectorUserData *userData = calloc(1, sizeof(struct ConnectorUserData));
-    SRMDevice *device = srmConnectorGetDevice(connector);
-    userData->rendererDevice = srmDeviceGetRendererDevice(device);
 
     // This initializes the rendering thread
     if (!srmConnectorInitialize(connector, &connectorInterface, userData))
@@ -317,7 +321,6 @@ static void initConnector(SRMConnector *connector)
     }
 
     /* Connector initialized! */
-
 }
 
 /* When a new GPU/driver is connected/initialized */

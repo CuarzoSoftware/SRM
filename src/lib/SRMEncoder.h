@@ -10,9 +10,9 @@ extern "C" {
 /**
  * @defgroup SRMEncoder SRMEncoder
  *
- * @brief Display encoders in a DRM context.
+ * @brief Connector encoder in a DRM context.
  *
- * An SRMEncoder represents a display encoder device responsible for driving displays (e.g., monitors or screens).
+ * An @ref SRMEncoder represents a connector encoder device responsible for driving displays (e.g., monitors or screens).
  * This module provides functions to work with display encoders, including retrieving their information
  * and associated resources.
  *
@@ -24,36 +24,36 @@ extern "C" {
 /**
  * @brief Get the unique identifier of the encoder.
  *
- * @param encoder A pointer to the SRMEncoder instance.
+ * @param encoder A pointer to the @ref SRMEncoder instance.
  *
  * @return The ID of the encoder.
  */
 UInt32 srmEncoderGetID(SRMEncoder *encoder);
 
 /**
- * @brief Get the device to which this encoder is connected.
+ * @brief Get the device to which this encoder belongs.
  *
- * @param encoder A pointer to the SRMEncoder instance.
+ * @param encoder A pointer to the @ref SRMEncoder instance.
  *
- * @return A pointer to the SRMDevice representing the device to which the encoder is connected.
+ * @return A pointer to the @ref SRMDevice representing the device to which the encoder belongs.
  */
 SRMDevice *srmEncoderGetDevice(SRMEncoder *encoder);
 
 /**
- * @brief Get a list of CRTCs (Cathode Ray Tube Controllers) associated with this encoder.
+ * @brief Get a list of CRTCs (Cathode Ray Tube Controllers) compatible with this encoder.
  *
- * @param encoder A pointer to the SRMEncoder instance.
+ * @param encoder A pointer to the @ref SRMEncoder instance.
  *
- * @return A list of pointers to the CRTCs (SRMCrtc*) associated with the encoder.
+ * @return A list of pointers to the CRTCs (@ref SRMCrtc) compatible with the encoder.
  */
 SRMList *srmEncoderGetCrtcs(SRMEncoder *encoder);
 
 /**
  * @brief Get the connector that is currently using this encoder.
  *
- * @param encoder A pointer to the SRMEncoder instance.
+ * @param encoder A pointer to the @ref SRMEncoder instance.
  *
- * @return A pointer to the SRMConnector currently utilizing this encoder, or NULL if not in use.
+ * @return A pointer to the @ref SRMConnector currently utilizing this encoder, or `NULL` if not in use.
  */
 SRMConnector *srmEncoderGetCurrentConnector(SRMEncoder *encoder);
 

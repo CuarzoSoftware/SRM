@@ -1,4 +1,4 @@
-# Tutorial
+# 🎓 Tutorial
 
 In this tutorial, you will learn the basics of SRM to kickstart your journey into creating DRM/KMS applications with OpenGL ES 2.0. 
 
@@ -55,6 +55,8 @@ Found ninja-1.10.1 at /usr/bin/ninja
 ```
 
 If this is not the case, and the libraries are not found, please double-check that you have installed the GLESv2 and SRM libraries correctly, or investigate if any environment configuration adjustments are necessary.
+
+Please refer to the [Downloads](md_md__downloads.html) section for detailed installation instructions for SRM.
 
 Now, in `main.c` let's set up an interface that allows SRM to open and close DRM devices.
 
@@ -486,16 +488,12 @@ if (!buffer)
 
 // ...
 
-// Use the buffer in a connector rendering thread (paintGL() call)
-
-// First, get the device the connector belongs to
-SRMDevice *connectorDevice = srmConnectorGetDevice(connector);
-
-// Then, get the device responsible for rendering for the connector device (usually the same device)
-SRMDevice *connectorRendererDevice = srmDeviceGetRendererDevice(connectorDevice);
+// Use the buffer in a connector rendering thread (paintGL() event)
 
 // Retrieve the OpenGL texture ID
-GLuint textureId = srmBufferGetTextureID(connectorRendererDevice, buffer);
+GLuint textureId = srmBufferGetTextureID(
+    srmConnectorGetRendererDevice(connector), 
+    buffer);
 
 if (textureId == 0)
     SRMError("Failed to get the GL texture ID from SRMBuffer.");

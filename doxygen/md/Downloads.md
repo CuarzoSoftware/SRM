@@ -1,4 +1,4 @@
-# Downloads
+# 📦 Downloads
 
 SRM depends on the following libraries:
 
@@ -39,7 +39,7 @@ $ cd build
 $ sudo meson install
 ```
 
-To ensure that everything is functioning correctly, you can test one of the available [examples](https://cuarzosoftware.github.io/SRM/md_md__examples.html).
+To ensure that everything is functioning correctly, you can test one of the available [examples](md_md__examples.html).
 
 ## RedHat (Fedora, CentOS, openSUSE, etc)
 
@@ -60,4 +60,4 @@ $ cd build
 $ sudo meson install
 ```
 
-To ensure that everything is functioning correctly, you can test one of the available [examples](https://cuarzosoftware.github.io/SRM/md_md__examples.html).
+To ensure that everything is functioning correctly, you can test one of the available [examples](md_md__examples.html).

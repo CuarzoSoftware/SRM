@@ -187,14 +187,11 @@ UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
 {
     pthread_mutex_lock(&connector->repaintMutex);
 
-    if (srmCoreIsSuspended(connector->device->core))
+    if ((!connector->repaintRequested && !connector->atomicCursorHasChanges) || srmCoreIsSuspended(connector->device->core))
     {
-        connector->repaintRequested = 0;
         connector->atomicCursorHasChanges = 0;
-    }
-
-    if (!connector->repaintRequested && !connector->atomicCursorHasChanges)
         pthread_cond_wait(&connector->repaintCond, &connector->repaintMutex);
+    }
 
     pthread_mutex_unlock(&connector->repaintMutex);
 

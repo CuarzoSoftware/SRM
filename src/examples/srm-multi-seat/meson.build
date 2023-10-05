@@ -1,8 +1,6 @@
-sources = run_command('find', '.', '-type', 'f', '-name', '*[.c,.h]').stdout().strip().split('\n')
-
 executable(
     'srm-multi-seat',
-    sources : sources,
+    sources : ['main.c'],
     dependencies : [
         srm_dep,
         glesv2_dep,

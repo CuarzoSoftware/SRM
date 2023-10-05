@@ -340,7 +340,7 @@ static void handleInputEvents()
                     libinput_event_destroy(ev);
                     libinput_dispatch(input);
                     libseat_switch_session(seat, keyCode - 58);
-                    while (libseat_dispatch(seat, 2000) > 0) {}
+                    libseat_dispatch(seat, 100);
                     return;
                 }
             }
@@ -458,13 +458,15 @@ int main(void)
     {
         poll(fds, 3, -1);
 
+       /* In certain older libseat versions, a POLLIN event may not be generated
+        * during session switching. To ensure stability, we always dispatch
+        * events; otherwise, the app might crash when a user is in a different
+        * session and a new DRM connector is plugged in. */
+        libseat_dispatch(seat, 0);
+
         // SRM
         if (fds[0].revents & POLLIN)
             srmCoreProcessMonitor(core, 0);
-
-        // SEAT
-        if (fds[1].revents & POLLIN)
-            libseat_dispatch(seat, 0);
 
         // INPUT
         if (fds[2].revents & POLLIN)

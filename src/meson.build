@@ -1,7 +1,7 @@
 project(
     'SRM',
     'c',
-    version : run_command('cat', '../VERSION').stdout(),
+    version : run_command('cat', '../VERSION', check : true).stdout(),
     meson_version: '>= 0.59.0',
     default_options: [
         'warning_level=2',
@@ -33,7 +33,7 @@ examples_install_dir = '/usr/bin'
 api_headers = ['/', '/private', '/private/modes']
 
 foreach subdir : api_headers
-    install_headers(run_command('find', './lib' + subdir, '-type', 'f', '-name', '*.h', '-maxdepth', '1').stdout().strip().split('\n'),
+    install_headers(run_command('find', './lib' + subdir, '-type', 'f', '-name', '*.h', '-maxdepth', '1', check : true).stdout().strip().split('\n'),
         install_dir : headers_install_dir + subdir)
 endforeach
 
@@ -49,7 +49,7 @@ include_paths_str = [
 ]
 
 foreach p : include_paths_str
-    if run_command('[', '-d', p, ']').returncode() == 0
+    if run_command('[', '-d', p, ']', check : true).returncode() == 0
       include_paths += [include_directories(p)]
     endif
 endforeach
@@ -66,8 +66,8 @@ display_info_dep = c.find_library('display-info')
 
 # ------------ SOURCE CODE FILES ------------
 
-headers = run_command('find', './lib', '-type', 'f', '-name', '*.h').stdout().strip().split('\n')
-sources = run_command('find', './lib', '-type', 'f', '-name', '*.c').stdout().strip().split('\n')
+headers = run_command('find', './lib', '-type', 'f', '-name', '*.h', check : true).stdout().strip().split('\n')
+sources = run_command('find', './lib', '-type', 'f', '-name', '*.c', check : true).stdout().strip().split('\n')
 
 SRM = library(
     'SRM',

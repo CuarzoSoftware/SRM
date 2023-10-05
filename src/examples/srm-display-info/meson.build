@@ -1,8 +1,6 @@
-sources = run_command('find', '.', '-type', 'f', '-name', '*[.c,.h]').stdout().strip().split('\n')
-
 executable(
     'srm-display-info',
-    sources : sources,
+    sources : ['main.c'],
     dependencies : [
         srm_dep
     ],

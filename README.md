@@ -15,6 +15,10 @@ With SRM, you can focus on the OpenGL ES 2.0 logic of your application. For each
 
 SRM allows you to use multiple GPUs simultaneously and automatically finds the most efficient configuration. It also offers functions for creating OpenGL textures, which are automatically shared among GPUs.
 
+![](https://lh3.googleusercontent.com/pw/ADCreHe3at3xi48laVeFOaXZCie-leP1JI6UOMtvbKQ_TypnTGjns7FIQR9o0VAwQlSGQ3UDh7KC56popZr4xLlxsIx174csz7T7o2y2mNAbIbD26MTK_o4=w2400)
+
+SRM serves as the primary graphic backend for the [Louvre C++ Wayland Library](https://github.com/CuarzoSoftware/Louvre).
+
 ### Links
 
 * [📖 C API Documentation](https://cuarzosoftware.github.io/SRM/modules.html)

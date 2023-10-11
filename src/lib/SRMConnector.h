@@ -398,7 +398,7 @@ SRMPlane *srmConnectorGetCurrentCursorPlane(SRMConnector *connector);
 /**
  * @brief Get the preferred connector mode.
  *
- * This function returns the preferred @ref SRMConnectorMode for the given @ref SRMConnector.\n
+ * This function returns the preferred @ref SRMConnectorMode for the given @ref SRMConnector .\n
  * This mode typically has the higher resolution and refresh rate.
  *
  * @param connector Pointer to the @ref SRMConnector for which to retrieve the preferred mode.

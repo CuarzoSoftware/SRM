@@ -259,7 +259,7 @@ const SRMEGLDeviceExtensions *srmDeviceGetEGLExtensions(SRMDevice *device);
 /**
  * @brief Returns a structure with pointers to many available EGL functions.
  *
- * @param core A pointer to the @ref SRMDevice instance.
+ * @param device A pointer to the @ref SRMDevice instance.
  *
  * @return A pointer to the @ref SRMEGLDeviceFunctions structure containing pointers to avaliable EGL functions.
  */

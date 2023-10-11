@@ -25,11 +25,27 @@ c = meson.get_compiler('c')
 glesv2_dep = c.find_library('GLESv2')
 srm_dep = c.find_library('SRM')
 
+include_paths = []
+
+include_paths_str = [
+    '/usr/include',
+    '/usr/local/include',
+    '/usr/include/drm',
+    '/usr/include/libdrm'
+]
+
+foreach p : include_paths_str
+    if run_command('[', '-d', p, ']', check : false).returncode() == 0
+      include_paths += [include_directories(p)]
+    endif
+endforeach
+
 sources = ['main.c']
 
 executable(
     'srm-example',
     sources,
+    include_directories : include_paths,
     dependencies: [glesv2_dep, srm_dep])
 ```
 

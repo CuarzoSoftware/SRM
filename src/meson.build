@@ -1,7 +1,7 @@
 project(
     'SRM',
     'c',
-    version : run_command('cat', '../VERSION', check : true).stdout(),
+    version : run_command('cat', '../VERSION', check : false).stdout(),
     meson_version: '>= 0.59.0',
     default_options: [
         'warning_level=2',
@@ -12,14 +12,6 @@ project(
 if get_option('buildtype') == 'custom'
     add_project_arguments('-Ofast', '-g3', '-s', language : 'c')
 endif
-
-little_endian = target_machine.endian() == 'little'
-big_endian = target_machine.endian() == 'big'
-
-add_project_arguments([
-        '-DSRM_LITTLE_ENDIAN=@0@'.format(little_endian.to_int()),
-        '-DSRM_BIG_ENDIAN=@0@'.format(big_endian.to_int()),
-], language: 'c')
 
 c = meson.get_compiler('c')
 
@@ -33,7 +25,7 @@ examples_install_dir = '/usr/bin'
 api_headers = ['/', '/private', '/private/modes']
 
 foreach subdir : api_headers
-    install_headers(run_command('find', './lib' + subdir, '-type', 'f', '-name', '*.h', '-maxdepth', '1', check : true).stdout().strip().split('\n'),
+    install_headers(run_command('find', './lib' + subdir, '-type', 'f', '-name', '*.h', '-maxdepth', '1', check : false).stdout().strip().split('\n'),
         install_dir : headers_install_dir + subdir)
 endforeach
 
@@ -43,13 +35,14 @@ include_paths = []
 
 include_paths_str = [
     './lib',
+    '/usr/include',
     '/usr/local/include',
     '/usr/include/drm',
     '/usr/include/libdrm'
 ]
 
 foreach p : include_paths_str
-    if run_command('[', '-d', p, ']', check : true).returncode() == 0
+    if run_command('[', '-d', p, ']', check : false).returncode() == 0
       include_paths += [include_directories(p)]
     endif
 endforeach
@@ -66,8 +59,8 @@ display_info_dep = c.find_library('display-info')
 
 # ------------ SOURCE CODE FILES ------------
 
-headers = run_command('find', './lib', '-type', 'f', '-name', '*.h', check : true).stdout().strip().split('\n')
-sources = run_command('find', './lib', '-type', 'f', '-name', '*.c', check : true).stdout().strip().split('\n')
+headers = run_command('find', './lib', '-type', 'f', '-name', '*.h', check : false).stdout().strip().split('\n')
+sources = run_command('find', './lib', '-type', 'f', '-name', '*.c', check : false).stdout().strip().split('\n')
 
 SRM = library(
     'SRM',
@@ -83,6 +76,8 @@ SRM = library(
         gbm_dep
     ],
     install : true)
+
+meson.add_install_script('../scripts/ld.sh', get_option('prefix') + '/' + get_option('libdir'))
 
 if get_option('build_examples') or get_option('build_tests')
     srm_dep = declare_dependency(

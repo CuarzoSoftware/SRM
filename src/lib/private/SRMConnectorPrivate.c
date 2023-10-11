@@ -158,11 +158,8 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
 
     // Set name
     char name[64];
-    memset(name, 0, sizeof(name));
-    sprintf(name, "%s-%d", srmGetConnectorTypeString(connector->type), connector->nameID);
-    Int32 nameLen = strlen(name) + 1;
-    connector->name = malloc(nameLen);
-    memcpy(connector->name, name, nameLen);
+    snprintf(name, sizeof(name) - 1, "%s-%d", srmGetConnectorTypeString(connector->type), connector->nameID);
+    connector->name = strdup(name);
 
     if (!connector->connected)
         return 0;
@@ -181,7 +178,10 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
     {
         drmModePropertyPtr prop = drmModeGetProperty(connector->device->fd, connectorRes->props[i]);
 
-        if (prop && (strcmp(prop->name, "EDID") == 0))
+        if (!prop)
+            continue;
+
+        if (strcmp(prop->name, "EDID") == 0)
         {
             blob = drmModeGetPropertyBlob(connector->device->fd, connectorRes->prop_values[i]);
             drmModeFreeProperty(prop);
@@ -208,35 +208,11 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
         return 0;
     }
 
-    char *make = di_info_get_make(info);
-    int len = strlen(make);
-
-    if (len > 0)
-    {
-        connector->manufacturer = malloc(len+1);
-        memcpy(connector->manufacturer, make, len+1);
-    }
-
-    char *model = di_info_get_model(info);
-    len = strlen(model);
-
-    if (len > 0)
-    {
-        connector->model = malloc(len+1);
-        memcpy(connector->model, model, len+1);
-    }
-
-    if (make)
-        free(make);
-
-    if (model)
-        free(model);
-
+    connector->manufacturer = di_info_get_make(info);
+    connector->model = di_info_get_model(info);
     di_info_destroy(info);
-
     drmModeFreePropertyBlob(blob);
     drmModeFreeConnector(connectorRes);
-
     return 1;
 }
 

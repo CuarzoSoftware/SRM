@@ -478,12 +478,8 @@ void srmBufferDestroy(SRMBuffer *buffer)
         srmListDestroy(buffer->textures);
     }
 
-    struct timespec delay;
-    delay.tv_sec = 0;
-    delay.tv_nsec = 32;
-
     while (!srmListIsEmpty(buffer->core->deallocatorMessages))
-        nanosleep(&delay, NULL);
+        usleep(100);
 
     for (UInt32 i = 0; i < buffer->planesCount; i++)
     {

@@ -39,6 +39,20 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
         goto fail;
     }
 
+    drmVersion *version = drmGetVersion(device->fd);
+
+    if (version)
+    {
+        if (strcmp(version->name, "i915") == 0)
+            device->driver = SRM_DEVICE_DRIVER_i915;
+        else if (strcmp(version->name, "nouveau") == 0)
+            device->driver = SRM_DEVICE_DRIVER_nouveau;
+        else if (strcmp(version->name, "lima") == 0)
+            device->driver = SRM_DEVICE_DRIVER_lima;
+
+        drmFreeVersion(version);
+    }
+
     // REF 3
     if (pthread_mutex_init(&device->pageFlipMutex, NULL))
     {

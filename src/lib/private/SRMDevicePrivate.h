@@ -11,10 +11,19 @@
 extern "C" {
 #endif
 
+enum SRM_DEVICE_DRIVER
+{
+    SRM_DEVICE_DRIVER_unknown = 0,
+    SRM_DEVICE_DRIVER_i915 = 1,
+    SRM_DEVICE_DRIVER_nouveau = 2,
+    SRM_DEVICE_DRIVER_lima = 3
+};
 
 struct SRMDeviceStruct
 {
     SRMCore *core;
+
+    enum SRM_DEVICE_DRIVER driver;
 
     // All GPUs are enabled by default
     UInt8 enabled;

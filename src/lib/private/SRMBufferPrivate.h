@@ -67,6 +67,7 @@ struct SRMBufferStruct
     struct dma_buf_sync sync;
 
     // Gles
+    GLenum target; // GL_TEXTURE_2D is mutable and GL_TEXTURE_EXTERNAL_OES immutable
     GLint glInternalFormat;
     GLint glFormat;
     GLint glType;

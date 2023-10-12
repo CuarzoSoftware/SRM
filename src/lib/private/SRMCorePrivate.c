@@ -396,7 +396,7 @@ void srmCoreUpdateSharedDMATextureFormats(SRMCore *core)
             UInt8 isSupported = 0;
 
             /* Check if if the device support it as well */
-            SRMListForeach(devFmtIt, dev->dmaRenderFormats)
+            SRMListForeach(devFmtIt, dev->dmaTextureFormats)
             {
                 SRMFormat *devFmt = srmListItemGetData(devFmtIt);
 

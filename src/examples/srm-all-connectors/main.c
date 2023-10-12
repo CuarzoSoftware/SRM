@@ -197,9 +197,7 @@ static void paintGL(SRMConnector *connector, void *userData)
     {
         /* Calling srmBufferGetTextureID() returns a GL texture ID for a specific device (GPU).
          * In this case, we want one for the device that do the rendering for this connector
-         * (connector->device->rendererDevice).
-         * The texture is only created the first time this method is called.
-         * Calling srmBufferGetTextureID() again returns the same texture ID.*/
+         * (connector->device->rendererDevice).*/
         GLuint textureId = srmBufferGetTextureID(srmConnectorGetRendererDevice(connector), buffer);
 
         if (!textureId)
@@ -208,11 +206,12 @@ static void paintGL(SRMConnector *connector, void *userData)
             exit(1);
         }
 
-        glBindTexture(GL_TEXTURE_2D, textureId);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        GLenum textureTarget = srmBufferGetTextureTarget(buffer);
+        glBindTexture(textureTarget, textureId);
+        glTexParameteri(textureTarget, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(textureTarget, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(textureTarget, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(textureTarget, GL_TEXTURE_WRAP_T, GL_REPEAT);
     }
 
     float cosine = cosf(data->phase);

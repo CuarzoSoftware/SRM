@@ -514,6 +514,9 @@ GLuint textureId = srmBufferGetTextureID(
 if (textureId == 0)
     SRMError("Failed to get the GL texture ID from SRMBuffer.");
 
+GLenum textureTarget = srmBufferGetTextureTarget(buffer);
+glBindTexture(textureTarget, textureId);
+
 // ...
 ```
 

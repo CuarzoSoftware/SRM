@@ -61,6 +61,16 @@ const SRMGLFormat *srmFormatDRMToGL(SRM_BUFFER_FORMAT format);
 SRMListItem *srmFormatsListAddFormat(SRMList *formatsList, UInt32 format, UInt64 modifier);
 
 /**
+ * @brief Check if a format/modifier pair is in the list.
+ *
+ * @param format The buffer format code.
+ * @param modifier The modifier associated with the format.
+ *
+ * @return 1 if in the list, 0 otherwise.
+ */
+UInt8 srmFormatIsInList(SRMList *formatsList, UInt32 format, UInt64 modifier);
+
+/**
  * @brief Find the first format matching the specified format code in a list of formats.
  *
  * @param formatsList A list of formats to search in.

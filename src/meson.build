@@ -5,13 +5,21 @@ project(
     meson_version: '>= 0.59.0',
     default_options: [
         'warning_level=2',
-        'buildtype=debug'
+        'buildtype=custom'
     ]
 )
 
 if get_option('buildtype') == 'custom'
     add_project_arguments('-Ofast', '-g3', '-s', language : 'c')
 endif
+
+little_endian = target_machine.endian() == 'little'
+big_endian = target_machine.endian() == 'big'
+
+add_project_arguments([
+        '-DSRM_LITTLE_ENDIAN=@0@'.format(little_endian.to_int()),
+        '-DSRM_BIG_ENDIAN=@0@'.format(big_endian.to_int()),
+], language: 'c')
 
 c = meson.get_compiler('c')
 

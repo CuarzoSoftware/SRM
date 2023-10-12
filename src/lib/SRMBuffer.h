@@ -222,6 +222,16 @@ void srmBufferDestroy(SRMBuffer *buffer);
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
 
 /**
+ * @brief Get the OpenGL texture target associated with an @ref SRMBuffer.
+ *
+ * This function retrieves the OpenGL texture target associated with the provided @ref SRMBuffer.
+ *
+ * @param buffer Pointer to the @ref SRMBuffer for which the texture target is needed.
+ * @return The associated OpenGL texture target, which can be either GL_TEXTURE_2D or GL_TEXTURE_EXTERNAL_OES.
+ */
+GLenum srmBufferGetTextureTarget(SRMBuffer *buffer);
+
+/**
  * @brief Writes pixel data to an @ref SRMBuffer.
  *
  * This function writes pixel data to the specified region of an @ref SRMBuffer.

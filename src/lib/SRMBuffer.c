@@ -54,6 +54,9 @@ SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMDevice *allocator, SRMBuffer
         buffer->modifiers[i] = dmaData->modifiers[i];
     }
 
+    buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
+                                       buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
+
     return buffer;
 }
 
@@ -73,6 +76,8 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     buffer->width = width;
     buffer->height = height;
     buffer->format = format;
+    buffer->target = GL_TEXTURE_2D;
+
     const SRMGLFormat *glFmt;
 
     UInt8 supportLinear = 0;
@@ -326,9 +331,13 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
 
     for (UInt32 i = 0; i < buffer->planesCount; i++)
     {
+        buffer->modifiers[i] = gbm_bo_get_modifier(buffer->bo);
         buffer->strides[i] = gbm_bo_get_stride_for_plane(buffer->bo, i);
         buffer->offsets[i] = gbm_bo_get_offset(buffer->bo, i);
     }
+
+    buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
+                                       buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
 
     pthread_mutex_unlock(&buffer->mutex);
     return buffer;
@@ -443,13 +452,13 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     }
 
     glGenTextures(1, &texture->texture);
-    glBindTexture(GL_TEXTURE_2D, texture->texture);
-    device->eglFunctions.glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, texture->image);
+    glBindTexture(buffer->target, texture->texture);
+    device->eglFunctions.glEGLImageTargetTexture2DOES(buffer->target, texture->image);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(buffer->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(buffer->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(buffer->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(buffer->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     srmListAppendData(buffer->textures, texture);
     pthread_mutex_unlock(&buffer->mutex);
@@ -514,6 +523,12 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
 
     if (!(buffer->caps & SRM_BUFFER_CAP_WRITE))
         goto fail;
+
+    if (buffer->target == GL_TEXTURE_EXTERNAL_OES)
+    {
+        SRMError("[%s] srmBufferWrite() failed. Buffers with the GL_TEXTURE_EXTERNAL_OES target are immutable.", buffer->allocator->name);
+        return 0;
+    }
 
     if (buffer->map)
     {
@@ -632,6 +647,9 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo)
         buffer->offsets[i] = gbm_bo_get_offset(bo, i);
     }
 
+    buffer->target = srmFormatIsInList(allocDev->dmaRenderFormats,
+                                       buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
+
     buffer->bpp = gbm_bo_get_bpp(buffer->bo);
     buffer->pixelSize = buffer->bpp/8;
 
@@ -705,4 +723,9 @@ UInt8 srmBufferRead(SRMBuffer *buffer, Int32 srcX, Int32 srcY, Int32 srcW, Int32
     }
 
     return 0;
+}
+
+GLenum srmBufferGetTextureTarget(SRMBuffer *buffer)
+{
+    return buffer->target;
 }

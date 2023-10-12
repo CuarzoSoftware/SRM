@@ -131,6 +131,20 @@ SRMListItem *srmFormatsListAddFormat(SRMList *formatsList, UInt32 format, UInt64
     return srmListAppendData(formatsList, fmt);
 }
 
+UInt8 srmFormatIsInList(SRMList *formatsList, UInt32 format, UInt64 modifier)
+{
+    SRMFormat *fmt;
+    SRMListForeach(fmtIt, formatsList)
+    {
+        fmt = srmListItemGetData(fmtIt);
+
+        if (fmt->format == format && fmt->modifier == modifier)
+            return 1;
+    }
+
+    return 0;
+}
+
 void srmFormatsListDestroy(SRMList **formatsList)
 {
     if (*formatsList)
@@ -166,7 +180,6 @@ const SRMGLFormat *srmFormatDRMToGL(SRM_BUFFER_FORMAT format)
 
     return NULL;
 }
-
 
 SRMFormat *srmFormatListFirstMatchFormat(SRMList *formatsList, UInt32 format)
 {

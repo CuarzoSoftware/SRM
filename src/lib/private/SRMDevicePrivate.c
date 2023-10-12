@@ -535,8 +535,12 @@ UInt8 srmDeviceUpdateCaps(SRMDevice *device)
     device->capDumbBuffer = value == 1;
 
     drmGetCap(device->fd, DRM_CAP_PRIME, &value);
-    device->capPrimeImport = value & DRM_PRIME_CAP_IMPORT;
-    device->capPrimeExport = value & DRM_PRIME_CAP_EXPORT;
+
+    if (device->driver != SRM_DEVICE_DRIVER_nouveau)
+    {
+        device->capPrimeImport = value & DRM_PRIME_CAP_IMPORT;
+        device->capPrimeExport = value & DRM_PRIME_CAP_EXPORT;
+    }
 
     // Validate EXPORT cap
     if (device->capPrimeExport)

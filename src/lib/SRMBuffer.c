@@ -402,6 +402,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
             goto skipDMA;
     }
 
+    /* 
     if (!buffer->allocator->capPrimeExport)
     {
         SRMError("srmBufferGetTextureID failed. Allocator device (%s) has not the PRIME export cap.", buffer->allocator->name);
@@ -412,7 +413,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     {
         SRMError("srmBufferGetTextureID failed. Target device (%s) has not the PRIME import cap.", device->name);
         goto skipDMA;
-    }
+    }*/
 
     if (buffer->fds[0] == -1 && buffer->bo)
     {

@@ -229,7 +229,7 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
 
     char *env = getenv("SRM_RENDER_MODE_DUMB_FB_COUNT");
 
-    UInt32 fbCount = 1;
+    UInt32 fbCount = 2;
 
     if (env)
     {

@@ -216,6 +216,12 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
         if (!srmDeviceIsEnabled(allocDev))
             continue;
 
+        if (allocDev->driver == SRM_DEVICE_DRIVER_nouveau && srmListGetLength(core->devices) > 1)
+        {
+            allocDev->capPrimeExport = 0;
+            allocDev->capPrimeImport = 0;
+        }
+
         int currentScore = srmDeviceGetCapPrimeExport(allocDev) ? 100 : 10;
 
         SRMListForeach(item2, core->devices)

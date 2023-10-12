@@ -31,7 +31,7 @@ Please note that v-sync is always disabled for the "CPU" mode, and this setting 
 By default, the framebuffer count for each render mode is as follows:
 
 * **ITSELF**: 2
-* **DUMB**: 1
+* **DUMB**: 2
 * **CPU**: 1
 
 Remember to adjust the values accordingly based on your specific requirements and hardware capabilities.

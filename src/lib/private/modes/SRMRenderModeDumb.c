@@ -728,6 +728,10 @@ static void pauseRendering(SRMConnector *connector)
 static void resumeRendering(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
+
+    for (UInt32 i = 0; i < data->buffersCount; i++)
+        gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[i]);
+
     srmRenderModeCommonResumeRendering(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
 }
 

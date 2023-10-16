@@ -1182,8 +1182,9 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     if (ret)
         connector->pendingPageFlip = 0;
 
-    if (buffersCount == 2)
+    if (buffersCount == 2 || connector->firstPageFlip)
     {
+        connector->firstPageFlip = 0;
         struct pollfd fds;
         fds.fd = connector->device->fd;
         fds.events = POLLIN;

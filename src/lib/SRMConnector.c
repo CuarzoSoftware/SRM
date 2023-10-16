@@ -310,6 +310,7 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
     connector->interface = interface;
 
     connector->renderInitResult = 0;
+    connector->firstPageFlip = 1;
 
     if (pthread_create(&connector->renderThread, NULL, srmConnectorRenderThread, connector))
     {

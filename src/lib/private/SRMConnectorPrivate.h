@@ -80,6 +80,7 @@ struct SRMConnectorStruct
     UInt32 lastFb;
     drmEventContext drmEventCtx;
     UInt8 pendingPageFlip;
+    UInt8 firstPageFlip;
     pthread_cond_t repaintCond;
     pthread_mutex_t repaintMutex;
     volatile UInt8 repaintRequested;

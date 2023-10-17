@@ -335,6 +335,7 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
     srmDeviceDestroyDMAFormats(device);
 
     device->dmaRenderFormats = srmListCreate();
+    device->dmaExternalFormats = srmListCreate();
     device->dmaTextureFormats = srmListCreate();
 
     if (!device->eglExtensions.EXT_image_dma_buf_import)
@@ -432,7 +433,9 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
         {
             srmFormatsListAddFormat(device->dmaTextureFormats, formats[i], modifiers[j]);
 
-            if (!externalOnly[j])
+            if (externalOnly[j])
+                srmFormatsListAddFormat(device->dmaExternalFormats, formats[i], modifiers[j]);
+            else
             {
                 srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], modifiers[j]);
                 allExternalOnly = 0;
@@ -443,6 +446,7 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
         // assume the implicit modifier supports rendering too.
 
         srmFormatsListAddFormat(device->dmaTextureFormats, formats[i], DRM_FORMAT_MOD_INVALID);
+        srmFormatsListAddFormat(device->dmaExternalFormats, formats[i], DRM_FORMAT_MOD_INVALID);
         if (modifiersCount == 0 || !allExternalOnly)
             srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], DRM_FORMAT_MOD_INVALID);
 
@@ -461,6 +465,7 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
 void srmDeviceDestroyDMAFormats(SRMDevice *device)
 {
     srmFormatsListDestroy(&device->dmaRenderFormats);
+    srmFormatsListDestroy(&device->dmaExternalFormats);
     srmFormatsListDestroy(&device->dmaTextureFormats);
 }
 

@@ -143,6 +143,11 @@ SRMList *srmDeviceGetDMARenderFormats(SRMDevice *device)
     return device->dmaRenderFormats;
 }
 
+SRMList *srmDeviceGetDMAExternalFormats(SRMDevice *device)
+{
+    return device->dmaExternalFormats;
+}
+
 EGLDisplay *srmDeviceGetEGLDisplay(SRMDevice *device)
 {
     return device->eglDisplay;

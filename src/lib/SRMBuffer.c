@@ -54,8 +54,8 @@ SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMDevice *allocator, SRMBuffer
         buffer->modifiers[i] = dmaData->modifiers[i];
     }
 
-    buffer->target = (srmFormatIsInList(buffer->allocator->dmaRenderFormats,
-                                        buffer->format, buffer->modifiers[0])) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
+    buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
+                                        buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
 
     return buffer;
 }
@@ -137,8 +137,8 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     buffer->strides[0] = gbm_bo_get_stride(buffer->bo);
     buffer->pixelSize = buffer->bpp/8;
 
-    buffer->target = (srmFormatIsInList(buffer->allocator->dmaRenderFormats,
-                                        buffer->format, buffer->modifiers[0])) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
+    buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
+                                        buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
 
     buffer->fds[0] = srmBufferGetDMAFDFromBO(buffer->allocator, buffer->bo);
 
@@ -339,8 +339,8 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
         buffer->offsets[i] = gbm_bo_get_offset(buffer->bo, i);
     }
 
-    buffer->target = (srmFormatIsInList(buffer->allocator->dmaRenderFormats,
-                                        buffer->format, buffer->modifiers[0])) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
+    buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
+                                        buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
 
     pthread_mutex_unlock(&buffer->mutex);
     return buffer;
@@ -652,8 +652,8 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo)
         buffer->offsets[i] = gbm_bo_get_offset(bo, i);
     }
 
-    buffer->target = (srmFormatIsInList(buffer->allocator->dmaRenderFormats,
-                                        buffer->format, buffer->modifiers[0])) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
+    buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
+                                        buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
 
     buffer->bpp = gbm_bo_get_bpp(buffer->bo);
     buffer->pixelSize = buffer->bpp/8;

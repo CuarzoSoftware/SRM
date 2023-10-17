@@ -53,7 +53,7 @@ struct SRMDeviceStruct
     EGLint eglSharedContextAttribs[7];
     SRMEGLDeviceExtensions eglExtensions;
     SRMEGLDeviceFunctions eglFunctions;
-    SRMList *dmaRenderFormats, *dmaTextureFormats;
+    SRMList *dmaRenderFormats, *dmaExternalFormats, *dmaTextureFormats;
 
     UInt8 clientCapStereo3D;
     UInt8 clientCapUniversalPlanes;

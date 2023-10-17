@@ -212,8 +212,10 @@ SRMList *srmDeviceGetPlanes(SRMDevice *device);
 SRMList *srmDeviceGetConnectors(SRMDevice *device);
 
 /**
- * @brief Get a list of DMA (Direct Memory Access) texture formats supported by the device.
+ * @brief Get a list of all DMA (Direct Memory Access) texture formats supported by the device.
  *
+ * @note This list includes both render and external formats.
+ * 
  * @param device A pointer to the @ref SRMDevice instance.
  *
  * @return A list of DMA texture formats supported by the device.
@@ -223,11 +225,24 @@ SRMList *srmDeviceGetDMATextureFormats(SRMDevice *device);
 /**
  * @brief Get a list of DMA (Direct Memory Access) render formats supported by the device.
  *
+ * @note Render formats have the `GL_TEXTURE_2D` target.
+ * 
  * @param device A pointer to the @ref SRMDevice instance.
  *
  * @return A list of DMA render formats supported by the device.
  */
 SRMList *srmDeviceGetDMARenderFormats(SRMDevice *device);
+
+/**
+ * @brief Get a list of DMA (Direct Memory Access) external formats supported by the device.
+ *
+ * @note External formats have the `GL_TEXTURE_EXTERNAL_OES` target.
+ * 
+ * @param device A pointer to the @ref SRMDevice instance.
+ *
+ * @return A list of DMA external formats supported by the device.
+ */
+SRMList *srmDeviceGetDMAExternalFormats(SRMDevice *device);
 
 /**
  * @brief Get the `EGLDisplay` associated with the device.

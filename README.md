@@ -5,7 +5,7 @@
     <img src="https://img.shields.io/badge/license-GPL_v3.0-blue.svg" alt="SRM is released under the GPL v3.0 license." />
   </a>
   <a href="https://github.com/CuarzoSoftware/SRM">
-    <img src="https://img.shields.io/badge/version-0.2.0-brightgreen" alt="Current SRM version." />
+    <img src="https://img.shields.io/badge/version-0.3.0-brightgreen" alt="Current SRM version." />
   </a>
 </p>
 

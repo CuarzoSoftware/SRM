@@ -225,9 +225,25 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
  * @brief Get the OpenGL texture target associated with an @ref SRMBuffer.
  *
  * This function retrieves the OpenGL texture target associated with the provided @ref SRMBuffer.
+ * 
+ * For textures using the `GL_TEXTURE_EXTERNAL_OES` target, rendering requires the utilization of a 
+ * custom shader, as demonstrated in the following example:
+ * 
+ * ### Fragment shader example
+ * 
+ * @code
+ * #extension GL_OES_EGL_image_external : require
+ * uniform samplerExternalOES texture;
+ * varying vec2 v_texcoord;
+ *
+ * void main()
+ * {
+ *    gl_FragColor = texture2D(texture, v_texcoord);
+ * }
+ * @endcode
  *
  * @param buffer Pointer to the @ref SRMBuffer for which the texture target is needed.
- * @return The associated OpenGL texture target, which can be either GL_TEXTURE_2D or GL_TEXTURE_EXTERNAL_OES.
+ * @return The associated OpenGL texture target, which can be either `GL_TEXTURE_2D` or `GL_TEXTURE_EXTERNAL_OES`.
  */
 GLenum srmBufferGetTextureTarget(SRMBuffer *buffer);
 

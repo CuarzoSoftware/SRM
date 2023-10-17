@@ -1,3 +1,18 @@
+SRM (0.3.0-1)
+
+  # Additions
+
+  * SRMBuffer now supports external OpenGL ES 2.0 textures.
+  * Introduce srmBufferGetTextureTarget() for retrieving the OpenGL texture target of an SRMBuffer.
+
+  # Bug Fixes
+
+  * Disabled ITSELF rendering mode on Nouveau in multi-GPU setups to prevent crashes in drivers that do not support multitreading.
+  * Fixed tearing of the first rendered frame when triple buffering is enabled.
+  
+-- Eduardo Hopperdietzel ehopperdietzel@gmail.com Tue, 17 Oct 2023 14:57:31 -0300
+
+
 SRM (0.2.0-1)
 
   # Additions

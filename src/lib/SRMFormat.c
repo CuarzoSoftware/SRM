@@ -139,7 +139,16 @@ UInt8 srmFormatIsInList(SRMList *formatsList, UInt32 format, UInt64 modifier)
         fmt = srmListItemGetData(fmtIt);
 
         if (fmt->format == format && fmt->modifier == modifier)
+        {
+            // Cache the format
+            if (fmtIt != srmListGetFront(formatsList))
+            {
+                srmListRemoveItem(formatsList, fmtIt);
+                srmListPrependData(formatsList, fmt);
+            }
+
             return 1;
+        }
     }
 
     return 0;

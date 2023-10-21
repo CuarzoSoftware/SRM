@@ -87,7 +87,17 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
         SRMFormat *fmt = srmListItemGetData(fmtIt);
 
         if (fmt->format == format && fmt->modifier == DRM_FORMAT_MOD_LINEAR)
+        {
+            // Cache format
+            if (fmtIt != srmListGetFront(buffer->allocator->dmaTextureFormats))
+            {
+                srmListRemoveItem(buffer->allocator->dmaTextureFormats, fmtIt);
+                srmListPrependData(buffer->allocator->dmaTextureFormats, fmt);
+            }
+
             supportLinear = 1;
+            break;
+        }
     }
 
     pthread_mutex_lock(&buffer->mutex);
@@ -105,7 +115,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     if (!buffer->bo)
     {
-        SRMWarning("gbm_bo_create_with_modifiers failed.");
+        SRMWarning("[SRMBuffer] gbm_bo_create_with_modifiers failed.");
 
         // Try to use linear so that can be mapped
         buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_SCANOUT;
@@ -114,7 +124,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     if (!buffer->bo)
     {
-        SRMWarning("GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_SCANOUT failed.");
+        SRMWarning("[SRMBuffer] GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_SCANOUT failed.");
         buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR;
         buffer->bo = gbm_bo_create(buffer->allocator->gbm, width, height, format, buffer->flags);
     }
@@ -183,7 +193,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
         goto gbmWrite;
     }
 
-    SRMDebug("[%s] Buffer mapped with gbm_bo_map().", buffer->allocator->name);
+    /* SRMDebug("[%s] Buffer mapped with gbm_bo_map().", buffer->allocator->name); */
 
     mapWrite:
 
@@ -195,7 +205,8 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     srmBufferWrite(buffer, stride, 0, 0, width, height, pixels);
     pthread_mutex_lock(&buffer->mutex);
 
-    SRMDebug("[%s] CPU buffer created using mapping.", buffer->allocator->name);
+    /* SRMDebug("[%s] CPU buffer created using mapping.", buffer->allocator->name); */
+
     pthread_mutex_unlock(&buffer->mutex);
 
     return buffer;
@@ -399,7 +410,10 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 
     if (device == buffer->allocator && buffer->bo)
     {
-        texture->image = eglCreateImage(device->eglDisplay, device->eglSharedContext, EGL_NATIVE_PIXMAP_KHR, buffer->bo, NULL);
+        imageAttribs[0] = EGL_IMAGE_PRESERVED_KHR;
+        imageAttribs[1] = EGL_TRUE;
+        imageAttribs[2] = EGL_NONE;
+        texture->image = eglCreateImage(device->eglDisplay, device->eglSharedContext, EGL_NATIVE_PIXMAP_KHR, buffer->bo, imageAttribs);
 
         if (texture->image != EGL_NO_IMAGE)
             goto skipDMA;

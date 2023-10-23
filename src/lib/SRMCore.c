@@ -243,7 +243,26 @@ Int32 srmCoreGetMonitorFD(SRMCore *core)
 
 Int32 srmCoreProcessMonitor(SRMCore *core, Int32 msTimeout)
 {
-    int ret = poll(&core->monitorFd, 1, msTimeout);
+    int ret;
+
+    if (core->isSuspended)
+        goto checkPoll;
+
+    SRMListForeach(deviceIt, core->devices)
+    {
+        SRMDevice *dev = srmListItemGetData(deviceIt);
+
+        if (dev->pendingUdevEvents)
+        {
+            // If not master
+            if (!srmDeviceHandleHotpluggingEvent(dev))
+                msTimeout = 500;
+        }
+    }
+
+    checkPoll:
+
+    ret = poll(&core->monitorFd, 1, msTimeout);
 
     if (!core->isSuspended && ret > 0 && core->monitorFd.revents & POLLIN)
     {
@@ -279,77 +298,7 @@ Int32 srmCoreProcessMonitor(SRMCore *core, Int32 msTimeout)
                 // Possible connector hotplug event
                 if (strcmp(action, "change") == 0)
                 {
-                    // Check connector states
-                    SRMListForeach(connectorIt, device->connectors)
-                    {
-                        SRMConnector *connector = srmListItemGetData(connectorIt);
-                        drmModeConnector *connectorRes = drmModeGetConnector(device->fd, connector->id);
-
-                        if (!connectorRes)
-                        {
-                            SRMError("Failed to get device %s connector %d resources in hotplug event.", connector->device->name, connector->id);
-                            continue;
-                        }
-
-                        UInt8 connected = connectorRes->connection == DRM_MODE_CONNECTED;
-
-                        // Connector changed state
-                        if (connector->connected != connected)
-                        {
-                            // Plugged event
-                            if (connected)
-                            {
-                                srmConnectorUpdateProperties(connector);
-                                srmConnectorUpdateNames(connector);
-                                srmConnectorUpdateEncoders(connector);
-                                srmConnectorUpdateModes(connector);
-
-                                SRMDebug("[%s] Connector (%d) %s, %s, %s plugged.",
-                                         connector->device->name,
-                                         connector->id,
-                                         connector->name,
-                                         connector->model,
-                                         connector->manufacturer);
-
-                                // Notify listeners
-                                SRMListForeach(listenerIt, core->connectorPluggedListeners)
-                                {
-                                    SRMListener *listener = srmListItemGetData(listenerIt);
-                                    void (*callback)(SRMListener *, SRMConnector *) = (void(*)(SRMListener *, SRMConnector *))listener->callback;
-                                    callback(listener, connector);
-                                }
-                            }
-
-                            // Unplugged event
-                            else
-                            {
-                                SRMDebug("[%s] Connector (%d) %s, %s, %s unplugged.",
-                                         connector->device->name,
-                                         connector->id,
-                                         connector->name,
-                                         connector->model,
-                                         connector->manufacturer);
-
-                                // Notify listeners
-                                SRMListForeach(listenerIt, core->connectorUnpluggedListeners)
-                                {
-                                    SRMListener *listener = srmListItemGetData(listenerIt);
-                                    void (*callback)(SRMListener *, SRMConnector *) = (void(*)(SRMListener *, SRMConnector *))listener->callback;
-                                    callback(listener, connector);
-                                }
-
-                                // Uninitialize after notify so users can for example backup some data
-                                srmConnectorUninitialize(connector);
-
-                                srmConnectorUpdateProperties(connector);
-                                srmConnectorUpdateNames(connector);
-                                srmConnectorUpdateEncoders(connector);
-                                srmConnectorUpdateModes(connector);
-                            }
-                        }
-
-                        drmModeFreeConnector(connectorRes);
-                    }
+                    srmDeviceHandleHotpluggingEvent(device);
                 }
 
                 // GPU added

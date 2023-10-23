@@ -1,3 +1,4 @@
+#include <private/SRMListenerPrivate.h>
 #include <private/SRMCorePrivate.h>
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMCrtcPrivate.h>
@@ -38,6 +39,8 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
         SRMError("[device] Failed to open DRM device %s.", device->name);
         goto fail;
     }
+
+    SRMDebug("[%s] Is master: %s.", device->name, drmIsMaster(device->fd) ?  "YES" : "NO");
 
     drmVersion *version = drmGetVersion(device->fd);
 
@@ -720,4 +723,90 @@ void srmDeviceUninitEGLDeallocatorContext(SRMDevice *device)
         while (device->core->deallocatorState == 0)
             usleep(10);
     }
+}
+
+UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
+{
+    if (drmIsMaster(device->fd) != 1)
+    {
+        device->pendingUdevEvents = 1;
+        SRMWarning("[core] Can't handle connector hotplugging event. Device %s is not master.", device->name);
+        return 0;
+    }
+
+    device->pendingUdevEvents = 0;
+
+    // Check connector states
+    SRMListForeach(connectorIt, device->connectors)
+    {
+        SRMConnector *connector = srmListItemGetData(connectorIt);
+        drmModeConnector *connectorRes = drmModeGetConnector(device->fd, connector->id);
+
+        if (!connectorRes)
+        {
+            SRMError("Failed to get device %s connector %d resources in hotplug event.", connector->device->name, connector->id);
+            continue;
+        }
+
+        UInt8 connected = connectorRes->connection == DRM_MODE_CONNECTED;
+
+        // Connector changed state
+        if (connector->connected != connected)
+        {
+            // Plugged event
+            if (connected)
+            {
+                srmConnectorUpdateProperties(connector);
+                srmConnectorUpdateNames(connector);
+                srmConnectorUpdateEncoders(connector);
+                srmConnectorUpdateModes(connector);
+
+                SRMDebug("[%s] Connector (%d) %s, %s, %s plugged.",
+                         connector->device->name,
+                         connector->id,
+                         connector->name,
+                         connector->model,
+                         connector->manufacturer);
+
+                // Notify listeners
+                SRMListForeach(listenerIt, device->core->connectorPluggedListeners)
+                {
+                    SRMListener *listener = srmListItemGetData(listenerIt);
+                    void (*callback)(SRMListener *, SRMConnector *) = (void(*)(SRMListener *, SRMConnector *))listener->callback;
+                    callback(listener, connector);
+                }
+            }
+
+            // Unplugged event
+            else
+            {
+                SRMDebug("[%s] Connector (%d) %s, %s, %s unplugged.",
+                         connector->device->name,
+                         connector->id,
+                         connector->name,
+                         connector->model,
+                         connector->manufacturer);
+
+                // Notify listeners
+                SRMListForeach(listenerIt, device->core->connectorUnpluggedListeners)
+                {
+                    SRMListener *listener = srmListItemGetData(listenerIt);
+                    void (*callback)(SRMListener *, SRMConnector *) = (void(*)(SRMListener *, SRMConnector *))listener->callback;
+                    callback(listener, connector);
+                }
+
+                // Uninitialize after notify so users can for example backup some data
+                srmConnectorUninitialize(connector);
+
+                srmConnectorUpdateProperties(connector);
+                srmConnectorUpdateNames(connector);
+                srmConnectorUpdateEncoders(connector);
+                srmConnectorUpdateModes(connector);
+            }
+        }
+
+        drmModeFreeConnector(connectorRes);
+    }
+
+    return 1;
 }

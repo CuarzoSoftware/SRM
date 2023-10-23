@@ -31,7 +31,6 @@ SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
     connector->device = device;
     connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
     pthread_mutex_init(&connector->stateMutex, NULL);
-
     srmConnectorUpdateProperties(connector);
 
     // srmConnectorUpdateNames(connector) is called after its device is added to the core devices list
@@ -150,7 +149,7 @@ UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
 }
 
 UInt8 srmConnectorUpdateNames(SRMConnector *connector)
-{  
+{
     srmConnectorDestroyNames(connector);
 
     // Search a free name ID for the connector type

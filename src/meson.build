@@ -5,13 +5,9 @@ project(
     meson_version: '>= 0.59.0',
     default_options: [
         'warning_level=2',
-        'buildtype=custom'
+        'buildtype=release'
     ]
 )
-
-if get_option('buildtype') == 'custom'
-    add_project_arguments('-Ofast', '-g3', '-s', language : 'c')
-endif
 
 little_endian = target_machine.endian() == 'little'
 big_endian = target_machine.endian() == 'big'
@@ -43,8 +39,6 @@ include_paths = []
 
 include_paths_str = [
     './lib',
-    '/usr/include',
-    '/usr/local/include',
     '/usr/include/drm',
     '/usr/include/libdrm'
 ]

@@ -34,7 +34,7 @@ Next, execute the following commands:
 ```bash
 $ git clone https://github.com/CuarzoSoftware/SRM.git
 $ cd SRM/src
-$ meson setup build -Dbuildtype=custom
+$ meson setup build
 $ cd build
 $ sudo meson install
 ```
@@ -55,7 +55,7 @@ Next, execute the following commands:
 ```bash
 $ git clone https://github.com/CuarzoSoftware/SRM.git
 $ cd SRM/src
-$ meson setup build -Dbuildtype=custom
+$ meson setup build
 $ cd build
 $ sudo meson install
 ```

@@ -357,9 +357,6 @@ static void connectorUnpluggedEventHandler(SRMListener *listener, SRMConnector *
 
 int main(void)
 {
-    setenv("SRM_DEBUG", "4", 1);
-    setenv("SRM_EGL_DEBUG", "4", 1);
-
     SRMCore *core = srmCoreCreate(&srmInterface, NULL);
 
     if (!core)

@@ -49,6 +49,16 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 * NVIDIA GPUs (Nouveau and propietary drivers)
 * Mali GPUs (Lima driver)
 
+### Multi-GPU Buffer Sharing and Rendering
+
+Automatic buffer sharing across GPUs is accomplished through DMA. When all GPUs support DMA, each one is responsible for rendering into its own connectors (ITSELF MODE).
+
+In cases where a GPU cannot import DMA buffers, another GPU handles the rendering into its connectors using DUMB buffers (DUMB MODE) or CPU copying (CPU MODE) as a last resort.
+
+Performance in the last two modes can be significantly improved by specifying rects with the damaged regions after a `paintGL()` event using `srmConnectorSetBufferDamage()`.
+
+> Note: You don't need to handle buffer allocation or rendering differently depending on the mode, all of this is managed internally by SRM.
+
 ### Basic Example
 
 ```c

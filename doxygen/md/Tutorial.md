@@ -25,18 +25,16 @@ c = meson.get_compiler('c')
 glesv2_dep = c.find_library('GLESv2')
 srm_dep = c.find_library('SRM')
 
-include_paths = []
+include_directories_filtered = []
 
-include_paths_str = [
-    '/usr/include',
-    '/usr/local/include',
+include_directories_all = [
     '/usr/include/drm',
     '/usr/include/libdrm'
 ]
 
-foreach p : include_paths_str
+foreach p : include_directories_all
     if run_command('[', '-d', p, ']', check : false).returncode() == 0
-      include_paths += [include_directories(p)]
+      include_directories_filtered += [include_directories(p)]
     endif
 endforeach
 
@@ -45,7 +43,7 @@ sources = ['main.c']
 executable(
     'srm-example',
     sources,
-    include_directories : include_paths,
+    include_directories : include_directories_filtered,
     dependencies: [glesv2_dep, srm_dep])
 ```
 
@@ -206,11 +204,11 @@ The output should display one or more devices along with their respective connec
 
 Please note that in the output, connectors may appear as "Unknown" for model and manufacturer if no display is attached to those connectors. This is the expected behavior.
 
-In my case, you can observe that there is only one connected connector, which corresponds to my laptop screen (eDP-0). You can check the connectivity status of any connector with the srmConnectorIsConnected() function, which we will demonstrate in the upcoming sections.
+In my case, you can observe that there is only one connected, which corresponds to my laptop screen (eDP-0). You can check the connectivity status of any connector with the srmConnectorIsConnected() function, which we will demonstrate in the upcoming sections.
 
 #### Rendering
 
-Now, let's delve into the process of rendering to the available connectors. Our approach involves setting up a unified interface for managing OpenGL rendering events, which will be shared across all connectors. While it's possible to employ distinct interfaces for each connector, for the sake of simplicity, we'll use a single interface here.
+Now, let's delve into the process of rendering to the available connectors. Our approach involves setting up a unified interface for managing OpenGL rendering events, which will be shared across all connectors. While it's possible to employ distinct interfaces for each connector, for the sake of simplicity, we'll use a single one here.
 
 It's of utmost importance to underscore that these events are initiated by SRM itself and should not be manually triggered by you. Additionally, it's essential to recognize that all these events are executed within the rendering thread of each connector, operating independently from the main thread.
 
@@ -419,7 +417,7 @@ int main()
         return 1;
     }
 
-    // Subscribe to Udev events
+    // Subscribe to udev events
     srmCoreAddConnectorPluggedEventListener(core, &connectorPluggedEventHandler, NULL);
     srmCoreAddConnectorUnpluggedEventListener(core, &connectorUnpluggedEventHandler, NULL);
 
@@ -517,7 +515,7 @@ if (textureId == 0)
 GLenum textureTarget = srmBufferGetTextureTarget(buffer);
 glBindTexture(textureTarget, textureId);
 
-// ...
+// ... glDrawArrays() 
 ```
 
 It's essential to acknowledge that all buffers are shared across all devices, with the exception of those created from GBM buffers or Wayland DRM buffers, which may not always be supported by all devices.

@@ -507,7 +507,7 @@ void srmBufferDestroy(SRMBuffer *buffer)
     }
 
     while (!srmListIsEmpty(buffer->core->deallocatorMessages))
-        usleep(100);
+        usleep(1000);
 
     for (UInt32 i = 0; i < buffer->planesCount; i++)
     {

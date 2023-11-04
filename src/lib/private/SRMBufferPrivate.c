@@ -29,7 +29,7 @@ SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator)
     else
         buffer->allocator = srmCoreGetAllocatorDevice(core);
 
-    return buffer;    
+    return buffer;
 }
 
 Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
@@ -55,6 +55,7 @@ Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
 
     /* SRMDebug("[%s] Got buffer DMA fd using DRM_IOCTL_PRIME_HANDLE_TO_FD.", device->name); */
 
+    fcntl(prime_handle.fd, F_SETFD, FD_CLOEXEC);
     return prime_handle.fd;
 
     fail:
@@ -64,6 +65,7 @@ Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo)
     if (prime_handle.fd >= 0)
     {
         /* SRMDebug("[%s] Got buffer DMA fd using gbm_bo_get_fd().", device->name); */
+        fcntl(prime_handle.fd, F_SETFD, FD_CLOEXEC);
         return prime_handle.fd;
     }
 

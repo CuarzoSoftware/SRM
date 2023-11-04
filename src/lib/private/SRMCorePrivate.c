@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <fcntl.h>
 
 UInt8 srmCoreUpdateEGLExtensions(SRMCore *core)
 {
@@ -147,7 +148,9 @@ UInt8 srmCoreInitMonitor(SRMCore *core)
         goto fail;
     }
 
-    core->monitorFd.fd = epoll_create1(0);
+    fcntl(core->udevMonitorFd, F_SETFD, FD_CLOEXEC);
+
+    core->monitorFd.fd = epoll_create1(EPOLL_CLOEXEC);
 
     if (core->monitorFd.fd < 0)
     {

@@ -40,6 +40,8 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
         goto fail;
     }
 
+    fcntl(device->fd, F_SETFD, FD_CLOEXEC);
+
     SRMDebug("[%s] Is master: %s.", device->name, drmIsMaster(device->fd) ?  "YES" : "NO");
 
     drmVersion *version = drmGetVersion(device->fd);

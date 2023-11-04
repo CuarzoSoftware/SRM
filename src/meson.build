@@ -19,6 +19,11 @@ add_project_arguments([
 
 c = meson.get_compiler('c')
 
+if get_option('buildtype') == 'custom'
+    proj_args = ['-Ofast', '-g3', '-s', '-march=native', '-fno-strict-aliasing']
+    add_project_arguments(proj_args, language : 'c')
+endif
+
 # ------------ INSTALL CONFIG ------------
 
 # Install directories

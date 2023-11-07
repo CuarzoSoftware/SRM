@@ -10,7 +10,7 @@ SRM depends on the following libraries:
 * libEGL
 * libGLESv2
 
-The **srm-multi-seat** example also require:
+The **srm-multi-session** example also require:
 
 * libseat
 * libinput

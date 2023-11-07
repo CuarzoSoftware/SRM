@@ -101,7 +101,7 @@ if get_option('build_examples')
     subdir('examples/srm-basic')
     subdir('examples/srm-display-info')
     subdir('examples/srm-all-connectors')
-    subdir('examples/srm-multi-seat')
+    subdir('examples/srm-multi-session')
 endif
 
 if get_option('build_tests')

@@ -52,8 +52,8 @@ extern "C" {
  * @brief Interface for managing DRM devices (/dev/dri/card*).
  * 
  * SRM provides this interface for opening and closing DRM devices.\n
- * Rather than relying solely on the `open()` and `close()` functions, you have the option to use [libseat](https://github.com/kennylevinsen/seatd) for enabling multi-seat support.\n
- * You can refer to the [srm-multi-seat](md_md__examples.html) example to see how to enable multi-seat support with [libseat](https://github.com/kennylevinsen/seatd).
+ * Rather than relying solely on the `open()` and `close()` functions, you have the option to use [libseat](https://github.com/kennylevinsen/seatd) for enabling multi-session support.\n
+ * You can refer to the [srm-multi-session](md_md__examples.html) example to see how to enable multi-session support with [libseat](https://github.com/kennylevinsen/seatd).
  */
 typedef struct SRMInterfaceStruct
 {
@@ -95,9 +95,9 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData);
  * @brief Temporarily suspends SRM.
  *
  * This function temporarily suspends all connector rendering threads and evdev events within SRM.\n
- * It should be used when switching to another session in a multi-seat system.\n
+ * It should be used when switching to another session in a multi-session system.\n
  * While the core is suspended, SRM no longer acts as the DRM master, and KMS operations cannot be performed.\n
- * For guidance on enabling multi-seat functionality using libseat, please refer to the [srm-multi-seat](md_md__examples.html) example.
+ * For guidance on enabling multi-session functionality using libseat, please refer to the [srm-multi-session](md_md__examples.html) example.
  *
  * @note Pending hotplugging events will be emitted once the core is resumed.
  *

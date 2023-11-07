@@ -111,7 +111,7 @@ static SRMInterface srmInterface =
 
 This interface handles the management of DRM file descriptors during SRMCore's device scanning process and when you call srmCoreDestroy(). 
 
-Instead of relying solely on the `open()` and `close()` functions, you might consider incorporating a library like [libseat](https://github.com/kennylevinsen/seatd) to enhance your program's compatibility with multi-seat setups, enabling seamless TTY switching (like in the [srm-multi-seat](https://github.com/CuarzoSoftware/SRM/tree/main/src/examples/srm-multi-seat) example).
+Instead of relying solely on the `open()` and `close()` functions, you might consider incorporating a library like [libseat](https://github.com/kennylevinsen/seatd) to enhance your program's compatibility with multi-session setups, enabling seamless TTY switching (like in the [srm-multi-session](https://github.com/CuarzoSoftware/SRM/tree/main/src/examples/srm-multi-session) example).
 
 Let's proceed by creating an `SRMCore` instance using this interface. If any errors arise during the `SRMCore` creation process, we will ensure a graceful program exit.
 

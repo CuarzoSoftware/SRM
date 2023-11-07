@@ -32,16 +32,15 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 ### Features
 
 * Multiple GPUs support
-* Automatic optimal GPUs/connectors configuration
+* Automatic GPUs/connectors configuration
 * Automatic texture sharing between GPUs
 * Texture allocation from CPU buffers, DMA buffers, GBM BOs, Flink Handles, Wayland DRM buffers.
-* Multi seat support ([libseat](https://github.com/kennylevinsen/seatd) can be used to open DRM devices for example)
-* GPU hot-plugging event listener
+* Multi-session support ([libseat](https://github.com/kennylevinsen/seatd) can be used to open DRM devices for example)
 * Connectors hot-plugging event listener
 * Hardware cursor compositing
 * V-Sync
-* Frame buffer damage (improves performance when DMA is not supported)
-* Access to renderbuffers as textures.
+* Frame buffer damage (improves performance in multi-GPUs setups when DMA is not supported)
+* Access to screen framebuffers as textures.
 
 ### Tested on
 
@@ -51,9 +50,9 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 
 ### Multi-GPU Buffer Sharing and Rendering
 
-Automatic buffer sharing across GPUs is accomplished through DMA. When all GPUs support DMA, each one is responsible for rendering into its own connectors (ITSELF MODE).
+Automatic buffer sharing across GPUs is accomplished through DMA. When all GPUs support it, each one can render into its own connectors (ITSELF MODE).
 
-In cases where a GPU cannot import DMA buffers, another GPU handles the rendering into its connectors using DUMB buffers (DUMB MODE) or CPU copying (CPU MODE) as a last resort.
+In cases where a GPU cannot import DMA buffers from the allocator GPU, another GPU handles the rendering for its connectors using DUMB buffers (DUMB MODE) or CPU copying (CPU MODE) as a last resort.
 
 Performance in the last two modes can be significantly improved by specifying rects with the damaged regions after a `paintGL()` event using `srmConnectorSetBufferDamage()`.
 

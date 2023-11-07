@@ -17,6 +17,9 @@ extern "C" {
  * An @ref SRMBuffer encapsulates an OpenGL ES 2.0 texture that is shared across multiple GPUs.
  * It can be created from a variety of sources including DMA planes, main memory, GBM bo buffers,
  * and more. This module provides functions to manage and use such shared textures.
+ * 
+ * @note Buffers can be shared across all GPUs only if they adhere to the formats and modifiers 
+ *       specified in @ref srmCoreGetSharedDMATextureFormats.
  *
  * @addtogroup SRMBuffer
  * @{

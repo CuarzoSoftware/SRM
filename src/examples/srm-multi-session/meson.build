@@ -1,5 +1,5 @@
 executable(
-    'srm-multi-seat',
+    'srm-multi-session',
     sources : ['main.c'],
     dependencies : [
         srm_dep,

@@ -1,12 +1,12 @@
 /*
- * Project: srm-multi-seat Example
+ * Project: srm-multi-session Example
  *
  * Author: Eduardo Hopperdietzel
  *
  * Description: This example changes the background color of all available
  *              connectors when the hardware cursor changes position until
  *              the ESC key is pressed. It also demonstrates how to enable
- *              multi-seat support and integrate input events with Libinput.
+ *              multi-session support and integrate input events with Libinput.
  *              To switch to different ttys, use CTRL-ALT-F[1, 2, ..., 10],
  *              and to move the hardware cursor use any pointing device like
  *              a mouse or touchpad.
@@ -194,7 +194,7 @@ static void connectorPluggedEventHandler(SRMListener *listener, SRMConnector *co
 
     /* Got a new connector, let's render on it */
     if (!srmConnectorInitialize(connector, &connectorInterface, NULL))
-        SRMError("[srm-multi-seat] Failed to initialize connector %s.",
+        SRMError("[srm-multi-session] Failed to initialize connector %s.",
                  srmConnectorGetModel(connector));
 }
 
@@ -206,7 +206,7 @@ static void enableSeat(struct libseat *seat, void *userdata)
     SRM_UNUSED(seat);
     SRM_UNUSED(userdata);
 
-    SRMDebug("[srm-multi-seat] Seat enabled.");
+    SRMDebug("[srm-multi-session] Seat enabled.");
 
     srmCoreResume(core);
 
@@ -234,7 +234,7 @@ static void enableSeat(struct libseat *seat, void *userdata)
  * Libinput. */
 static void disableSeat(struct libseat *seat, void *userdata)
 {
-    SRMDebug("[srm-multi-seat] Seat disabled.");
+    SRMDebug("[srm-multi-session] Seat disabled.");
     SRM_UNUSED(userdata);
     srmCoreSuspend(core);
     libinput_suspend(input);
@@ -363,7 +363,7 @@ int main(void)
 
     if (!seat)
     {
-        SRMFatal("[srm-multi-seat] Failed to open seat.");
+        SRMFatal("[srm-multi-session] Failed to open seat.");
         return 1;
     }
 
@@ -375,7 +375,7 @@ int main(void)
 
     if (!core)
     {
-        SRMFatal("[srm-multi-seat] Failed to initialize SRM core.");
+        SRMFatal("[srm-multi-session] Failed to initialize SRM core.");
         return 1;
     }
 
@@ -414,7 +414,7 @@ int main(void)
             if (srmConnectorIsConnected(connector))
             {
                 if (!srmConnectorInitialize(connector, &connectorInterface, NULL))
-                    SRMError("[srm-multi-seat] Failed to initialize connector %s.",
+                    SRMError("[srm-multi-session] Failed to initialize connector %s.",
                              srmConnectorGetModel(connector));
             }
         }
@@ -428,7 +428,7 @@ int main(void)
 
     if (!input)
     {
-        SRMFatal("[srm-multi-seat] Failed to initialize Libinput.");
+        SRMFatal("[srm-multi-session] Failed to initialize Libinput.");
         return 1;
     }
 

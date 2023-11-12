@@ -796,7 +796,8 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
                                        connector->interfaceData);
     }
 
-    if (connector->device->clientCapAtomic)
+    // Force legacy API
+    if (0 && connector->device->clientCapAtomic)
     {
         drmModeAtomicReqPtr req;
         req = drmModeAtomicAlloc();

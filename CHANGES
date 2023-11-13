@@ -1,3 +1,18 @@
+SRM (0.3.1-1)
+
+## Internal Changes
+
+- Implemented caching for frequently used shared DRM formats/modifiers, enhancing access speed.
+- Introduced the O_CLOEXEC flag to DMA, UDEV, and EPOLL file descriptors to prevent unintentional leakage to child processes.
+
+## Bug Fixes
+
+- Fixed crash occurring when a connector is hotplugged during a session switch.
+- Rectified a flawed DRM atomic commit that was preventing the configuration of CRTCs during connectors initialization.
+  
+-- Eduardo Hopperdietzel ehopperdietzel@gmail.com Sun, 12 Nov 2023 21:13:17 -0300
+
+
 SRM (0.3.0-1)
 
   # Additions

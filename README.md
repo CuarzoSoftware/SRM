@@ -46,6 +46,7 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 
 * Intel GPUs (i915 driver)
 * NVIDIA GPUs (Nouveau and propietary drivers)
+* AMD GPUs (AMDGPU driver)
 * Mali GPUs (Lima driver)
 
 ### Multi-GPU Buffer Sharing and Rendering

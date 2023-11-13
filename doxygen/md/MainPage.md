@@ -12,6 +12,7 @@ SRM allows you to use multiple GPUs simultaneously and automatically finds the m
 
 * Intel GPUs (i915 driver)
 * NVIDIA GPUs (Nouveau and propietary drivers)
+* AMD GPUs (AMDGPU driver)
 * Mali GPUs (Lima driver)
 
 ### Features

@@ -20,7 +20,7 @@ The **srm-multi-session** example also require:
 To build SRM from a Debian based distribution please install the following packages:
 
 ```bash
-$ sudo apt install build-essential meson hwinfo libdisplay-info-dev libinput-dev libudev-dev libdrm-dev libgbm-dev libegl1-mesa-dev libgles2-mesa-dev
+$ sudo apt install build-essential meson libseat-dev libinput-dev libudev-dev libdrm-dev libgbm-dev libegl1-mesa-dev libgles2-mesa-dev hwinfo libdisplay-info-dev
 ```
 
 If the [hwinfo](https://github.com/vcrhonek/hwdata) or [libdisplay-info](https://gitlab.freedesktop.org/emersion/libdisplay-info) packages are not available in your distribution, please download and install them manually in the specified order:

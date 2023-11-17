@@ -5,7 +5,7 @@
 #define SRM_MAX_COPY_THREADS 32
 
 #include <stdint.h>
-#include <drm/drm_fourcc.h>
+#include <drm_fourcc.h>
 
 #ifdef __cplusplus
 extern "C" {

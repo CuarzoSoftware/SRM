@@ -5,8 +5,6 @@
 #include <SRMList.h>
 #include <SRMLog.h>
 
-#include <drm/drm.h>
-#include <drm/drm_mode.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 

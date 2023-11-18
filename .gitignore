@@ -1,7 +1,6 @@
 **/build**
 **.user
 **.DS_Store
-**/*.ipynb_checkpoints/
 **/.cache
 **/.vscode
 **.autosave

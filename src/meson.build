@@ -87,8 +87,6 @@ SRM = library(
     ],
     install : true)
 
-meson.add_install_script('../scripts/ld.sh', get_option('prefix') + '/' + get_option('libdir'))
-
 if get_option('build_examples') or get_option('build_tests')
     srm_dep = declare_dependency(
         dependencies: [],

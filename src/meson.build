@@ -87,6 +87,13 @@ SRM = library(
     ],
     install : true)
 
+pkg.generate(
+    SRM,
+    name: 'Simple Rendering Manager',
+    description: 'C library for building DRM/KMS applications with OpenGL ES 2.0',
+    version: meson.project_version(),
+    filebase: 'libSRM')
+
 if get_option('build_examples') or get_option('build_tests')
     srm_dep = declare_dependency(
         dependencies: [],

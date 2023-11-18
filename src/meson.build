@@ -56,13 +56,14 @@ endforeach
 
 # ------------ DEPENDENCIES ------------
 
-egl_dep          = c.find_library('EGL')
-glesv2_dep       = c.find_library('GLESv2')
-udev_dep         = c.find_library('udev')
+pkg              = import('pkgconfig')
+egl_dep          = dependency('egl')
+glesv2_dep       = dependency('glesv2')
+udev_dep         = dependency('libudev')
 pthread_dep      = c.find_library('pthread')
-drm_dep          = c.find_library('drm')
-gbm_dep          = c.find_library('gbm')
-display_info_dep = c.find_library('display-info')
+drm_dep          = dependency('libdrm')
+gbm_dep          = dependency('gbm')
+display_info_dep = dependency('libdisplay-info')
 
 # ------------ SOURCE CODE FILES ------------
 
@@ -95,8 +96,8 @@ endif
 
 if get_option('build_examples')
     m_dep = c.find_library('m')
-    libinput_dep = c.find_library('input')
-    libseat_dep = c.find_library('seat')
+    libinput_dep = dependency('libinput')
+    libseat_dep = dependency('libseat')
 
     subdir('examples/srm-basic')
     subdir('examples/srm-display-info')

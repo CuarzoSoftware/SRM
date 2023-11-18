@@ -21,8 +21,8 @@ project('srm-example',
         version : '0.1.0')
 
 c = meson.get_compiler('c')
-
-glesv2_dep = c.find_library('GLESv2')
+pkg = import('pkgconfig')
+glesv2_dep = dependency('glesv2')
 srm_dep = c.find_library('SRM')
 
 include_directories_filtered = []

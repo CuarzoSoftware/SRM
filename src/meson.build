@@ -57,6 +57,7 @@ endforeach
 # ------------ DEPENDENCIES ------------
 
 pkg              = import('pkgconfig')
+gl_dep           = dependency('gl')
 egl_dep          = dependency('egl')
 glesv2_dep       = dependency('glesv2')
 udev_dep         = dependency('libudev')
@@ -77,6 +78,7 @@ SRM = library(
     dependencies : [
         display_info_dep,
         egl_dep,
+        gl_dep,
         glesv2_dep,
         udev_dep,
         pthread_dep,

@@ -25,7 +25,6 @@ UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector);
 void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqPtr req);
 Int32 srmRenderModeAtomicResetConnectorProps(SRMConnector *connector);
 Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags, void *data);
-
 Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb);
 void srmRenderModeCommonPauseRendering(SRMConnector *connector);
 void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb);

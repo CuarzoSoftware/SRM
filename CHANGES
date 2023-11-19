@@ -1,3 +1,17 @@
+SRM (0.3.2-2)
+
+  # Building
+
+  * Implemented pkgconfig in meson.build to enhance dependency management, with special thanks to @jengelh.
+  
+  # Documentation Changes
+
+  * Refactored meson.build for clarity in the tutorial.
+  * Added the missing math.h header to the tutorial.
+  
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sat, 18 Nov 2023 22:30:15 -0300
+
+
 SRM (0.3.2-1)
 
   # Bug Fixes

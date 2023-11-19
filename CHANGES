@@ -8,6 +8,7 @@ SRM (0.3.2-2)
 
   * Refactored meson.build for clarity in the tutorial.
   * Added the missing math.h header to the tutorial.
+  * Added ldconfig command in the build instructions of the downloads page.
   
 -- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sat, 18 Nov 2023 22:30:15 -0300
 

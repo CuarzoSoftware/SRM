@@ -27,8 +27,7 @@ endif
 # ------------ INSTALL CONFIG ------------
 
 # Install directories
-headers_install_dir = '/usr/include/SRM'
-examples_install_dir = '/usr/bin'
+headers_install_dir = join_paths(get_option('prefix'), get_option('includedir'), 'SRM')
 
 # Public and private API headers
 api_headers = ['/', '/private', '/private/modes']
@@ -61,10 +60,10 @@ gl_dep           = dependency('gl')
 egl_dep          = dependency('egl')
 glesv2_dep       = dependency('glesv2')
 udev_dep         = dependency('libudev')
-pthread_dep      = c.find_library('pthread')
 drm_dep          = dependency('libdrm')
 gbm_dep          = dependency('gbm')
 display_info_dep = dependency('libdisplay-info')
+pthread_dep      = c.find_library('pthread')
 
 # ------------ SOURCE CODE FILES ------------
 
@@ -92,7 +91,7 @@ pkg.generate(
     name: 'Simple Rendering Manager',
     description: 'C library for building DRM/KMS applications with OpenGL ES 2.0',
     version: meson.project_version(),
-    filebase: 'libSRM')
+    filebase: 'SRM')
 
 if get_option('build_examples') or get_option('build_tests')
     srm_dep = declare_dependency(
@@ -102,9 +101,9 @@ if get_option('build_examples') or get_option('build_tests')
 endif
 
 if get_option('build_examples')
-    m_dep = c.find_library('m')
     libinput_dep = dependency('libinput')
     libseat_dep = dependency('libseat')
+    m_dep = c.find_library('m')
 
     subdir('examples/srm-basic')
     subdir('examples/srm-display-info')

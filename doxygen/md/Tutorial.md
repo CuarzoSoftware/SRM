@@ -19,32 +19,20 @@ int main()
 project('srm-example',
         'c',
         version : '0.1.0')
-
+ 
 c = meson.get_compiler('c')
+
 pkg = import('pkgconfig')
 glesv2_dep = dependency('glesv2')
-srm_dep = c.find_library('SRM')
-
-include_directories_filtered = []
-
-include_directories_all = [
-    '/usr/include/drm',
-    '/usr/include/libdrm'
-]
-
-foreach p : include_directories_all
-    if run_command('[', '-d', p, ']', check : false).returncode() == 0
-      include_directories_filtered += [include_directories(p)]
-    endif
-endforeach
-
+srm_dep = dependency('SRM')
+m_dep = c.find_library('m')
+   
 sources = ['main.c']
-
+ 
 executable(
     'srm-example',
     sources,
-    include_directories : include_directories_filtered,
-    dependencies: [glesv2_dep, srm_dep])
+    dependencies: [glesv2_dep, srm_dep, m_dep])
 ```
 
 Now, let's configure the project by running the following commands in your project directory:
@@ -54,18 +42,16 @@ cd your_project_dir
 meson setup builddir
 ```
 
-You should observe output confirming that the GLESv2 and SRM libraries have been found, and a new `builddir` directory should be created. 
+You should observe output confirming that the GLESv2, SRM and Math libraries have been found, and a new `builddir` directory should be created. 
 
 ```bash
 ...
 
-Host machine cpu family: x86_64
-Host machine cpu: x86_64
-Library GLESv2 found: YES
-Library SRM found: YES
+Found pkg-config: /usr/bin/pkg-config (0.29.2)
+Run-time dependency glesv2 found: YES 3.2
+Run-time dependency srm found: YES 0.3.2
+Library m found: YES
 Build targets in project: 1
-
-Found ninja-1.10.1 at /usr/bin/ninja
 ```
 
 If this is not the case, and the libraries are not found, please double-check that you have installed the GLESv2 and SRM libraries correctly, or investigate if any environment configuration adjustments are necessary.
@@ -85,6 +71,9 @@ Now, in `main.c` let's set up an interface that allows SRM to open and close DRM
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <math.h>
+
+static float color = 0.f;
 
 /* Opens a DRM device */
 static int openRestricted(const char *path, int flags, void *userData)

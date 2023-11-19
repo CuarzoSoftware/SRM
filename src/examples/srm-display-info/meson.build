@@ -4,5 +4,4 @@ executable(
     dependencies : [
         srm_dep
     ],
-    install : true, 
-    install_dir : examples_install_dir)
+    install : true)

@@ -2,7 +2,7 @@
 
 <p align="left">
   <a href="https://github.com/CuarzoSoftware/SRM/blob/main/LICENSE">
-    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="SRM is released under the GPL v3.0 license." />
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="SRM is released under the MIT license." />
   </a>
   <a href="https://github.com/CuarzoSoftware/SRM">
     <img src="https://img.shields.io/badge/version-0.3.2-brightgreen" alt="Current SRM version." />

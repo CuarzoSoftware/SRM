@@ -160,6 +160,15 @@ void srmCoreSetUserData(SRMCore *core, void *userData);
 SRMList *srmCoreGetDevices(SRMCore *core);
 
 /**
+ * @brief Get the SRM version of the core.
+ *
+ * @param core A pointer to the @ref SRMCore instance.
+ *
+ * @return A pointer to the core's @ref SRMVersion instance.
+ */
+SRMVersion *srmCoreGetVersion(SRMCore *core);
+
+/**
  * @brief Get the allocator device.
  *
  * The allocator device is responsible for creating buffers (textures) that can be shared among all devices.

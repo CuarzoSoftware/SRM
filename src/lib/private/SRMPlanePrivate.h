@@ -44,6 +44,8 @@ UInt8 srmPlaneUpdateCrtcs(SRMPlane *plane);
 void srmPlaneUpdateInFormats(SRMPlane *plane, UInt64 blobID);
 void srmPlaneDestroyInFormats(SRMPlane *plane);
 
+UInt8 srmPlaneUpdateFormats(SRMPlane *plane);
+
 #ifdef __cplusplus
 }
 #endif

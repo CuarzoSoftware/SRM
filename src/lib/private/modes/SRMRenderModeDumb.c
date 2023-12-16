@@ -540,6 +540,7 @@ static UInt8 flipPage(SRMConnector *connector)
     if (connector->damageRectsCount > 0)
     {
         SRMRect *rect;
+        UInt32 buffInd;
 
         for (Int32 r = 0; r < connector->damageRectsCount; r++)
         {
@@ -547,13 +548,38 @@ static UInt8 flipPage(SRMConnector *connector)
 
             for (Int32 i = rect->y; i < rect->y + rect->height; i++)
             {
-                glReadPixels(rect->x,
-                             h-i-1,
-                             rect->width,
-                             1,
-                             GL_BGRA_EXT,
-                             GL_UNSIGNED_BYTE,
-                             &data->dumbMaps[b][i*p + s*rect->x]);
+                buffInd = i*p + s*rect->x;
+
+                if (connector->device->glExtensions.EXT_read_format_bgra)
+                {
+                    glReadPixels(rect->x,
+                                 h-i-1,
+                                 rect->width,
+                                 1,
+                                 GL_BGRA_EXT,
+                                 GL_UNSIGNED_BYTE,
+                                 &data->dumbMaps[b][buffInd]);
+                }
+                else
+                {
+                    glReadPixels(rect->x,
+                                 h-i-1,
+                                 rect->width,
+                                 1,
+                                 GL_RGBA,
+                                 GL_UNSIGNED_BYTE,
+                                 &data->dumbMaps[b][buffInd]);
+
+                    UInt8 tmp;
+
+                    // Swap R <> B
+                    for (UInt32 r = buffInd; r < buffInd + rect->width * s; r += s)
+                    {
+                        tmp = data->dumbMaps[b][r];
+                        data->dumbMaps[b][r] = data->dumbMaps[b][r + 2];
+                        data->dumbMaps[b][r + 2] = tmp;
+                    }
+                }
             }
         }
 
@@ -565,13 +591,36 @@ static UInt8 flipPage(SRMConnector *connector)
     {
         for (UInt32 i = 0; i < h; i++)
         {
-            glReadPixels(0,
-                         h-i-1,
-                         w,
-                         1,
-                         GL_BGRA_EXT,
-                         GL_UNSIGNED_BYTE,
-                         &data->dumbMaps[b][i*p]);
+            if (connector->device->glExtensions.EXT_read_format_bgra)
+            {
+                glReadPixels(0,
+                             h-i-1,
+                             w,
+                             1,
+                             GL_BGRA_EXT,
+                             GL_UNSIGNED_BYTE,
+                             &data->dumbMaps[b][i*p]);
+            }
+            else
+            {
+                glReadPixels(0,
+                             h-i-1,
+                             w,
+                             1,
+                             GL_RGBA,
+                             GL_UNSIGNED_BYTE,
+                             &data->dumbMaps[b][i*p]);
+
+                UInt8 tmp;
+
+                // Swap R <> B
+                for (UInt32 r = i*p; r < i*p + w * s; r += s)
+                {
+                    tmp = data->dumbMaps[b][r];
+                    data->dumbMaps[b][r] = data->dumbMaps[b][r + 2];
+                    data->dumbMaps[b][r + 2] = tmp;
+                }
+            }
         }
     }
 

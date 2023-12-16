@@ -121,6 +121,17 @@ typedef UInt32 SRM_BUFFER_FORMAT; ///< A DRM format defined in drm_fourcc.h.
 typedef UInt64 SRM_BUFFER_MODIFIER; ///< A DRM format modifier defined in drm_fourcc.h.
 
 /**
+ * @brief SRM version data.
+ */
+typedef struct SRMVersionStruct
+{
+    UInt32 major;   ///< Major version.
+    UInt32 minor;   ///< Minor version.
+    UInt32 patch;   ///< Patch version.
+    UInt32 build;   ///< Build number.
+} SRMVersion;
+
+/**
  * @brief Structure representing a rectangle with integer coordinates.
  */
 typedef struct SRMRectStruct

@@ -245,7 +245,7 @@ static UInt8 createEGLContext(SRMConnector *connector)
     }
 
     if (connector->device->eglExtensions.IMG_context_priority)
-        connector->device->eglSharedContextAttribs[3] = EGL_CONTEXT_PRIORITY_LOW_IMG;
+        connector->device->eglSharedContextAttribs[3] = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
     data->connectorEGLContext = eglCreateContext(connector->device->eglDisplay,
                                                  data->connectorEGLConfig,
                                                  // It is EGL_NO_CONTEXT if no context was previously created in this device
@@ -818,7 +818,8 @@ static UInt8 flipPage(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    UInt8 mapEnabled = data->rendererBuffers[data->currentBufferIndex] &&
+    UInt8 mapEnabled = connector->device->glExtensions.EXT_texture_format_BGRA8888 &&
+                       data->rendererBuffers[data->currentBufferIndex] &&
                        data->rendererBuffers[data->currentBufferIndex]->map &&
                        data->rendererBuffers[data->currentBufferIndex]->modifiers[0] == DRM_FORMAT_MOD_LINEAR;
 
@@ -852,7 +853,7 @@ static UInt8 flipPage(SRMConnector *connector)
                          0,
                          connector->currentMode->info.hdisplay,
                          connector->currentMode->info.vdisplay,
-                         GL_BGRA,
+                         GL_RGBA,
                          GL_UNSIGNED_BYTE,
                          data->cpuBuffers[data->currentBufferIndex]);
         }
@@ -873,7 +874,7 @@ static UInt8 flipPage(SRMConnector *connector)
                              y,
                              damage[i].width,
                              damage[i].height,
-                             GL_BGRA,
+                             GL_RGBA,
                              GL_UNSIGNED_BYTE,
                              data->cpuBuffers[data->currentBufferIndex]);
             }
@@ -946,7 +947,7 @@ static UInt8 flipPage(SRMConnector *connector)
                             y,
                             damage[i].width,
                             damage[i].height,
-                            GL_BGRA,
+                            GL_RGBA,
                             GL_UNSIGNED_BYTE,
                             data->cpuBuffers[data->currentBufferIndex]);
         }

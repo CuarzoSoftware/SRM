@@ -24,3 +24,7 @@ SRM_PLANE_TYPE srmPlaneGetType(SRMPlane *plane)
 {
     return plane->type;
 }
+SRMList *srmPlaneGetFormats(SRMPlane *plane)
+{
+    return plane->inFormats;
+}

@@ -53,6 +53,7 @@ struct SRMDeviceStruct
     EGLint eglSharedContextAttribs[7];
     SRMEGLDeviceExtensions eglExtensions;
     SRMEGLDeviceFunctions eglFunctions;
+    SRMGLDeviceExtensions glExtensions;
     SRMList *dmaRenderFormats, *dmaExternalFormats, *dmaTextureFormats;
 
     UInt8 clientCapStereo3D;
@@ -92,6 +93,8 @@ void srmDeviceDestroyDMAFormats(SRMDevice *device);
 
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device);
 void srmDeviceUninitializeEGLSharedContext(SRMDevice *device);
+
+UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device);
 
 UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device);
 void srmDeviceUninitEGLDeallocatorContext(SRMDevice *device);

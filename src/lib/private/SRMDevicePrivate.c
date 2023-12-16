@@ -40,8 +40,6 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
         goto fail;
     }
 
-    fcntl(device->fd, F_SETFD, FD_CLOEXEC);
-
     SRMDebug("[%s] Is master: %s.", device->name, drmIsMaster(device->fd) ?  "YES" : "NO");
 
     drmVersion *version = drmGetVersion(device->fd);
@@ -87,6 +85,10 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
 
     // REF 7
     if (!srmDeviceInitializeEGLSharedContext(device))
+        goto fail;
+
+    // REF -
+    if (!srmDeviceUpdateGLExtensions(device))
         goto fail;
 
     // REF 8
@@ -483,10 +485,11 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
     if (device->eglExtensions.IMG_context_priority)
     {
         device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_PRIORITY_LEVEL_IMG;
-        device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_PRIORITY_LOW_IMG;
+        device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
     }
 
-    if (device->eglExtensions.EXT_create_context_robustness) {
+    if (device->eglExtensions.EXT_create_context_robustness)
+    {
         device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT;
         device->eglSharedContextAttribs[atti++] = EGL_LOSE_CONTEXT_ON_RESET_EXT;
     }
@@ -502,9 +505,9 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 
     if (device->eglExtensions.IMG_context_priority)
     {
-        EGLint priority = EGL_CONTEXT_PRIORITY_LOW_IMG;
+        EGLint priority = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
         eglQueryContext(device->eglDisplay, device->eglSharedContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &priority);
-        SRMDebug("[%s] Using %s priority EGL context.", device->name, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "low");
+        SRMDebug("[%s] Using %s priority EGL context.", device->name, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
     }
 
     eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
@@ -521,6 +524,16 @@ void srmDeviceUninitializeEGLSharedContext(SRMDevice *device)
         eglDestroyContext(device->eglDisplay, device->eglSharedContext);
     }
 }
+
+
+UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device)
+{
+    const char *exts = (const char*)glGetString(GL_EXTENSIONS);
+    device->glExtensions.EXT_read_format_bgra = srmEGLHasExtension(exts, "GL_EXT_read_format_bgra");
+    device->glExtensions.EXT_texture_format_BGRA8888 = srmEGLHasExtension(exts, "GL_EXT_texture_format_BGRA8888");
+    return 1;
+}
+
 
 UInt8 srmDeviceUpdateClientCaps(SRMDevice *device)
 {

@@ -29,6 +29,7 @@ struct SRMDeallocatorThreadMessage
 
 struct SRMCoreStruct
 {
+    SRMVersion version;
     SRMInterface *interface;
     void *interfaceUserData;
 

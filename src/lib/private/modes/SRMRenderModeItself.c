@@ -61,6 +61,22 @@ static UInt8 createData(SRMConnector *connector)
     connector->renderData = data;
     data->connectorEGLContext = EGL_NO_CONTEXT;
     data->connectorEGLSurface = EGL_NO_SURFACE;
+
+    connector->currentFormat.format = 0;
+
+    // TODO: check if match visual ID
+    if (srmFormatListFirstMatchFormat(connector->currentPrimaryPlane->inFormats, DRM_FORMAT_XRGB8888))
+        connector->currentFormat.format = DRM_FORMAT_XRGB8888;
+    else if (srmFormatListFirstMatchFormat(connector->currentPrimaryPlane->inFormats, DRM_FORMAT_XBGR8888))
+        connector->currentFormat.format = DRM_FORMAT_XBGR8888;
+    else
+    {
+        SRMError("Failed to initialize device %s connector %d. XRGB8888 and XBGR8888 not avaliable (ITSELF MODE).",
+                 connector->device->name,
+                 connector->id);
+        return 0;
+    }
+
     return 1;
 }
 
@@ -83,11 +99,12 @@ static UInt8 createGBMSurfaces(SRMConnector *connector)
         return 1;
     }
 
+
     data->connectorGBMSurface = gbm_surface_create(
         connector->device->gbm,
         connector->currentMode->info.hdisplay,
         connector->currentMode->info.vdisplay,
-        GBM_FORMAT_XRGB8888,
+        connector->currentFormat.format,
         GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
 
     if (!data->connectorGBMSurface)
@@ -117,7 +134,7 @@ static UInt8 getEGLConfiguration(SRMConnector *connector)
 
     if (!srmRenderModeCommonChooseEGLConfiguration(connector->device->eglDisplay,
                                 eglConfigAttribs,
-                                GBM_FORMAT_XRGB8888,
+                                connector->currentFormat.format,
                                 &data->connectorEGLConfig))
     {
         SRMError("Failed to choose EGL configuration for device %s connector %d (ITSELF MODE).",
@@ -139,8 +156,8 @@ static UInt8 createEGLContext(SRMConnector *connector)
         return 1;
     }
 
-    if (connector->device->eglExtensions.IMG_context_priority)
-        connector->device->eglSharedContextAttribs[3] = EGL_CONTEXT_PRIORITY_HIGH_IMG;
+    if (connector->device->rendererDevice->eglExtensions.IMG_context_priority)
+        connector->device->rendererDevice->eglSharedContextAttribs[3] = EGL_CONTEXT_PRIORITY_HIGH_IMG;
 
     data->connectorEGLContext = eglCreateContext(connector->device->eglDisplay,
                                                  data->connectorEGLConfig,
@@ -154,6 +171,13 @@ static UInt8 createEGLContext(SRMConnector *connector)
                  connector->device->name,
                  connector->id);
         return 0;
+    }
+
+    if (connector->device->eglExtensions.IMG_context_priority)
+    {
+        EGLint priority = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
+        eglQueryContext(connector->device->eglDisplay, data->connectorEGLContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &priority);
+        SRMDebug("[%s] Using %s priority EGL context.", srmConnectorGetName(connector), priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
     }
 
     // Store it if is the first context created for this device, so that later on shared context can be created
@@ -397,10 +421,14 @@ static UInt8 render(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    eglMakeCurrent(connector->device->eglDisplay,
-                   data->connectorEGLSurface,
-                   data->connectorEGLSurface,
-                   data->connectorEGLContext);
+    if (connector->device->eglDisplay != eglGetCurrentDisplay() ||
+        data->connectorEGLSurface != eglGetCurrentSurface(EGL_READ) ||
+        data->connectorEGLSurface != eglGetCurrentSurface(EGL_DRAW) ||
+        data->connectorEGLContext != eglGetCurrentContext())
+        eglMakeCurrent(connector->device->eglDisplay,
+                       data->connectorEGLSurface,
+                       data->connectorEGLSurface,
+                       data->connectorEGLContext);
 
     connector->interface->paintGL(connector, connector->interfaceData);
 

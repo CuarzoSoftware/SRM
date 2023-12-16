@@ -167,3 +167,8 @@ const SRMEGLDeviceFunctions *srmDeviceGetEGLFunctions(SRMDevice *device)
 {
     return &device->eglFunctions;
 }
+
+const SRMGLDeviceExtensions *srmDeviceGetGLExtensions(SRMDevice *device)
+{
+    return &device->glExtensions;
+}

@@ -2,7 +2,7 @@
 #define SRMCONNECTORPRIVATE_H
 
 #include "../SRMConnector.h"
-
+#include "SRMFormat.h"
 #include <GLES2/gl2.h>
 #include <gbm.h>
 #include <EGL/egl.h>
@@ -57,7 +57,7 @@ struct SRMConnectorStruct
     SRMEncoder *currentEncoder;
     SRMCrtc *currentCrtc;
     SRMPlane *currentPrimaryPlane, *currentCursorPlane;
-    volatile SRM_CONNECTOR_STATE state;
+    SRM_CONNECTOR_STATE state;
 
     // Used to
     Int8 renderInitResult;
@@ -69,7 +69,7 @@ struct SRMConnectorStruct
     UInt32 cursorFB, cursorFBPending;
     Int32 cursorX, cursorY;
     UInt8 cursorVisible;
-    volatile UInt8 atomicCursorHasChanges;
+    UInt8 atomicCursorHasChanges;
 
     // Interface for OpenGL events
     SRMConnectorInterface *interface;
@@ -83,10 +83,11 @@ struct SRMConnectorStruct
     UInt8 firstPageFlip;
     pthread_cond_t repaintCond;
     pthread_mutex_t repaintMutex;
-    volatile UInt8 repaintRequested;
+    UInt8 repaintRequested;
     pthread_mutex_t stateMutex;
     SRMRect *damageRects;
     Int32 damageRectsCount;
+    SRMFormat currentFormat;
 
     // Render specific
     struct SRMConnectorRenderInterface renderInterface;

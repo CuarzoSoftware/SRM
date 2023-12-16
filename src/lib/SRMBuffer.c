@@ -57,6 +57,8 @@ SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMDevice *allocator, SRMBuffer
     buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
                                         buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
 
+    //srmBufferGetTextureID(buffer->allocator, buffer);
+
     return buffer;
 }
 

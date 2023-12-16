@@ -832,7 +832,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
         fds.events = POLLIN;
         fds.revents = 0;
 
-        while(connector->pendingPageFlip)
+        while (connector->pendingPageFlip)
         {
             if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
                 break;
@@ -866,8 +866,8 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     {
         drmModeAtomicReqPtr req;
         req = drmModeAtomicAlloc();
-
         srmRenderModeCommitCursorChanges(connector, req);
+
         drmModeAtomicAddProperty(req,
                                  connector->currentPrimaryPlane->id,
                                  connector->currentPrimaryPlane->propIDs.FB_ID,
@@ -882,10 +882,10 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     else
     {
         ret = drmModePageFlip(connector->device->fd,
-                        connector->currentCrtc->id,
-                        connector->lastFb,
-                        DRM_MODE_PAGE_FLIP_EVENT,
-                        connector);
+                              connector->currentCrtc->id,
+                              connector->lastFb,
+                              DRM_MODE_PAGE_FLIP_EVENT,
+                              connector);
     }
 
     if (ret)
@@ -899,6 +899,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     if (buffersCount == 2 || connector->firstPageFlip)
     {
         connector->firstPageFlip = 0;
+
         struct pollfd fds;
         fds.fd = connector->device->fd;
         fds.events = POLLIN;

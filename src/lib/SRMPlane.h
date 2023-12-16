@@ -66,6 +66,15 @@ SRMConnector *srmPlaneGetCurrentConnector(SRMPlane *plane);
 SRM_PLANE_TYPE srmPlaneGetType(SRMPlane *plane);
 
 /**
+ * @brief Get a list of DRM framebuffer formats supported by the plane.
+ * *
+ * @param plane A pointer to the @ref SRMPlane instance.
+ *
+ * @return A list of DRM formats/modifiers supported by the plane.
+ */
+SRMList *srmPlaneGetFormats(SRMPlane *plane);
+
+/**
  * @}
  */
 

@@ -89,6 +89,15 @@ typedef struct SRMEGLDeviceFunctionsStruct
 } SRMEGLDeviceFunctions;
 
 /**
+ * @brief Structure representing device-specific OpenGL extensions.
+ */
+typedef struct SRMGLDeviceExtensionsStruct
+{
+    UInt8 EXT_read_format_bgra;
+    UInt8 EXT_texture_format_BGRA8888;
+} SRMGLDeviceExtensions;
+
+/**
  * @brief Get a human-readable error string for an EGL error code.
  *
  * @param error An EGL error code.

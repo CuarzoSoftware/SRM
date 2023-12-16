@@ -280,9 +280,19 @@ const SRMEGLDeviceExtensions *srmDeviceGetEGLExtensions(SRMDevice *device);
  */
 const SRMEGLDeviceFunctions *srmDeviceGetEGLFunctions(SRMDevice *device);
 
-// TODO: Enabling /disabling GPUs on the fly is still unsupported
+/**
+ * @brief Returns a structure with boolean variables indicating which OpenGL extensions the device supports.
+ *
+ * @param device A pointer to the @ref SRMDevice instance.
+ *
+ * @return A pointer to the @ref SRMGLDeviceExtensions structure indicating the supported OpenGL extensions.
+ */
+const SRMGLDeviceExtensions *srmDeviceGetGLExtensions(SRMDevice *device);
 
 /// @cond OMIT
+
+// TODO: Enabling /disabling GPUs on the fly is still unsupported
+
 UInt8 srmDeviceSetEnabled(SRMDevice *device, UInt8 enabled);
 UInt8 srmDeviceIsEnabled(SRMDevice *device);
 /// @endcond OMIT

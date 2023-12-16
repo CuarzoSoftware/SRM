@@ -20,6 +20,18 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
 
     // REF 1
     SRMCore *core = calloc(1, sizeof(SRMCore));
+
+    core->version.major = SRM_VERSION_MAJOR;
+    core->version.minor = SRM_VERSION_MINOR;
+    core->version.patch = SRM_VERSION_PATCH;
+    core->version.build = SRM_VERSION_BUILD;
+
+    SRMDebug("[core] SRM version %d.%d.%d-%d.",
+             SRM_VERSION_MAJOR,
+             SRM_VERSION_MINOR,
+             SRM_VERSION_PATCH,
+             SRM_VERSION_BUILD);
+
     core->interface = interface;
     core->interfaceUserData = userData;
     core->isSuspended = 0;
@@ -226,6 +238,11 @@ UInt8 srmCoreIsSuspended(SRMCore *core)
     return core->isSuspended;
 }
 
+SRMVersion *srmCoreGetVersion(SRMCore *core)
+{
+    return &core->version;
+}
+
 SRMList *srmCoreGetDevices(SRMCore *core)
 {
     return core->devices;
@@ -378,4 +395,3 @@ void srmCoreSetUserData(SRMCore *core, void *userData)
 {
     core->interfaceUserData = userData;
 }
-

@@ -9,12 +9,21 @@ project(
     ]
 )
 
+version_major = meson.project_version().split('.')[0]
+version_minor = meson.project_version().split('.')[1]
+version_patch = meson.project_version().split('.')[2]
+version_build = run_command('cat', '../BUILD', check : false).stdout()
+
 little_endian = target_machine.endian() == 'little'
 big_endian = target_machine.endian() == 'big'
 
 add_project_arguments([
         '-DSRM_LITTLE_ENDIAN=@0@'.format(little_endian.to_int()),
         '-DSRM_BIG_ENDIAN=@0@'.format(big_endian.to_int()),
+        '-DSRM_VERSION_MAJOR=@0@'.format(version_major.to_int()),
+        '-DSRM_VERSION_MINOR=@0@'.format(version_minor.to_int()),
+        '-DSRM_VERSION_PATCH=@0@'.format(version_patch.to_int()),
+        '-DSRM_VERSION_BUILD=@0@'.format(version_build.to_int())
 ], language: 'c')
 
 c = meson.get_compiler('c')
@@ -84,6 +93,7 @@ SRM = library(
         drm_dep,
         gbm_dep
     ],
+    soversion: version_major,
     install : true)
 
 pkg.generate(

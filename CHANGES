@@ -1,3 +1,24 @@
+SRM (0.4.0-1)
+
+  # New Features
+
+  * Introduced srmPlaneGetFormats() to retrieve the supported formats/modifiers of an SRMPlane.
+  * Implemented srmDeviceGetGLExtensions() for checking the support of common OpenGL extensions.
+  * Added srmCoreGetVersion() to retrieve the current SRM version.
+
+  # Building
+
+  * Incorporated soversion in meson.build, special thanks to @sudipm-mukherjee.
+  
+  # Internal Changes
+
+  * Set rendering OpenGL contexts to high priority.
+  * Removed GL_BGRA format dependency in DUMB and CPU render modes.
+  * Reduced the frequency of calls to eglMakeCurrent() in all render modes.
+  
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Fri, 15 Dec 2023 20:24:22 -0300
+
+
 SRM (0.3.2-2)
 
   # Building

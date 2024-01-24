@@ -2,6 +2,7 @@
 #define SRMCONNECTOR_H
 
 #include "SRMTypes.h"
+#include <xf86drmMode.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -563,6 +564,23 @@ UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector);
  * @warning It is important to ensure that the coordinates of the rectangles originate from the top-left corner of the framebuffer and do not extend beyond its boundaries to avoid segmentation errors.
  */
 UInt8 srmConnectorSetBufferDamage(SRMConnector *connector, SRMRect *rects, Int32 n);
+
+/**
+ * @brief Get the subpixel layout associated with a connector.
+ *
+ * This function retrieves the subpixel layout associated with a given connector.
+ * Subpixels are individual color elements that make up a pixel on a display, and the subpixel layout
+ * is crucial for accurate color interpretation and display. The returned value indicates how the
+ * red, green, and blue subpixels are arranged in relation to each other.
+ *
+ * @note The returned value is only meaningful when a display is connected. If the subpixel layout is unknown or not applicable,
+ *       the method may return @ref SRM_CONNECTOR_SUBPIXEL_UNKNOWN or @ref SRM_CONNECTOR_SUBPIXEL_NONE, respectively.
+ *
+ * @param connector Pointer to the @ref SRMConnector for which the subpixel layout is requested.
+ * @return The subpixel layout associated with the connector.
+ *
+ */
+SRM_CONNECTOR_SUBPIXEL srmConnectorGetSubPixel(SRMConnector *connector);
 
 /**
  * @}

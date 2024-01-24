@@ -219,6 +219,66 @@ const char *srmGetConnectorStateString(SRM_CONNECTOR_STATE state);
 const char *srmGetConnectorTypeString(UInt32 type);
 
 /**
+ * @ingroup SRMConnector
+ * @brief Enumeration of connector subpixel layouts.
+ *
+ * This enumeration defines different subpixel layouts that can be associated with a connector.
+ * Subpixels are individual color elements that make up a pixel on a display. Understanding the subpixel layout
+ * is crucial for accurate color interpretation and display.
+ */
+typedef enum SRM_CONNECTOR_SUBPIXEL_ENUM
+{
+    /**
+     * @brief Unknown subpixel layout.
+     */
+    SRM_CONNECTOR_SUBPIXEL_UNKNOWN = 1,
+
+    /**
+     * @brief Horizontal subpixel layout with RGB order.
+     *
+     * Red, green, and blue subpixels are arranged horizontally.
+     */
+    SRM_CONNECTOR_SUBPIXEL_HORIZONTAL_RGB = 2,
+
+    /**
+     * @brief Horizontal subpixel layout with BGR order.
+     *
+     * Blue, green, and red subpixels are arranged horizontally.
+     */
+    SRM_CONNECTOR_SUBPIXEL_HORIZONTAL_BGR = 3,
+
+    /**
+     * @brief Vertical subpixel layout with RGB order.
+     *
+     * Red, green, and blue subpixels are arranged vertically.
+     */
+    SRM_CONNECTOR_SUBPIXEL_VERTICAL_RGB = 4,
+
+    /**
+     * @brief Vertical subpixel layout with BGR order.
+     *
+     * Blue, green, and red subpixels are arranged vertically.
+     */
+    SRM_CONNECTOR_SUBPIXEL_VERTICAL_BGR = 5,
+
+    /**
+     * @brief No specific subpixel layout.
+     *
+     * The connector does not have a well-defined order for subpixels.
+     */
+    SRM_CONNECTOR_SUBPIXEL_NONE = 6,
+} SRM_CONNECTOR_SUBPIXEL;
+
+/**
+ * @brief Get a string representation of a connector subpixel layout.
+ *
+ * @param subpixel The connector subpixel layout to retrieve the string for.
+ *
+ * @return A pointer to the string representation of the subpixel layout.
+ */
+const char *srmGetConnectorSubPixelString(SRM_CONNECTOR_SUBPIXEL subpixel);
+
+/**
  * @}
  */
 

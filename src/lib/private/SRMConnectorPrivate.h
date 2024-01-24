@@ -7,6 +7,7 @@
 #include <gbm.h>
 #include <EGL/egl.h>
 #include <xf86drm.h>
+#include <xf86drmMode.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,6 +52,7 @@ struct SRMConnectorStruct
     struct SRMConnectorPropIDs propIDs;
     SRMList *encoders, *modes;
     UInt32 mmWidth, mmHeight;
+    SRM_CONNECTOR_SUBPIXEL subpixel;
     SRMConnectorMode *preferredMode, *currentMode,
     *targetMode; // This one is used while changing mode
 

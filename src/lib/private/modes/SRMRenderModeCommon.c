@@ -201,6 +201,7 @@ UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
         pthread_mutex_unlock(&connector->stateMutex);
         connector->interface->uninitializeGL(connector, connector->interfaceData);
         connector->renderInterface.uninitialize(connector);
+        eglReleaseThread();
         pthread_mutex_lock(&connector->stateMutex);
         connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
         pthread_mutex_unlock(&connector->stateMutex);

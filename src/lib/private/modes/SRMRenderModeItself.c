@@ -99,7 +99,6 @@ static UInt8 createGBMSurfaces(SRMConnector *connector)
         return 1;
     }
 
-
     data->connectorGBMSurface = gbm_surface_create(
         connector->device->gbm,
         connector->currentMode->info.hdisplay,
@@ -284,7 +283,7 @@ static void destroyEGLSurfaces(SRMConnector *connector)
     {
         for (UInt32 i = 0; i < data->buffersCount; i++)
         {
-            if(data->connectorBOs[i])
+            if (data->connectorBOs[i])
             {
                 gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[i]);
                 data->connectorBOs[i] = NULL;
@@ -457,13 +456,19 @@ static UInt8 initCrtc(SRMConnector *connector)
 
 static void uninitialize(SRMConnector *connector)
 {
-    if (connector->renderData)
+    RenderModeData *data = (RenderModeData*)connector->renderData;
+
+    if (data)
     {
+        eglMakeCurrent(connector->device->eglDisplay,
+                       EGL_NO_SURFACE,
+                       EGL_NO_SURFACE,
+                       data->connectorEGLContext);
         srmRenderModeCommonUninitialize(connector);
-        destroyEGLSurfaces(connector);
-        destroyEGLContext(connector);
         destroyDRMFramebuffers(connector);
+        destroyEGLSurfaces(connector);
         destroyGBMSurfaces(connector);
+        destroyEGLContext(connector);
         destroyData(connector);
     }
 }

@@ -566,3 +566,8 @@ UInt8 srmConnectorSetBufferDamage(SRMConnector *connector, SRMRect *rects, Int32
     connector->damageRectsCount = n;
     return 1;
 }
+
+SRM_CONNECTOR_SUBPIXEL srmConnectorGetSubPixel(SRMConnector *connector)
+{
+    return connector->subpixel;
+}

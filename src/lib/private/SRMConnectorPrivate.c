@@ -94,6 +94,7 @@ UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
         return 0;
     }
 
+    connector->subpixel = (SRM_CONNECTOR_SUBPIXEL)connectorRes->subpixel;
     connector->mmHeight = connectorRes->mmHeight;
     connector->mmWidth = connectorRes->mmWidth;
     connector->connected = connectorRes->connection == DRM_MODE_CONNECTED;

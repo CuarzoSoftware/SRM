@@ -490,6 +490,18 @@ void srmBufferDestroy(SRMBuffer *buffer)
 {
     pthread_mutex_lock(&buffer->mutex);
 
+    if (buffer->map)
+    {
+        if (buffer->mapData)
+            gbm_bo_unmap(buffer->bo, buffer->mapData);
+        else
+            munmap(buffer->map, buffer->height * buffer->strides[0]);
+    }
+
+    for (UInt32 i = 0; i < buffer->planesCount; i++)
+        if (buffer->fds[i] != -1)
+            close(buffer->fds[i]);
+
     if (buffer->textures)
     {
         while (!srmListIsEmpty(buffer->textures))
@@ -511,22 +523,8 @@ void srmBufferDestroy(SRMBuffer *buffer)
     while (!srmListIsEmpty(buffer->core->deallocatorMessages))
         usleep(1000);
 
-    for (UInt32 i = 0; i < buffer->planesCount; i++)
-    {
-        if (buffer->fds[i] != -1)
-            close(buffer->fds[i]);
-    }
-
     if (buffer->bo)
     {
-        if (buffer->map)
-        {
-            if (buffer->mapData)
-                gbm_bo_unmap(buffer->bo, buffer->mapData);
-            else
-                munmap(buffer->map, buffer->height * buffer->strides[0]);
-        }
-
         // Do not destroy the user's bo
         if (buffer->src != SRM_BUFFER_SRC_GBM)
             gbm_bo_destroy(buffer->bo);

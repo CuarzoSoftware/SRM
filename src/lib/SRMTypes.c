@@ -107,3 +107,17 @@ const char *srmGetConnectorTypeString(UInt32 type)
         default:                             return "unknown";
     }
 }
+
+const char *srmGetConnectorSubPixelString(SRM_CONNECTOR_SUBPIXEL subpixel)
+{
+    switch (subpixel)
+    {
+        case SRM_CONNECTOR_SUBPIXEL_UNKNOWN:        return "UNKNOWN";
+        case SRM_CONNECTOR_SUBPIXEL_HORIZONTAL_RGB: return "HORIZONTAL_RGB";
+        case SRM_CONNECTOR_SUBPIXEL_HORIZONTAL_BGR: return "HORIZONTAL_BGR";
+        case SRM_CONNECTOR_SUBPIXEL_VERTICAL_RGB:   return "VERTICAL_RGB";
+        case SRM_CONNECTOR_SUBPIXEL_VERTICAL_BGR:   return "VERTICAL_BGR";
+        case SRM_CONNECTOR_SUBPIXEL_NONE:           return "NONE";
+        default:                                    return "unknown";
+    }
+}

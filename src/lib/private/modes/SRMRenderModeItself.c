@@ -465,10 +465,10 @@ static void uninitialize(SRMConnector *connector)
                        EGL_NO_SURFACE,
                        data->connectorEGLContext);
         srmRenderModeCommonUninitialize(connector);
-        destroyDRMFramebuffers(connector);
         destroyEGLSurfaces(connector);
-        destroyGBMSurfaces(connector);
         destroyEGLContext(connector);
+        destroyDRMFramebuffers(connector);
+        destroyGBMSurfaces(connector);
         destroyData(connector);
     }
 }

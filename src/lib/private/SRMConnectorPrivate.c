@@ -31,6 +31,7 @@ SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
     connector->device = device;
     connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
     pthread_mutex_init(&connector->stateMutex, NULL);
+    pthread_mutex_init(&connector->propsMutex, NULL);
     srmConnectorUpdateProperties(connector);
 
     // srmConnectorUpdateNames(connector) is called after its device is added to the core devices list
@@ -48,6 +49,7 @@ void srmConnectorDestroy(SRMConnector *connector)
     srmConnectorDestroyEncoders(connector);
     srmConnectorDestroyModes(connector);
 
+    pthread_mutex_destroy(&connector->propsMutex);
     pthread_mutex_destroy(&connector->stateMutex);
 
     if (connector->deviceLink)
@@ -493,7 +495,7 @@ void *srmConnectorRenderThread(void *conn)
                     pthread_mutex_unlock(&connector->stateMutex);
                     continue;
             }
-            else if (connector->atomicCursorHasChanges)
+            else if (connector->atomicChanges)
             {
                 srmRenderModeCommonPageFlip(connector, connector->lastFb);
             }
@@ -547,6 +549,7 @@ repaintCondFail:
 repaintMutexFail:
     pthread_mutex_destroy(&connector->repaintMutex);
     connector->renderInitResult = -1;
+    connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
     return NULL;
 }
 

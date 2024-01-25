@@ -9,11 +9,12 @@
 extern "C" {
 #endif
 
-enum SRM_CURSOR_ATOMIC_CHANGE
+enum SRM_ATOMIC_CHANGE
 {
-    SRM_CURSOR_ATOMIC_CHANGE_VISIBILITY = 1,
-    SRM_CURSOR_ATOMIC_CHANGE_POSITION = 2,
-    SRM_CURSOR_ATOMIC_CHANGE_BUFFER = 4,
+    SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY = 1 << 0,
+    SRM_ATOMIC_CHANGE_CURSOR_POSITION   = 1 << 1,
+    SRM_ATOMIC_CHANGE_CURSOR_BUFFER     = 1 << 2,
+    SRM_ATOMIC_CHANGE_GAMMA_LUT         = 1 << 3,
 };
 
 Int8  srmRenderModeCommonMatchConfigToVisual(EGLDisplay egl_display, EGLint visual_id, EGLConfig *configs, int count);
@@ -22,7 +23,7 @@ void  srmRenderModeCommonPageFlipHandler(int, unsigned int, unsigned int, unsign
 UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector);
 void srmRenderModeCommonDestroyCursor(SRMConnector *connector);
 UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector);
-void srmRenderModeCommitCursorChanges(SRMConnector *connector, drmModeAtomicReqPtr req);
+void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqPtr req);
 Int32 srmRenderModeAtomicResetConnectorProps(SRMConnector *connector);
 Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags, void *data);
 Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb);

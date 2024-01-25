@@ -3,6 +3,16 @@ SRM (0.5.0-1)
   # New Features
 
   * Introduced srmConnectorGetSubPixel() to retrieve the subpixel layout of a connected display.
+  * Added support for gamma correction through srmConnectorGetGammaSize() and srmConnectorSetGamma().
+
+  # Security Improvements
+
+  * Fixed a security vulnerability where the hardware cursor plane pointer reference used by a connector was set to NULL
+    before the connector was completely uninitialized. This could have caused crashes due to racing conditions between threads.
+
+  # Documentation
+
+  * Enhanced the Doxygen layout to showcase member declarations at the top of each page, accompanied by brief descriptions for improved readability.
   
 -- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Wed, 24 Jan 2024 12:43:33 -0300
 

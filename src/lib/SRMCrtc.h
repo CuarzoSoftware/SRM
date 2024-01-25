@@ -49,6 +49,20 @@ SRMDevice *srmCrtcGetDevice(SRMCrtc *crtc);
 SRMConnector *srmCrtcGetCurrentConnector(SRMCrtc *crtc);
 
 /**
+ * @brief Gets the number of elements used to represent each RGB gamma correction curve.
+ *
+ * This function retrieves the number of elements (N) used to represent each RGB gamma correction curve,
+ * where N is the count of @ref UInt16 elements for red, green, and blue curves.
+ * 
+ * @see srmConnectorSetGamma()
+ * 
+ * @param connector Pointer to the @ref SRMCrtc.
+ * @return The number of elements used to represent each RGB gamma correction curve, or 0
+ *         if the driver does not support gamma correction.
+ */
+UInt64 srmCrtcGetGammaSize(SRMCrtc *crtc);
+
+/**
  * @}
  */
 

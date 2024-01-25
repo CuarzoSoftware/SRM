@@ -33,6 +33,17 @@ void srmCrtcDestroy(SRMCrtc *crtc)
 
 UInt8 srmCrtcUpdateProperties(SRMCrtc *crtc)
 {
+    drmModeCrtc *crtcRes = drmModeGetCrtc(crtc->device->fd, crtc->id);
+
+    if (!crtcRes)
+    {
+        SRMError("Unable to get device %s crtc %d resources.", crtc->device->name, crtc->id);
+        return 0;
+    }
+
+    crtc->gammaSizeLegacy = (UInt64)crtcRes->gamma_size;
+    drmModeFreeCrtc(crtcRes);
+
     drmModeObjectPropertiesPtr props = drmModeObjectGetProperties(crtc->device->fd, crtc->id, DRM_MODE_OBJECT_CRTC);
 
     if (!props)
@@ -58,7 +69,10 @@ UInt8 srmCrtcUpdateProperties(SRMCrtc *crtc)
         else if (strcmp(prop->name, "GAMMA_LUT") == 0)
             crtc->propIDs.GAMMA_LUT = prop->prop_id;
         else if (strcmp(prop->name, "GAMMA_LUT_SIZE") == 0)
+        {
             crtc->propIDs.GAMMA_LUT_SIZE = prop->prop_id;
+            crtc->gammaSize = (UInt64)props->prop_values[i];
+        }
         else if (strcmp(prop->name, "MODE_ID") == 0)
             crtc->propIDs.MODE_ID = prop->prop_id;
         else if (strcmp(prop->name, "VRR_ENABLED") == 0)
@@ -68,7 +82,6 @@ UInt8 srmCrtcUpdateProperties(SRMCrtc *crtc)
     }
 
     drmModeFreeObjectProperties(props);
-
     return 1;
 }
 

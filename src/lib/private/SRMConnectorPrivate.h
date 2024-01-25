@@ -61,7 +61,10 @@ struct SRMConnectorStruct
     SRMPlane *currentPrimaryPlane, *currentCursorPlane;
     SRM_CONNECTOR_STATE state;
 
-    // Used to
+    // Gamma table, used only in atomic API
+    struct drm_color_lut *gamma;
+    UInt32 gammaBlobId;
+
     Int8 renderInitResult;
     UInt8 connected;
     char *name, *manufacturer, *model, *serial;
@@ -71,7 +74,7 @@ struct SRMConnectorStruct
     UInt32 cursorFB, cursorFBPending;
     Int32 cursorX, cursorY;
     UInt8 cursorVisible;
-    UInt8 atomicCursorHasChanges;
+    UInt32 atomicChanges;
 
     // Interface for OpenGL events
     SRMConnectorInterface *interface;
@@ -90,6 +93,9 @@ struct SRMConnectorStruct
     SRMRect *damageRects;
     Int32 damageRectsCount;
     SRMFormat currentFormat;
+
+    // Protect stuff like cursor and gamma updates
+    pthread_mutex_t propsMutex;
 
     // Render specific
     struct SRMConnectorRenderInterface renderInterface;

@@ -24,6 +24,8 @@ struct SRMCrtcStruct
     SRMListItem *deviceLink;
     SRMConnector *currentConnector;
     struct SRMCrtcPropIDs propIDs;
+    UInt64 gammaSizeLegacy;
+    UInt64 gammaSize;
 };
 
 SRMCrtc *srmCrtcCreate(SRMDevice *device, UInt32 id);

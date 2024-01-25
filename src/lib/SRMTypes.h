@@ -51,6 +51,18 @@ typedef int8_t   Int8;
 typedef uint8_t  UInt8;
 
 /**
+ * @typedef Int16
+ * @brief Alias for a signed 16-bit integer (int16_t).
+ */
+typedef int16_t  Int16;
+
+/**
+ * @typedef UInt16
+ * @brief Alias for an unsigned 16-bit integer (uint16_t).
+ */
+typedef uint16_t UInt16;
+
+/**
  * @typedef Int32
  * @brief Alias for a signed 32-bit integer (int32_t).
  */
@@ -73,6 +85,18 @@ typedef int64_t  Int64;
  * @brief Alias for an unsigned 64-bit integer (uint64_t).
  */
 typedef uint64_t UInt64;
+
+/**
+ * @typedef Float32
+ * @brief Alias for a 32-bit floating point (float).
+ */
+typedef float Float32;
+
+/**
+ * @typedef Float64
+ * @brief Alias for a 64-bit floating point (double).
+ */
+typedef double Float64;
 
 struct SRMCoreStruct;
 /// @ingroup SRMCore

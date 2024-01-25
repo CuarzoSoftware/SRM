@@ -583,6 +583,42 @@ UInt8 srmConnectorSetBufferDamage(SRMConnector *connector, SRMRect *rects, Int32
 SRM_CONNECTOR_SUBPIXEL srmConnectorGetSubPixel(SRMConnector *connector);
 
 /**
+ * @brief Gets the number of elements used to represent each RGB gamma correction curve.
+ *
+ * This function retrieves the number of elements (N) used to represent each RGB gamma correction curve,
+ * where N is the count of @ref UInt16 elements for red, green, and blue curves.
+ * 
+ * @note This method should only be called once the connector is assigned a CRTC,
+ *       meaning after the connector is initialized. If called when uninitialized, it returns 0.
+ *       If the connector is initialized and this method returns 0, it indicates that the driver
+ *       does not support gamma correction.
+ * 
+ * @param connector Pointer to the @ref SRMConnector.
+ * @return The number of elements used to represent each RGB gamma correction curve, or 0 if the connector is uninitialized or
+ *         if the driver does not support gamma correction.
+ */
+UInt64 srmConnectorGetGammaSize(SRMConnector *connector);
+
+/**
+ * @brief Sets the gamma correction curves for each RGB component.
+ *
+ * This method allows you to individually set the gamma correction curves for each RGB component.
+ * The number of elements for each curve (N) should be obtained using srmConnectorGetGammaSize().
+ * The table array should then have a size of `3 * N * sizeof(UInt16)` bytes, with N @ref UInt16 values for red,
+ * N for green, and N for blue, in that order. Each value of the curves can represent the full range of @ref UInt16.
+ * 
+ * @note This method must only be called after the connector is initialized.
+ *       If the connector is uninitialized or the driver does not support gamma correction,
+ *       the function returns 0.
+ * 
+ * @param connector Pointer to the @ref SRMConnector.
+ * @param table Pointer to the array containing RGB curves for gamma correction.
+ * @return On success, returns 1. On failure (uninitialized connector or no gamma correction support),
+ *         returns 0. 
+ */
+UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table);
+
+/**
  * @}
  */
 

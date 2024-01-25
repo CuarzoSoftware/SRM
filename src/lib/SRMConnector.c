@@ -103,8 +103,10 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
 
         if (connector->device->clientCapAtomic)
         {
+            pthread_mutex_lock(&connector->propsMutex);
             connector->cursorVisible = 0;
-            connector->atomicCursorHasChanges |= SRM_CURSOR_ATOMIC_CHANGE_VISIBILITY;
+            connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
+            pthread_mutex_unlock(&connector->propsMutex);
             pthread_cond_signal(&connector->repaintCond);
         }
         else
@@ -120,8 +122,10 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
 
     gbm_bo_write(connector->cursorBOPending, pixels, 64*64*4);
 
+    pthread_mutex_lock(&connector->propsMutex);
+
     if (connector->device->clientCapAtomic)
-        connector->atomicCursorHasChanges |= SRM_CURSOR_ATOMIC_CHANGE_BUFFER;
+        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_BUFFER;
     else
     {
         struct gbm_bo *tmpBo = connector->cursorBO;
@@ -133,15 +137,16 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
         connector->cursorFBPending = tmpFb;
     }
 
-    if (connector->cursorVisible == 1 && connector->device->clientCapAtomic && connector->atomicCursorHasChanges)
+    if (connector->cursorVisible == 1 && connector->device->clientCapAtomic && connector->atomicChanges)
     {
+        pthread_mutex_unlock(&connector->propsMutex);
         pthread_cond_signal(&connector->repaintCond);
         return 1;
     }
 
     if (connector->device->clientCapAtomic)
     {
-        connector->atomicCursorHasChanges |= SRM_CURSOR_ATOMIC_CHANGE_VISIBILITY;
+        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
         pthread_cond_signal(&connector->repaintCond);
     }
     else
@@ -154,7 +159,7 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
     }
 
     connector->cursorVisible = 1;
-
+    pthread_mutex_unlock(&connector->propsMutex);
     return 1;
 }
 
@@ -168,9 +173,11 @@ UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
 
     if (connector->device->clientCapAtomic)
     {
+        pthread_mutex_lock(&connector->propsMutex);
         connector->cursorX = x;
         connector->cursorY = y;
-        connector->atomicCursorHasChanges |= SRM_CURSOR_ATOMIC_CHANGE_POSITION;
+        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION;
+        pthread_mutex_unlock(&connector->propsMutex);
         pthread_cond_signal(&connector->repaintCond);
     }
     else
@@ -312,6 +319,11 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
     connector->renderInitResult = 0;
     connector->firstPageFlip = 1;
 
+    UInt64 gammaSize = srmCrtcGetGammaSize(connector->currentCrtc);
+
+    if (gammaSize > 0 && connector->device->clientCapAtomic && connector->currentCrtc->propIDs.GAMMA_LUT_SIZE)
+        connector->gamma = malloc(gammaSize * sizeof(*connector->gamma));
+
     if (pthread_create(&connector->renderThread, NULL, srmConnectorRenderThread, connector))
     {
         SRMError("Could not start render thread for device %s connector %d.", connector->device->name, connector->id);
@@ -351,6 +363,18 @@ fail:
 
     connector->interfaceData = NULL;
     connector->interface = NULL;
+
+    if (connector->gammaBlobId)
+    {
+        drmModeDestroyPropertyBlob(connector->device->fd, connector->gammaBlobId);
+        connector->gammaBlobId = 0;
+    }
+
+    if (connector->gamma)
+    {
+        free(connector->gamma);
+        connector->gamma = NULL;
+    }
 
     connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
     return 0;
@@ -422,6 +446,18 @@ void srmConnectorUninitialize(SRMConnector *connector)
     connector->interfaceData = NULL;
     connector->interface = NULL;
 
+    if (connector->gamma)
+    {
+        free(connector->gamma);
+        connector->gamma = NULL;
+    }
+
+    if (connector->gammaBlobId)
+    {
+        drmModeDestroyPropertyBlob(connector->device->fd, connector->gammaBlobId);
+        connector->gammaBlobId = 0;
+    }
+
     SRMDebug("[%s] Connector (%d) %s, %s, %s uninitialized.",
              connector->device->name,
              connector->id,
@@ -461,14 +497,14 @@ UInt8 srmConnectorSuspend(SRMConnector *connector)
         case SRM_CONNECTOR_STATE_INITIALIZED:
         {
             connector->state = SRM_CONNECTOR_STATE_SUSPENDING;
-            connector->atomicCursorHasChanges = 0;
+            connector->atomicChanges = 0;
             pthread_mutex_unlock(&connector->stateMutex);
             return srmConnectorSuspend(connector);
         }
         default:
         {
             srmConnectorUnlockRenderThread(connector, 1);
-            connector->atomicCursorHasChanges = 0;
+            connector->atomicChanges = 0;
             pthread_mutex_unlock(&connector->stateMutex);
             usleep(10000);
             return srmConnectorSuspend(connector);
@@ -570,4 +606,66 @@ UInt8 srmConnectorSetBufferDamage(SRMConnector *connector, SRMRect *rects, Int32
 SRM_CONNECTOR_SUBPIXEL srmConnectorGetSubPixel(SRMConnector *connector)
 {
     return connector->subpixel;
+}
+
+UInt64 srmConnectorGetGammaSize(SRMConnector *connector)
+{
+    if (connector->currentCrtc)
+        return srmCrtcGetGammaSize(connector->currentCrtc);
+
+    return 0;
+}
+
+UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table)
+{
+    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED || !connector->currentCrtc)
+    {
+        SRMError("Failed to set gamma for connector %d. Gamma cannot be set on an uninitialized connector.",
+            connector->id);
+        return 0;
+    }
+
+    UInt64 gammaSize = srmCrtcGetGammaSize(connector->currentCrtc);
+
+    if (gammaSize == 0)
+    {
+        SRMError("Failed to set gamma for connector %d. Gamma size is 0, indicating that the driver does not support gamma correction.",
+            connector->id);
+        return 0;
+    }
+
+    if (connector->device->clientCapAtomic && connector->currentCrtc->propIDs.GAMMA_LUT_SIZE)
+    {
+        pthread_mutex_lock(&connector->propsMutex);
+        UInt16 *R = table;
+        UInt16 *G = table + gammaSize;
+        UInt16 *B = G + gammaSize;
+
+        for (UInt64 i = 0; i < gammaSize; i++)
+        {
+            connector->gamma[i].red = R[i];
+            connector->gamma[i].green = G[i];
+            connector->gamma[i].blue = B[i];
+        }
+        
+        connector->atomicChanges |= SRM_ATOMIC_CHANGE_GAMMA_LUT;
+        pthread_mutex_unlock(&connector->propsMutex);
+        return 1;
+    }
+    else
+    {
+        if (drmModeCrtcSetGamma(connector->device->fd,
+            connector->currentCrtc->id,
+            (UInt32)gammaSize,
+            table,
+            table + gammaSize,
+            table + gammaSize + gammaSize))
+        {
+            SRMError("Failed to set gamma for connector %d using legacy API drmModeCrtcSetGamma().",
+            connector->id);
+            return 0;
+        }
+    }
+
+    return 1;
 }

@@ -17,7 +17,13 @@ The **srm-multi-session** example also require:
 
 ## Debian (Ubuntu, Linux Mint, etc)
 
-To build SRM from a Debian based distribution please install the following packages:
+Thanks to [@sudipm-mukherjee](https://github.com/sudipm-mukherjee), you can directly install the library (v0.4.0-1) and examples from the Debian sid repository using the following command:
+
+```bash
+$ sudo apt install libsrm-dev libsrm-examples
+```
+
+To build SRM manually from a Debian based distribution please install the following packages:
 
 ```bash
 $ sudo apt install build-essential meson libseat-dev libinput-dev libudev-dev libdrm-dev libgbm-dev libegl1-mesa-dev libgles2-mesa-dev hwinfo libdisplay-info-dev

@@ -15,6 +15,7 @@ SRM (0.5.0-1)
   # Documentation
 
   * Enhanced the Doxygen layout to showcase member declarations at the top of each page, accompanied by brief descriptions for improved readability.
+  * Acknowledge the valuable contribution from @sudipm-mukherjee for uploading SRM to the Debian sid repository, highlighted on the Downloads page.
 
   # Building
 

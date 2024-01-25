@@ -167,6 +167,17 @@ typedef struct SRMRectStruct
 } SRMRect;
 
 /**
+ * @brief Structure representing a 2D bounding box.
+ */
+typedef struct SRMBoxStruct
+{
+    Int32 x1;       ///< X-coordinate of the left edge.
+    Int32 y1;       ///< Y-coordinate of the top edge.
+    Int32 x2;       ///< X-coordinate of the right edge.
+    Int32 y2;       ///< Y-coordinate of the bottom edge.
+} SRMBox;
+
+/**
  * @ingroup SRMDevice
  * @brief Enumeration of devices rendering modes.
  */

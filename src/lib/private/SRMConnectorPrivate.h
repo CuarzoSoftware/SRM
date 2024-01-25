@@ -90,8 +90,8 @@ struct SRMConnectorStruct
     pthread_mutex_t repaintMutex;
     UInt8 repaintRequested;
     pthread_mutex_t stateMutex;
-    SRMRect *damageRects;
-    Int32 damageRectsCount;
+    SRMBox *damageBoxes;
+    Int32 damageBoxesCount;
     SRMFormat currentFormat;
 
     // Protect stuff like cursor and gamma updates

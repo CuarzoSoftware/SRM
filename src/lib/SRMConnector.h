@@ -566,6 +566,20 @@ UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector);
 UInt8 srmConnectorSetBufferDamage(SRMConnector *connector, SRMRect *rects, Int32 n);
 
 /**
+ * @brief Notifies the connector of new damage generated during the last `paintGL()` call using boxes.
+ *
+ * This method is analogous to srmConnectorSetBufferDamage(), but instead of @ref SRMRect, it accepts @ref SRMBox.
+ *
+ * @see srmConnectorSetBufferDamage().
+ *
+ * @param connector Pointer to the @ref SRMConnector structure to notify of buffer damage.
+ * @param boxes An array of @ref SRMBox structures representing the damaged areas.
+ * @param n The number of boxes in the array. Passing 0 unsets the current damage.
+ * @return Returns 1 if the damage notification is successful, 0 if an error occurs.
+ */
+UInt8 srmConnectorSetBufferDamageBoxes(SRMConnector *connector, SRMBox *boxes, Int32 n);
+
+/**
  * @brief Get the subpixel layout associated with a connector.
  *
  * This function retrieves the subpixel layout associated with a given connector.

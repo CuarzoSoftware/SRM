@@ -376,6 +376,13 @@ fail:
         connector->gamma = NULL;
     }
 
+    if (connector->damageBoxes)
+    {
+        free(connector->damageBoxes);
+        connector->damageBoxes = NULL;
+        connector->damageBoxesCount = 0;
+    }
+
     connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
     return 0;
 }
@@ -456,6 +463,13 @@ void srmConnectorUninitialize(SRMConnector *connector)
     {
         drmModeDestroyPropertyBlob(connector->device->fd, connector->gammaBlobId);
         connector->gammaBlobId = 0;
+    }
+
+    if (connector->damageBoxes)
+    {
+        free(connector->damageBoxes);
+        connector->damageBoxes = NULL;
+        connector->damageBoxesCount = 0;
     }
 
     SRMDebug("[%s] Connector (%d) %s, %s, %s uninitialized.",
@@ -572,6 +586,9 @@ SRMBuffer *srmConnectorGetBuffer(SRMConnector *connector, UInt32 bufferIndex)
 
 UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector)
 {
+    if (connector->currentPrimaryPlane && connector->currentPrimaryPlane->propIDs.FB_DAMAGE_CLIPS)
+        return 1;
+
     SRM_RENDER_MODE renderMode = srmDeviceGetRenderMode(connector->device);
 
     if (renderMode == SRM_RENDER_MODE_ITSELF)
@@ -583,23 +600,58 @@ UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector)
 
 UInt8 srmConnectorSetBufferDamage(SRMConnector *connector, SRMRect *rects, Int32 n)
 {
-    if (!srmConnectorHasBufferDamageSupport(connector))
+    if (!connector->currentPrimaryPlane || !srmConnectorHasBufferDamageSupport(connector))
         return 0;
 
-    if (connector->damageRects)
+    if (connector->damageBoxes)
     {
-        free(connector->damageRects);
-        connector->damageRects = NULL;
-        connector->damageRectsCount = 0;
+        free(connector->damageBoxes);
+        connector->damageBoxes = NULL;
+        connector->damageBoxesCount = 0;
     }
 
-    if (n <= 0)
+    if (n == 0)
+        return 1;
+
+    if (n < 0)
         return 0;
 
-    ssize_t size = sizeof(SRMRect)*n;
-    connector->damageRects = malloc(size);
-    memcpy(connector->damageRects, rects, size);
-    connector->damageRectsCount = n;
+    ssize_t size = sizeof(SRMBox)*n;
+    connector->damageBoxes = malloc(size);
+
+    for (Int32 i = 0; i < n; i++)
+    {
+        connector->damageBoxes[i].x1 = rects[i].x;
+        connector->damageBoxes[i].y1 = rects[i].y;
+        connector->damageBoxes[i].x2 = rects[i].x + rects[i].width;
+        connector->damageBoxes[i].y2 = rects[i].y + rects[i].height;
+    }
+    connector->damageBoxesCount = n;
+    return 1;
+}
+
+UInt8 srmConnectorSetBufferDamageBoxes(SRMConnector *connector, SRMBox *boxes, Int32 n)
+{
+    if (!connector->currentPrimaryPlane || !srmConnectorHasBufferDamageSupport(connector))
+        return 0;
+
+    if (connector->damageBoxes)
+    {
+        free(connector->damageBoxes);
+        connector->damageBoxes = NULL;
+        connector->damageBoxesCount = 0;
+    }
+
+    if (n == 0)
+        return 1;
+
+    if (n < 0)
+        return 0;
+
+    ssize_t size = sizeof(SRMBox)*n;
+    connector->damageBoxes = malloc(size);
+    memcpy(connector->damageBoxes, boxes, size);
+    connector->damageBoxesCount = n;
     return 1;
 }
 

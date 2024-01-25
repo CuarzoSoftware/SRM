@@ -537,24 +537,26 @@ static UInt8 flipPage(SRMConnector *connector)
     if (useBufferRead)
         goto skipGLRead;
 
-    if (connector->damageRectsCount > 0)
+    if (connector->damageBoxesCount > 0)
     {
-        SRMRect *rect;
+        SRMBox *box;
         UInt32 buffInd;
+        Int32 w;
 
-        for (Int32 r = 0; r < connector->damageRectsCount; r++)
+        for (Int32 r = 0; r < connector->damageBoxesCount; r++)
         {
-            rect = &connector->damageRects[r];
+            box = &connector->damageBoxes[r];
 
-            for (Int32 i = rect->y; i < rect->y + rect->height; i++)
+            for (Int32 i = box->y1; i < box->y2; i++)
             {
-                buffInd = i*p + s*rect->x;
+                buffInd = i*p + s*box->x1;
+                w = box->x2 - box->x1;
 
                 if (connector->device->glExtensions.EXT_read_format_bgra)
                 {
-                    glReadPixels(rect->x,
+                    glReadPixels(box->x1,
                                  h-i-1,
-                                 rect->width,
+                                 w,
                                  1,
                                  GL_BGRA_EXT,
                                  GL_UNSIGNED_BYTE,
@@ -562,9 +564,9 @@ static UInt8 flipPage(SRMConnector *connector)
                 }
                 else
                 {
-                    glReadPixels(rect->x,
+                    glReadPixels(box->x1,
                                  h-i-1,
-                                 rect->width,
+                                 w,
                                  1,
                                  GL_RGBA,
                                  GL_UNSIGNED_BYTE,
@@ -573,7 +575,7 @@ static UInt8 flipPage(SRMConnector *connector)
                     UInt8 tmp;
 
                     // Swap R <> B
-                    for (UInt32 r = buffInd; r < buffInd + rect->width * s; r += s)
+                    for (UInt32 r = buffInd; r < buffInd + w * s; r += s)
                     {
                         tmp = data->dumbMaps[b][r];
                         data->dumbMaps[b][r] = data->dumbMaps[b][r + 2];
@@ -583,9 +585,9 @@ static UInt8 flipPage(SRMConnector *connector)
             }
         }
 
-        connector->damageRectsCount = 0;
-        free(connector->damageRects);
-        connector->damageRects = NULL;
+        connector->damageBoxesCount = 0;
+        free(connector->damageBoxes);
+        connector->damageBoxes = NULL;
     }
     else
     {
@@ -630,21 +632,23 @@ static UInt8 flipPage(SRMConnector *connector)
 
     if (useBufferRead)
     {
-        if (connector->damageRectsCount > 0)
+        if (connector->damageBoxesCount > 0)
         {
-            SRMRect *rect;
+            SRMBox *box;
 
-            for (Int32 r = 0; r < connector->damageRectsCount; r++)
+            for (Int32 r = 0; r < connector->damageBoxesCount; r++)
             {
-                rect = &connector->damageRects[r];
+                box = &connector->damageBoxes[r];
 
-                srmBufferRead(data->buffers[b],rect->x, rect->y, rect->width, rect->height,
-                              rect->x, rect->y, data->dumbBuffers[b].pitch, data->dumbMaps[b]);
+                srmBufferRead(data->buffers[b], box->x1, box->y1,
+                              box->x2 - box->x1,
+                              box->y2 - box->y1,
+                              box->x1, box->y1, data->dumbBuffers[b].pitch, data->dumbMaps[b]);
             }
 
-            connector->damageRectsCount = 0;
-            free(connector->damageRects);
-            connector->damageRects = NULL;
+            connector->damageBoxesCount = 0;
+            free(connector->damageBoxes);
+            connector->damageBoxes = NULL;
         }
         else
         {

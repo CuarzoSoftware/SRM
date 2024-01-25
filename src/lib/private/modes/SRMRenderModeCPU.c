@@ -823,7 +823,7 @@ static UInt8 flipPage(SRMConnector *connector)
                        data->rendererBuffers[data->currentBufferIndex]->map &&
                        data->rendererBuffers[data->currentBufferIndex]->modifiers[0] == DRM_FORMAT_MOD_LINEAR;
 
-    SRMRect defaultDamage =
+    SRMBox defaultDamage =
     {
         0,
         0,
@@ -831,13 +831,13 @@ static UInt8 flipPage(SRMConnector *connector)
         connector->currentMode->info.vdisplay
     };
 
-    SRMRect *damage;
+    SRMBox *damage;
     UInt32 damageCount;
 
-    if (connector->damageRectsCount > 0)
+    if (connector->damageBoxesCount > 0)
     {
-        damage = connector->damageRects;
-        damageCount = connector->damageRectsCount;
+        damage = connector->damageBoxes;
+        damageCount = connector->damageBoxesCount;
     }
     else
     {
@@ -847,7 +847,7 @@ static UInt8 flipPage(SRMConnector *connector)
 
     if (!mapEnabled)
     {
-        if (connector->damageRectsCount == 0)
+        if (connector->damageBoxesCount == 0)
         {
             glReadPixels(0,
                          0,
@@ -866,14 +866,14 @@ static UInt8 flipPage(SRMConnector *connector)
 
             for (UInt32 i = 0; i < damageCount; i++)
             {
-                y = connector->currentMode->info.vdisplay - damage[i].y - damage[i].height;
-                glPixelStorei(GL_PACK_SKIP_PIXELS, damage[i].x);
+                y = connector->currentMode->info.vdisplay - damage[i].y2;
+                glPixelStorei(GL_PACK_SKIP_PIXELS, damage[i].x1);
                 glPixelStorei(GL_PACK_SKIP_ROWS, y);
 
-                glReadPixels(damage[i].x,
+                glReadPixels(damage[i].x1,
                              y,
-                             damage[i].width,
-                             damage[i].height,
+                             damage[i].x2 - damage[i].x1,
+                             damage[i].y2 - damage[i].y1,
                              GL_RGBA,
                              GL_UNSIGNED_BYTE,
                              data->cpuBuffers[data->currentBufferIndex]);
@@ -913,14 +913,14 @@ static UInt8 flipPage(SRMConnector *connector)
                 data->currentBufferIndex]->offsets[0]
             ];
 
-            glPixelStorei(GL_UNPACK_SKIP_PIXELS, damage[i].x);
-            glPixelStorei(GL_UNPACK_SKIP_ROWS, damage[i].y);
+            glPixelStorei(GL_UNPACK_SKIP_PIXELS, damage[i].x1);
+            glPixelStorei(GL_UNPACK_SKIP_ROWS, damage[i].y1);
             glTexSubImage2D(GL_TEXTURE_2D,
                             0,
-                            damage[i].x,
-                            damage[i].y,
-                            damage[i].width,
-                            damage[i].height,
+                            damage[i].x1,
+                            damage[i].y1,
+                            damage[i].x2 - damage[i].x1,
+                            damage[i].y2 - damage[i].y1,
                             GL_BGRA,
                             GL_UNSIGNED_BYTE,
                             buff);
@@ -938,15 +938,15 @@ static UInt8 flipPage(SRMConnector *connector)
 
         for (UInt32 i = 0; i < damageCount; i++)
         {
-            y = connector->currentMode->info.vdisplay - damage[i].y - damage[i].height;
-            glPixelStorei(GL_UNPACK_SKIP_PIXELS, damage[i].x);
+            y = connector->currentMode->info.vdisplay - damage[i].y2;
+            glPixelStorei(GL_UNPACK_SKIP_PIXELS, damage[i].x1);
             glPixelStorei(GL_UNPACK_SKIP_ROWS, y);
             glTexSubImage2D(GL_TEXTURE_2D,
                             0,
-                            damage[i].x,
+                            damage[i].x1,
                             y,
-                            damage[i].width,
-                            damage[i].height,
+                            damage[i].x2 - damage[i].x1,
+                            damage[i].y2 - damage[i].y1,
                             GL_RGBA,
                             GL_UNSIGNED_BYTE,
                             data->cpuBuffers[data->currentBufferIndex]);
@@ -960,10 +960,10 @@ static UInt8 flipPage(SRMConnector *connector)
     for (UInt32 i = 0; i < damageCount; i++)
     {
         drawTexture(connector,
-                    damage[i].x,
-                    damage[i].y,
-                    damage[i].width,
-                    damage[i].height,
+                    damage[i].x1,
+                    damage[i].y1,
+                    damage[i].x2 - damage[i].x1,
+                    damage[i].y2 - damage[i].y1,
                     !mapEnabled);
     }
 

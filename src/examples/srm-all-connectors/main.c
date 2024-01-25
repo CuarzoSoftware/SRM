@@ -266,7 +266,7 @@ static void pageFlipped(SRMConnector *connector, void *userData)
     if (currSec != data->sec && currSec % 5 == 0)
     {
         data->sec = currSec;
-        SRMLog("[srm-all-connectors] Connector (%d) FPS: %d.",
+        SRMLog("[srm-all-connectors] Connector (%d) FPS: %lu.",
                srmConnectorGetID(connector),
                ((data->framesCount * 1000) / msDiff) + 1);
     }

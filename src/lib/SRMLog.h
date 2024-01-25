@@ -45,6 +45,7 @@ Int32 SRMLogGetLevel();
  * @param format A format string for the message.
  * @param ... Additional arguments for the format string.
  */
+__attribute__((format(printf, 1, 2)))
 void SRMLog(const char *format, ...);
 
 /**
@@ -53,6 +54,7 @@ void SRMLog(const char *format, ...);
  * @param format A format string for the error message.
  * @param ... Additional arguments for the format string.
  */
+__attribute__((format(printf, 1, 2)))
 void SRMFatal(const char *format, ...);
 
 /**
@@ -61,6 +63,7 @@ void SRMFatal(const char *format, ...);
  * @param format A format string for the error message.
  * @param ... Additional arguments for the format string.
  */
+__attribute__((format(printf, 1, 2)))
 void SRMError(const char *format, ...);
 
 /**
@@ -69,6 +72,7 @@ void SRMError(const char *format, ...);
  * @param format A format string for the warning message.
  * @param ... Additional arguments for the format string.
  */
+__attribute__((format(printf, 1, 2)))
 void SRMWarning(const char *format, ...);
 
 /**
@@ -77,6 +81,7 @@ void SRMWarning(const char *format, ...);
  * @param format A format string for the debug message.
  * @param ... Additional arguments for the format string.
  */
+__attribute__((format(printf, 1, 2)))
 void SRMDebug(const char *format, ...);
 
 /**

@@ -368,7 +368,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 {
     if (buffer->src == SRM_BUFFER_SRC_WL_DRM && device != buffer->allocator)
     {
-        SRMError("[%s] wl_drm buffers can only be accessed from allocator device.");
+        SRMError("[%s] wl_drm buffers can only be accessed from allocator device.", device->name);
         return 0;
     }
 

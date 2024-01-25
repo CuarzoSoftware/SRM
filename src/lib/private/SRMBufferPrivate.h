@@ -1,7 +1,7 @@
 #ifndef SRMBUFFERPRIVATE_H
 #define SRMBUFFERPRIVATE_H
 
-#include "../SRMBuffer.h"
+#include <SRMBuffer.h>
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <pthread.h>

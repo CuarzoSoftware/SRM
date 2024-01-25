@@ -1,7 +1,7 @@
 #ifndef SRMLISTPRIVATE_H
 #define SRMLISTPRIVATE_H
 
-#include "../SRMTypes.h"
+#include <SRMTypes.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,7 +1,7 @@
-#include "SRMTypes.h"
-#include "SRMDevice.h"
-#include "SRMPlane.h"
-#include "SRMConnector.h"
+#include <SRMTypes.h>
+#include <SRMDevice.h>
+#include <SRMPlane.h>
+#include <SRMConnector.h>
 #include <xf86drmMode.h>
 
 const char *srmGetRenderModeString(SRM_RENDER_MODE mode)

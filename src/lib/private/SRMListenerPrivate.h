@@ -1,7 +1,7 @@
 #ifndef SRMLISTENERPRIVATE_H
 #define SRMLISTENERPRIVATE_H
 
-#include "../SRMListener.h"
+#include <SRMListener.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -19,11 +19,7 @@ big_endian = target_machine.endian() == 'big'
 
 add_project_arguments([
         '-DSRM_LITTLE_ENDIAN=@0@'.format(little_endian.to_int()),
-        '-DSRM_BIG_ENDIAN=@0@'.format(big_endian.to_int()),
-        '-DSRM_VERSION_MAJOR=@0@'.format(version_major.to_int()),
-        '-DSRM_VERSION_MINOR=@0@'.format(version_minor.to_int()),
-        '-DSRM_VERSION_PATCH=@0@'.format(version_patch.to_int()),
-        '-DSRM_VERSION_BUILD=@0@'.format(version_build.to_int())
+        '-DSRM_BIG_ENDIAN=@0@'.format(big_endian.to_int())
 ], language: 'c')
 
 c = meson.get_compiler('c')
@@ -46,6 +42,17 @@ foreach subdir : api_headers
         install_dir : headers_install_dir + subdir)
 endforeach
 
+conf_data = configuration_data()
+conf_data.set('SRM_VERSION_MAJOR', version_major.to_int())
+conf_data.set('SRM_VERSION_MINOR', version_minor.to_int())
+conf_data.set('SRM_VERSION_PATCH', version_patch.to_int())
+conf_data.set('SRM_VERSION_BUILD', version_build.to_int())
+configure_file(input : 'lib/SRMTypes.h.in',
+               output : 'SRMTypes.h',
+               configuration : conf_data,
+               install_dir : headers_install_dir)
+conf_file_inc = include_directories('.')
+
 # ------------ SETUP INCLUDE PATHS ------------
 
 include_paths = []
@@ -61,6 +68,8 @@ foreach p : include_paths_str
       include_paths += [include_directories(p)]
     endif
 endforeach
+
+include_paths += conf_file_inc
 
 # ------------ DEPENDENCIES ------------
 
@@ -101,6 +110,7 @@ pkg.generate(
     name: 'Simple Rendering Manager',
     description: 'C library for building DRM/KMS applications with OpenGL ES 2.0',
     version: meson.project_version(),
+    subdirs: ['SRM'],
     filebase: 'SRM')
 
 if get_option('build_examples') or get_option('build_tests')

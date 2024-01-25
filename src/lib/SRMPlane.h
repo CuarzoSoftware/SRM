@@ -1,7 +1,7 @@
 #ifndef SRMPLANE_H
 #define SRMPLANE_H
 
-#include "SRMTypes.h"
+#include <SRMTypes.h>
 
 #ifdef __cplusplus
 extern "C" {

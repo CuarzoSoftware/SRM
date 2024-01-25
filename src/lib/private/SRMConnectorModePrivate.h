@@ -1,7 +1,7 @@
 #ifndef SRMCONNECTORMODEPRIVATE_H
 #define SRMCONNECTORMODEPRIVATE_H
 
-#include "../SRMConnectorMode.h"
+#include <SRMConnectorMode.h>
 #include <xf86drmMode.h>
 
 #ifdef __cplusplus

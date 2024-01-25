@@ -1,7 +1,7 @@
 #ifndef SRMCRTC_H
 #define SRMCRTC_H
 
-#include "SRMTypes.h"
+#include <SRMTypes.h>
 
 #ifdef __cplusplus
 extern "C" {

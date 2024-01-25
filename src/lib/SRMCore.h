@@ -1,8 +1,8 @@
 #ifndef SRMCORE_H
 #define SRMCORE_H
 
-#include "SRMTypes.h"
-#include "SRMEGL.h"
+#include <SRMTypes.h>
+#include <SRMEGL.h>
 
 #ifdef __cplusplus
 extern "C" {

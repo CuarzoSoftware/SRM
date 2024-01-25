@@ -1,5 +1,5 @@
-#include "private/SRMCrtcPrivate.h"
-#include "private/SRMDevicePrivate.h"
+#include <private/SRMCrtcPrivate.h>
+#include <private/SRMDevicePrivate.h>
 
 UInt32 srmCrtcGetID(SRMCrtc *crtc)
 {

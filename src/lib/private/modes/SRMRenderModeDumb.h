@@ -1,7 +1,7 @@
 #ifndef SRMRENDERMODEDUMB_H
 #define SRMRENDERMODEDUMB_H
 
-#include "../../SRMTypes.h"
+#include <SRMTypes.h>
 
 #ifdef __cplusplus
 extern "C" {

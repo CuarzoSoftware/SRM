@@ -1,7 +1,7 @@
 #ifndef SRMENCODERPRIVATE_H
 #define SRMENCODERPRIVATE_H
 
-#include "../SRMEncoder.h"
+#include <SRMEncoder.h>
 
 #ifdef __cplusplus
 extern "C" {

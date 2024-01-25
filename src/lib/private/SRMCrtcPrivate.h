@@ -1,7 +1,7 @@
 #ifndef SRMCRTCPRIVATE_H
 #define SRMCRTCPRIVATE_H
 
-#include "../SRMCrtc.h"
+#include <SRMCrtc.h>
 
 #ifdef __cplusplus
 extern "C" {

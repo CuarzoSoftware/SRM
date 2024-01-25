@@ -1,8 +1,8 @@
 #ifndef SRMDEVICEPRIVATE_H
 #define SRMDEVICEPRIVATE_H
 
-#include "../SRMDevice.h"
-#include "../SRMEGL.h"
+#include <SRMDevice.h>
+#include <SRMEGL.h>
 #include <gbm.h>
 #include <EGL/egl.h>
 #include <pthread.h>

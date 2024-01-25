@@ -3,7 +3,7 @@
 
 #include <EGL/egl.h>
 #include <xf86drmMode.h>
-#include "../../SRMTypes.h"
+#include <SRMTypes.h>
 
 #ifdef __cplusplus
 extern "C" {

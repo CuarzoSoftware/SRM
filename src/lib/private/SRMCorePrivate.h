@@ -1,8 +1,8 @@
 #ifndef SRMCOREPRIVATE_H
 #define SRMCOREPRIVATE_H
 
-#include "../SRMCore.h"
-#include "../SRMEGL.h"
+#include <SRMCore.h>
+#include <SRMEGL.h>
 
 #include <libudev.h>
 #include <sys/poll.h>

@@ -1,7 +1,7 @@
 #ifndef SRMBUFFER_H
 #define SRMBUFFER_H
 
-#include "SRMTypes.h"
+#include <SRMTypes.h>
 #include <GLES2/gl2.h>
 #include <gbm.h>
 

@@ -1,7 +1,7 @@
 #ifndef SRMFORMAT_H
 #define SRMFORMAT_H
 
-#include "SRMTypes.h"
+#include <SRMTypes.h>
 #include <GLES2/gl2.h>
 
 #ifdef __cplusplus

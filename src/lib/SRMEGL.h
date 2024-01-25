@@ -1,7 +1,7 @@
 #ifndef SRMEGL_H
 #define SRMEGL_H
 
-#include "SRMTypes.h"
+#include <SRMTypes.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>

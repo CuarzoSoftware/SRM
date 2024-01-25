@@ -1,8 +1,8 @@
 #ifndef SRMDEVICE_H
 #define SRMDEVICE_H
 
-#include "SRMTypes.h"
-#include "SRMEGL.h"
+#include <SRMTypes.h>
+#include <SRMEGL.h>
 #include <EGL/egl.h>
 
 #ifdef __cplusplus

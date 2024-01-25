@@ -1,7 +1,7 @@
 #ifndef SRMCONNECTOR_H
 #define SRMCONNECTOR_H
 
-#include "SRMTypes.h"
+#include <SRMTypes.h>
 #include <xf86drmMode.h>
 
 #ifdef __cplusplus

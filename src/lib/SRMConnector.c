@@ -1,4 +1,4 @@
-#include "private/modes/SRMRenderModeCommon.h"
+#include <private/modes/SRMRenderModeCommon.h>
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMEncoderPrivate.h>

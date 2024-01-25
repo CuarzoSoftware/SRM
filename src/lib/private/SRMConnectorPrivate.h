@@ -1,8 +1,8 @@
 #ifndef SRMCONNECTORPRIVATE_H
 #define SRMCONNECTORPRIVATE_H
 
-#include "../SRMConnector.h"
-#include "SRMFormat.h"
+#include <SRMConnector.h>
+#include <SRMFormat.h>
 #include <GLES2/gl2.h>
 #include <gbm.h>
 #include <EGL/egl.h>

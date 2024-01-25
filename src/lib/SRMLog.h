@@ -1,7 +1,7 @@
 #ifndef SRMLOG_H
 #define SRMLOG_H
 
-#include "SRMTypes.h"
+#include <SRMTypes.h>
 
 #ifdef __cplusplus
 extern "C" {

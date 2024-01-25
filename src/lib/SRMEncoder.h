@@ -1,7 +1,7 @@
 #ifndef SRMENCODER_H
 #define SRMENCODER_H
 
-#include "SRMTypes.h"
+#include <SRMTypes.h>
 
 #ifdef __cplusplus
 extern "C" {

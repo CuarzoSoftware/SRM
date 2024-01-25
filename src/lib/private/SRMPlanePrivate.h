@@ -1,7 +1,7 @@
 #ifndef SRMPLANEPRIVATE_H
 #define SRMPLANEPRIVATE_H
 
-#include "../SRMPlane.h"
+#include <SRMPlane.h>
 
 #ifdef __cplusplus
 extern "C" {

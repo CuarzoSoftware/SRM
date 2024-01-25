@@ -1,5 +1,5 @@
-#include "private/SRMConnectorModePrivate.h"
-#include "SRMConnector.h"
+#include <private/SRMConnectorModePrivate.h>
+#include <SRMConnector.h>
 
 SRMConnector *srmConnectorModeGetConnector(SRMConnectorMode *connectorMode)
 {

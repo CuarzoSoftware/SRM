@@ -11,6 +11,7 @@ SRM (0.5.0-1)
   * Fixed a security vulnerability where the hardware cursor plane pointer reference used by a connector was set to NULL
     before the connector was completely uninitialized. This could have caused crashes due to racing conditions between threads.
   * Enabled compiler warning messages for SRMLog functions to alert when the value types to print do not match the specified string format.
+  * Addressed a memory leak issue by ensuring the proper release of the connector mode blob ID after modifying a connector's mode.
 
   # Documentation
 

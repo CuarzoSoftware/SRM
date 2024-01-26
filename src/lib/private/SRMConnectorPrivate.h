@@ -55,6 +55,7 @@ struct SRMConnectorStruct
     SRM_CONNECTOR_SUBPIXEL subpixel;
     SRMConnectorMode *preferredMode, *currentMode,
     *targetMode; // This one is used while changing mode
+    UInt32 currentModeBlobId;
 
     SRMEncoder *currentEncoder;
     SRMCrtc *currentCrtc;

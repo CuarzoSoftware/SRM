@@ -383,6 +383,12 @@ fail:
         connector->damageBoxesCount = 0;
     }
 
+    if (connector->currentModeBlobId)
+    {
+        drmModeDestroyPropertyBlob(connector->device->fd, connector->currentModeBlobId);
+        connector->currentModeBlobId = 0;
+    }
+
     connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
     return 0;
 }
@@ -470,6 +476,12 @@ void srmConnectorUninitialize(SRMConnector *connector)
         free(connector->damageBoxes);
         connector->damageBoxes = NULL;
         connector->damageBoxesCount = 0;
+    }
+
+    if (connector->currentModeBlobId)
+    {
+        drmModeDestroyPropertyBlob(connector->device->fd, connector->currentModeBlobId);
+        connector->currentModeBlobId = 0;
     }
 
     SRMDebug("[%s] Connector (%d) %s, %s, %s uninitialized.",

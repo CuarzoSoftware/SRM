@@ -633,6 +633,46 @@ UInt64 srmConnectorGetGammaSize(SRMConnector *connector);
 UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table);
 
 /**
+ * @brief Checks if the driver supports the ability to turn off vsync.
+ *
+ * If the return value is 0, it indicates that vsync is always enabled.
+ *
+ * @note Currently, vsync disabling is only supported when using the legacy DRM API.
+ *       To enforce the use of the legacy API, set the **SRM_FORCE_LEGACY_API** environment variable
+ *       to 1.
+ *
+ * @param connector The @ref SRMConnector instance.
+ * @return 1 if vsync control is supported, 0 otherwise.
+ */
+UInt8 srmConnectorHasVsyncControlSupport(SRMConnector *connector);
+
+/**
+ * @brief Returns the current vsync status.
+ *
+ * Returns 1 if vsync is enabled, 0 otherwise. Vsync is enabled by default.
+ *
+ * @param connector The @ref SRMConnector instance.
+ * @return 1 if vsync is enabled, 0 if not.
+ */
+UInt8 srmConnectorIsVsyncEnabled(SRMConnector *connector);
+
+/**
+ * @brief Allows you to enable or disable vsync.
+ *
+ * Disabling vsync is only allowed if srmConnectorHasVsyncControlSupport() returns 1.
+ * Vsync is enabled by default.
+ *
+ * @note Currently, vsync disabling is only supported when using the legacy DRM API.
+ *       To enforce the use of the legacy API, set the **SRM_FORCE_LEGACY_API** environment variable
+ *       to 1.
+ *
+ * @param connector The @ref SRMConnector instance.
+ * @param enabled Set to 1 to enable vsync, 0 to disable vsync.
+ * @return 1 if the vsync change was successful, 0 otherwise.
+ */
+UInt8 srmConnectorEnableVsync(SRMConnector *connector, UInt8 enabled);
+
+/**
  * @}
  */
 

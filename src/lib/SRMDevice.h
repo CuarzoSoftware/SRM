@@ -133,6 +133,8 @@ UInt8 srmDeviceGetCapAddFb2Modifiers(SRMDevice *device);
 /**
  * @brief Get the driver's support for Async Page Flip capability.
  *
+ * @note This specifically indicates support for the legacy API, no the atomic API.
+ *
  * @param device A pointer to the @ref SRMDevice instance.
  *
  * @return 1 if the DRM device driver supports Async Page Flip capability, 0 otherwise.

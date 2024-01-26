@@ -32,6 +32,7 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb);
 void srmRenderModeCommonUninitialize(SRMConnector *connector);
 Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb);
 void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb);
+void srmRenderModeCommonWaitPageFlip(SRMConnector *connector);
 
 #ifdef __cplusplus
 }

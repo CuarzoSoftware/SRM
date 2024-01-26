@@ -16,6 +16,8 @@ SRM defaults to using the Atomic DRM API for all devices (when avaliable), which
 
 **SRM_FORCE_LEGACY_API**=1
 
+Note: Currently V-Sync can only be disabled using the legacy API.
+
 ## Buffering
 
 You can customize the framebuffer count for both "ITSELF" and "DUMB" render modes using the following environment variables:
@@ -24,9 +26,7 @@ You can customize the framebuffer count for both "ITSELF" and "DUMB" render mode
 
 **SRM_RENDER_MODE_DUMB_FB_COUNT**=[1, 2, 3]
 
-If you set the value to 1 for any of these variables, it will disable v-sync.
-
-Please note that v-sync is always disabled for the "CPU" mode, and this setting cannot be changed.
+Please note that the "CPU" mode always uses single buffering, and this setting cannot be changed.
 
 By default, the framebuffer count for each render mode is as follows:
 

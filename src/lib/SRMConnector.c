@@ -733,3 +733,22 @@ UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table)
 
     return 1;
 }
+
+UInt8 srmConnectorHasVsyncControlSupport(SRMConnector *connector)
+{
+    return connector->device->capAsyncPageFlip && !connector->device->clientCapAtomic;
+}
+
+UInt8 srmConnectorIsVsyncEnabled(SRMConnector *connector)
+{
+    return connector->pendingVsync;
+}
+
+UInt8 srmConnectorEnableVsync(SRMConnector *connector, UInt8 enabled)
+{
+    if (!enabled && (!connector->device->capAsyncPageFlip || connector->device->clientCapAtomic))
+        return 0;
+
+    connector->pendingVsync = enabled;
+    return 1;
+}

@@ -95,6 +95,12 @@ struct SRMConnectorStruct
     Int32 damageBoxesCount;
     SRMFormat currentFormat;
 
+    // Current VSYNC state (enabled by default)
+    UInt8 currentVsync;
+
+    // Requested by the user
+    UInt8 pendingVsync;
+
     // Protect stuff like cursor and gamma updates
     pthread_mutex_t propsMutex;
 

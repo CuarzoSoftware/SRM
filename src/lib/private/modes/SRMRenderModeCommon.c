@@ -974,38 +974,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     UInt32 buffersCount = srmConnectorGetBuffersCount(connector);
 
     if (buffersCount == 1 || buffersCount > 2)
-    {
-        struct pollfd fds;
-        fds.fd = connector->device->fd;
-        fds.events = POLLIN;
-        fds.revents = 0;
-
-        while (connector->pendingPageFlip)
-        {
-            if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
-                break;
-
-            // Prevent multiple threads invoking the drmHandleEvent at a time wich causes bugs
-            // If more than 1 connector is requesting a page flip, both can be handled here
-            // since the struct passed to drmHandleEvent is standard and could be handling events
-            // from any connector (E.g. pageFlipHandler(conn1) or pageFlipHandler(conn2))
-            pthread_mutex_lock(&connector->device->pageFlipMutex);
-
-            // Double check if the pageflip was notified in another thread
-            if (!connector->pendingPageFlip)
-            {
-                pthread_mutex_unlock(&connector->device->pageFlipMutex);
-                break;
-            }
-
-            poll(&fds, 1, 500);
-
-            if(fds.revents & POLLIN)
-                drmHandleEvent(fds.fd, &connector->drmEventCtx);
-
-            pthread_mutex_unlock(&connector->device->pageFlipMutex);
-        }
-    }
+        srmRenderModeCommonWaitPageFlip(connector);
 
     connector->lastFb = fb;
     connector->pendingPageFlip = 1;
@@ -1030,11 +999,31 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     }
     else
     {
-        ret = drmModePageFlip(connector->device->fd,
-                              connector->currentCrtc->id,
-                              connector->lastFb,
-                              DRM_MODE_PAGE_FLIP_EVENT,
-                              connector);
+        if (connector->currentVsync)
+        {
+            ret = drmModePageFlip(connector->device->fd,
+                                  connector->currentCrtc->id,
+                                  connector->lastFb,
+                                  DRM_MODE_PAGE_FLIP_EVENT,
+                                  connector);
+        }
+        else
+        {
+            retry:
+            ret = drmModePageFlip(connector->device->fd,
+                                  connector->currentCrtc->id,
+                                  connector->lastFb,
+                                  DRM_MODE_PAGE_FLIP_ASYNC,
+                                  connector);
+
+            if (ret == -16)
+            {
+                usleep(200);
+                goto retry;
+            }
+
+            connector->drmEventCtx.page_flip_handler(0, 0, 0, 0, connector);
+        }
     }
 
     if (ret)
@@ -1048,37 +1037,41 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     if (buffersCount == 2 || connector->firstPageFlip)
     {
         connector->firstPageFlip = 0;
+        srmRenderModeCommonWaitPageFlip(connector);
+    }
+}
 
-        struct pollfd fds;
-        fds.fd = connector->device->fd;
-        fds.events = POLLIN;
-        fds.revents = 0;
+void srmRenderModeCommonWaitPageFlip(SRMConnector *connector)
+{
+    struct pollfd fds;
+    fds.fd = connector->device->fd;
+    fds.events = POLLIN;
+    fds.revents = 0;
 
-        while(connector->pendingPageFlip)
+    while(connector->pendingPageFlip)
+    {
+        if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
+            break;
+
+        // Prevent multiple threads invoking the drmHandleEvent at a time wich causes bugs
+        // If more than 1 connector is requesting a page flip, both can be handled here
+        // since the struct passed to drmHandleEvent is standard and could be handling events
+        // from any connector (E.g. pageFlipHandler(conn1) or pageFlipHandler(conn2))
+        pthread_mutex_lock(&connector->device->pageFlipMutex);
+
+        // Double check if the pageflip was notified in another thread
+        if (!connector->pendingPageFlip)
         {
-            if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
-                break;
-
-            // Prevent multiple threads invoking the drmHandleEvent at a time wich causes bugs
-            // If more than 1 connector is requesting a page flip, both can be handled here
-            // since the struct passed to drmHandleEvent is standard and could be handling events
-            // from any connector (E.g. pageFlipHandler(conn1) or pageFlipHandler(conn2))
-            pthread_mutex_lock(&connector->device->pageFlipMutex);
-
-            // Double check if the pageflip was notified in another thread
-            if (!connector->pendingPageFlip)
-            {
-                pthread_mutex_unlock(&connector->device->pageFlipMutex);
-                break;
-            }
-
-            poll(&fds, 1, 500);
-
-            if(fds.revents & POLLIN)
-                drmHandleEvent(fds.fd, &connector->drmEventCtx);
-
             pthread_mutex_unlock(&connector->device->pageFlipMutex);
+            break;
         }
+
+        poll(&fds, 1, 500);
+
+        if(fds.revents & POLLIN)
+            drmHandleEvent(fds.fd, &connector->drmEventCtx);
+
+        pthread_mutex_unlock(&connector->device->pageFlipMutex);
     }
 }
 

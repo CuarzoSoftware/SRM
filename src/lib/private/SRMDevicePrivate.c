@@ -592,6 +592,10 @@ UInt8 srmDeviceUpdateCaps(SRMDevice *device)
     drmGetCap(device->fd, DRM_CAP_ASYNC_PAGE_FLIP, &value);
     device->capAsyncPageFlip = value == 1;
 
+    drmGetCap(device->fd, DRM_CAP_TIMESTAMP_MONOTONIC, &value);
+    device->capTimestampMonotonic = value == 1;
+    device->clock = device->capTimestampMonotonic ? CLOCK_MONOTONIC : CLOCK_REALTIME;
+
     return 1;
 }
 

@@ -3,6 +3,7 @@
 
 #include <SRMTypes.h>
 #include <xf86drmMode.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -671,6 +672,24 @@ UInt8 srmConnectorIsVsyncEnabled(SRMConnector *connector);
  * @return 1 if the vsync change was successful, 0 otherwise.
  */
 UInt8 srmConnectorEnableVsync(SRMConnector *connector, UInt8 enabled);
+
+/**
+ * @brief Gets the clock ID used for the timestamps returned by srmConnectorGetPresentationTime().
+ *
+ * The clock ID can be either CLOCK_MONOTONIC or CLOCK_REALTIME.
+ *
+ * @param connector A pointer to the @ref SRMConnector instance.
+ * @return The clock ID used for timestamps.
+ */
+clockid_t srmConnectorGetPresentationClock(SRMConnector *connector);
+
+/**
+ * @brief Retrieves information about how and when the current framebuffer displayed on the screen was presented.
+ *
+ * @param connector A pointer to the @ref SRMConnector instance.
+ * @return Pointer to the structure containing presentation time information, see @ref SRMPresentationTime.
+ */
+const SRMPresentationTime *srmConnectorGetPresentationTime(SRMConnector *connector);
 
 /**
  * @}

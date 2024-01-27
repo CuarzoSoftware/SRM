@@ -77,17 +77,33 @@ out:
     return 1;
 }
 
-void srmRenderModeCommonPageFlipHandler(int a, unsigned int b, unsigned int c, unsigned int d, void *data)
+void srmRenderModeCommonPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec, void *data)
 {
-    SRM_UNUSED(a);
-    SRM_UNUSED(b);
-    SRM_UNUSED(c);
-    SRM_UNUSED(d);
-
     if (data)
     {
         SRMConnector *connector = data;
         connector->pendingPageFlip = 0;
+
+        if (fd)
+        {
+            connector->presentationTime.flags = SRM_PRESENTATION_TIME_FLAGS_HW_CLOCK |
+                                                SRM_PRESENTATION_TIME_FLAGS_HW_COMPLETION |
+                                                SRM_PRESENTATION_TIME_FLAGS_VSYNC;
+
+            connector->presentationTime.frame = seq;
+            connector->presentationTime.time.tv_sec = sec;
+            connector->presentationTime.time.tv_nsec = usec * 1000;
+            connector->presentationTime.period =  connector->currentMode->info.vrefresh == 0 ? 0 : 1000000000/connector->currentMode->info.vrefresh;
+        }
+
+        // If fd == 0 then vsync is disabled
+        else
+        {
+            connector->presentationTime.flags = 0;
+            connector->presentationTime.frame = 0;
+            clock_gettime(connector->device->clock, &connector->presentationTime.time);
+            connector->presentationTime.period = 0;
+        }
     }
 }
 

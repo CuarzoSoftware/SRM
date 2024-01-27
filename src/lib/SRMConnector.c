@@ -752,3 +752,13 @@ UInt8 srmConnectorEnableVsync(SRMConnector *connector, UInt8 enabled)
     connector->pendingVsync = enabled;
     return 1;
 }
+
+clockid_t srmConnectorGetPresentationClock(SRMConnector *connector)
+{
+    return connector->device->clock;
+}
+
+const SRMPresentationTime *srmConnectorGetPresentationTime(SRMConnector *connector)
+{
+    return &connector->presentationTime;
+}

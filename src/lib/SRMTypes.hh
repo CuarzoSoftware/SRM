@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include <drm_fourcc.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -159,6 +160,37 @@ typedef struct SRMVersionStruct
     UInt32 patch;   ///< Patch version.
     UInt32 build;   ///< Build number.
 } SRMVersion;
+
+/**
+ * @ingroup SRMConnector
+ * @brief Bitmask of flags in an fb presentation.
+ *
+ * These flags provide information about how the last framebuffer was presented on a connector display.
+ *
+ * @see @ref SRMPresentationTime
+ */
+typedef enum SRM_PRESENTATION_TIME_FLAGS_ENUM
+{
+    SRM_PRESENTATION_TIME_FLAGS_VSYNC            = 0x1, ///< Presentation was vsync'd.
+    SRM_PRESENTATION_TIME_FLAGS_HW_CLOCK         = 0x2, ///< Hardware provided the presentation timestamp.
+    SRM_PRESENTATION_TIME_FLAGS_HW_COMPLETION    = 0x4, ///< Hardware signaled the start of the presentation.
+} SRM_PRESENTATION_TIME_FLAGS;
+
+/**
+ * @ingroup SRMConnector
+ * @brief Struct representing presentation time information.
+ *
+ * This struct provides information about how the last framebuffer was presented on a connector display.
+ *
+ * @see srmConnectorGetPresentationTime()
+ */
+typedef struct SRMPresentationTimeStruct
+{
+    struct timespec time;   ///< The presentation timestamp.
+    UInt32 period;          ///< Nanoseconds prediction until the next refresh. Zero if unknown.
+    UInt64 frame;           ///< Vertical retrace counter. Zero if unknown.
+    UInt32 flags;           ///< Flags indicating how the presentation was done, see @ref SRM_PRESENTATION_TIME_FLAGS.
+} SRMPresentationTime;
 
 /**
  * @brief Structure representing a rectangle with integer coordinates.

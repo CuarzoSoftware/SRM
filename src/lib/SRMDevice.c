@@ -71,6 +71,11 @@ UInt8 srmDeviceGetCapAsyncPageFlip(SRMDevice *device)
     return device->capAsyncPageFlip;
 }
 
+UInt8 srmDeviceGetCapTimestampMonotonic(SRMDevice *device)
+{
+    return device->capTimestampMonotonic;
+}
+
 UInt8 srmDeviceSetEnabled(SRMDevice *device, UInt8 enabled)
 {
     // If it is the only GPU it can not be disabled

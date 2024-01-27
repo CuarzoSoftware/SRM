@@ -47,7 +47,7 @@ conf_data.set('SRM_VERSION_MAJOR', version_major.to_int())
 conf_data.set('SRM_VERSION_MINOR', version_minor.to_int())
 conf_data.set('SRM_VERSION_PATCH', version_patch.to_int())
 conf_data.set('SRM_VERSION_BUILD', version_build.to_int())
-configure_file(input : 'lib/SRMTypes.h.in',
+configure_file(input : 'lib/SRMTypes.hh',
                output : 'SRMTypes.h',
                configuration : conf_data,
                install_dir : headers_install_dir)

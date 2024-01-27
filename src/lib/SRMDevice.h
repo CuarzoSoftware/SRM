@@ -142,6 +142,18 @@ UInt8 srmDeviceGetCapAddFb2Modifiers(SRMDevice *device);
 UInt8 srmDeviceGetCapAsyncPageFlip(SRMDevice *device);
 
 /**
+ * @brief Retrieve the driver's support for monotonic timestamps.
+ *
+ * @see srmConnectorGetPresentationClock()
+ * @see srmConnectorGetPresentationTime()
+ *
+ * @param device A pointer to the @ref SRMDevice instance.
+ *
+ * @return 1 if the DRM device reports vblank timestamps with CLOCK_MONOTONIC, 0 if it uses CLOCK_REALTIME.
+ */
+UInt8 srmDeviceGetCapTimestampMonotonic(SRMDevice *device);
+
+/**
  * @brief Check if the device can perform rendering.
  *
  * This function returns true when the device can import buffers from the allocator device,

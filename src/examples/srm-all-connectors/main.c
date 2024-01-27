@@ -76,12 +76,9 @@ struct ConnectorUserData
     UInt64 framesCount, msStart, sec;
 };
 
-
-UInt64 getMilliseconds()
+UInt64 getMilliseconds(const struct timespec *ts)
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return ((UInt64)tv.tv_sec * 1000) + ((UInt64)tv.tv_usec / 1000);
+    return (ts->tv_sec * 1000) + (ts->tv_nsec / 1000000);
 }
 
 /* Opens a DRM device */
@@ -186,7 +183,7 @@ static void initializeGL(SRMConnector *connector, void *userData)
     // Schedule a repaint
     srmConnectorRepaint(connector);
 
-    data->msStart = getMilliseconds();
+    data->msStart = 0;
 }
 
 static void paintGL(SRMConnector *connector, void *userData)
@@ -258,17 +255,22 @@ static void resizeGL(SRMConnector *connector, void *userData)
 static void pageFlipped(SRMConnector *connector, void *userData)
 {
     struct ConnectorUserData *data = userData;
+    const SRMPresentationTime *pt = srmConnectorGetPresentationTime(connector);
+
+    if (data->msStart == 0)
+        data->msStart = getMilliseconds(&pt->time);
 
     data->framesCount++;
-    UInt64 msDiff = getMilliseconds() - data->msStart;
-    UInt64 currSec = msDiff / 1000;
+    UInt64 msDiff = getMilliseconds(&pt->time) - data->msStart;
 
-    if (currSec != data->sec && currSec % 5 == 0)
+    if ((UInt64)pt->time.tv_sec != data->sec && pt->time.tv_sec % 5 == 0)
     {
-        data->sec = currSec;
-        SRMLog("[srm-all-connectors] Connector (%d) FPS: %lu.",
-               srmConnectorGetID(connector),
-               ((data->framesCount * 1000) / msDiff) + 1);
+        data->sec = pt->time.tv_sec;
+
+        if (msDiff != 0)
+            SRMLog("[srm-all-connectors] Connector (%d) FPS: %lu.",
+                   srmConnectorGetID(connector),
+                   ((data->framesCount * 1000) / msDiff));
     }
 }
 
@@ -397,7 +399,9 @@ int main(void)
         }
     }
 
-    UInt64 startMS = getMilliseconds();
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    UInt64 startSec = ts.tv_sec;
 
     // Here we update the shared background texture every sec
     while (1)
@@ -417,7 +421,9 @@ int main(void)
             srmBufferWrite(buffer, BUF_STRIDE, 0, 0, BUF_WIDTH, BUF_HEIGHT, bufferPixels);
         }
 
-        if (getMilliseconds() - startMS > 10000)
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+
+        if (ts.tv_sec - startSec > 10)
             break;
     }
 

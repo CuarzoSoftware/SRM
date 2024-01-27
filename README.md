@@ -31,21 +31,23 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 
 ### Features
 
-* Multiple GPUs support
-* Automatic GPUs/connectors configuration
-* Automatic texture sharing between GPUs
-* Texture allocation from CPU buffers, DMA buffers, GBM BOs, Flink Handles, Wayland DRM buffers.
-* Multi-session support ([libseat](https://github.com/kennylevinsen/seatd) can be used to open DRM devices for example)
-* Connectors hot-plugging event listener
-* Hardware cursor compositing
-* V-Sync
-* Frame buffer damage (improves performance in multi-GPUs setups when DMA is not supported)
-* Access to screen framebuffers as textures.
+* Support for Multiple GPUs
+* Automatic Configuration of GPUs and Connectors
+* Seamless Texture Sharing Among GPUs
+* Texture Allocation from CPU Buffers, DMA Buffers, GBM BOs, Flink Handles, Wayland DRM Buffers
+* Multi-session Capability (can utilize [libseat](https://github.com/kennylevinsen/seatd) to open DRM devices, for example)
+* Listener for Connectors Hot-Plugging Events
+* Hardware Cursor Compositing
+* V-Sync Control (applies only when using the legacy DRM API)
+* Frame Buffer Damage (enhances performance in multi-GPU setups where DMA support is lacking)
+* Access to Screen Framebuffers as Textures
+* Support for Single, Double, and Triple Buffering
+* Gamma Correction
 
 ### Tested on
 
 * Intel GPUs (i915 driver)
-* NVIDIA GPUs (Nouveau and propietary drivers)
+* NVIDIA GPUs (Nouveau works reliably, proprietary drivers are often buggy)
 * AMD GPUs (AMDGPU driver)
 * Mali GPUs (Lima driver)
 

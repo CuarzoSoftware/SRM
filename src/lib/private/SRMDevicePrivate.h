@@ -67,6 +67,9 @@ struct SRMDeviceStruct
     UInt8 capPrimeExport;
     UInt8 capAddFb2Modifiers;
     UInt8 capAsyncPageFlip;
+    UInt8 capTimestampMonotonic;
+
+    clockid_t clock;
 
     SRMList *crtcs;
     SRMList *encoders;

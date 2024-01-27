@@ -94,6 +94,7 @@ struct SRMConnectorStruct
     SRMBox *damageBoxes;
     Int32 damageBoxesCount;
     SRMFormat currentFormat;
+    SRMPresentationTime presentationTime;
 
     // Current VSYNC state (enabled by default)
     UInt8 currentVsync;

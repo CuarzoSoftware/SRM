@@ -7,6 +7,7 @@ SRM (0.5.0-1)
   * Introduced srmConnectorSetBufferDamageBoxes() to set connector damage using Pixman-style boxes.
   * Introduced new functions for vsync control: srmConnectorHasVsyncControlSupport(), srmConnectorIsVsyncEnabled(), and srmConnectorEnableVsync().
     Note: Support for the atomic DRM API requires Linux >= 6.8.
+  * Added srmConnectorGetRefreshRateLimit() and srmConnectorSetRefreshRateLimit() functions to get and set the refresh rate limit of a connector when vsync is disabled.
   * Added srmConnectorGetPresentationClock() and srmConnectorGetPresentationTime() functions for querying presentation time information of framebuffers.
 
   # Security Improvements

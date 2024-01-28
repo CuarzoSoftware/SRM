@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo apt install -y doxygen
+#sudo apt install -y doxygen
 mkdir -p ../../../srm_tmp
 mkdir -p ../../../srm_tmp/html
 

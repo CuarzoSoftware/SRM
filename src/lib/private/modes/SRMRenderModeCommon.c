@@ -102,7 +102,34 @@ void srmRenderModeCommonPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32
             connector->presentationTime.flags = 0;
             connector->presentationTime.frame = 0;
             connector->presentationTime.period = 0;
+
+            Int64 prevUsec = (connector->presentationTime.time.tv_sec * 1000000LL) + (connector->presentationTime.time.tv_nsec / 1000LL);
             clock_gettime(connector->device->clock, &connector->presentationTime.time);
+
+            if (connector->maxRefreshRate < 0)
+                return;
+
+            Int64 currUsec = (connector->presentationTime.time.tv_sec * 1000000LL) + (connector->presentationTime.time.tv_nsec / 1000LL);
+
+            Int64 periodUsec;
+
+            // Limit FPS to 2 * vrefresh
+            if (connector->maxRefreshRate == 0)
+                periodUsec = (connector->currentMode->info.vrefresh == 0 ? 0 : 490000/(connector->currentMode->info.vrefresh));
+            else
+                periodUsec = (connector->currentMode->info.vrefresh == 0 ? 0 : 1000000/(connector->maxRefreshRate));
+
+            if (fd == -1 && periodUsec > 0)
+            {
+                Int64 diffUsec = currUsec - prevUsec;
+
+                if (diffUsec >= 0 && diffUsec < periodUsec)
+                {
+                    usleep(periodUsec - diffUsec);
+                    clock_gettime(connector->device->clock, &connector->presentationTime.time);
+                }
+            }
+
         }
     }
 }
@@ -1073,10 +1100,10 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                     connector->pendingPageFlip = 1;
                     ret = 0;
                 }
-
-                if (!connector->pendingPageFlip)
-                    connector->drmEventCtx.page_flip_handler(0, 0, 0, 0, connector);
             }
+
+            if (!connector->pendingPageFlip)
+                connector->drmEventCtx.page_flip_handler(-1, 0, 0, 0, connector);
         }
     }
     else
@@ -1118,7 +1145,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
             }
 
             if (!connector->pendingPageFlip)
-                connector->drmEventCtx.page_flip_handler(0, 0, 0, 0, connector);
+                connector->drmEventCtx.page_flip_handler(-1, 0, 0, 0, connector);
         }
     }
 

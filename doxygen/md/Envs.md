@@ -16,7 +16,7 @@ SRM defaults to using the Atomic DRM API for all devices (when avaliable), which
 
 **SRM_FORCE_LEGACY_API**=1
 
-Note: Currently V-Sync can only be disabled using the legacy API.
+Note: Disabling vsync for the atomic API is supported only starting from Linux version 6.8.
 
 ## Buffering
 

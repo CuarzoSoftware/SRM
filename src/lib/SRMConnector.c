@@ -754,6 +754,16 @@ UInt8 srmConnectorEnableVsync(SRMConnector *connector, UInt8 enabled)
     return 1;
 }
 
+void srmConnectorSetRefreshRateLimit(SRMConnector *connector, Int32 hz)
+{
+    connector->maxRefreshRate = hz;
+}
+
+Int32 srmConnectorGetRefreshRateLimit(SRMConnector *connector)
+{
+    return connector->maxRefreshRate;
+}
+
 clockid_t srmConnectorGetPresentationClock(SRMConnector *connector)
 {
     return connector->device->clock;

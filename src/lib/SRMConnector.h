@@ -657,7 +657,7 @@ UInt8 srmConnectorHasVsyncControlSupport(SRMConnector *connector);
 UInt8 srmConnectorIsVsyncEnabled(SRMConnector *connector);
 
 /**
- * @brief Allows you to enable or disable vsync.
+ * @brief Enable or disable vsync.
  *
  * Disabling vsync is only allowed if srmConnectorHasVsyncControlSupport() returns 1.
  * Vsync is enabled by default.
@@ -670,6 +670,40 @@ UInt8 srmConnectorIsVsyncEnabled(SRMConnector *connector);
  * @return 1 if the vsync change was successful, 0 otherwise.
  */
 UInt8 srmConnectorEnableVsync(SRMConnector *connector, UInt8 enabled);
+
+/**
+ * @brief Sets the refresh rate limit when vsync is disabled.
+ *
+ * This function allows controlling the refresh rate limit when vsync is disabled
+ *
+ * @param connector A pointer to the @ref SRMConnector instance for which the refresh rate limit is to be set.
+ * @param hz The desired refresh rate limit in hertz.
+ *           If hz is less than 0, the refresh rate limit is disabled.
+ *           If hz is 0, the maximum refresh rate will be approximately twice the current display mode refresh rate.
+ *           The default value is 0.
+ *
+ * @note Using a value of 0 (twice the current mode refresh rate) provides a good balance between avoiding unnecessary undisplayed frames
+ *       and achieving snappier response times.
+ *
+ * @see srmConnectorGetRefreshRateLimit() to retrieve the current refresh rate limit.
+ *
+ * @warning Disabling the limit may result in visual artifacts and could potentially impact performance.
+ */
+void srmConnectorSetRefreshRateLimit(SRMConnector *connector, Int32 hz);
+
+/**
+ * @brief Retrieves the current refresh rate limit when vsync is disabled.
+ *
+ * This function allows you to query the refresh rate limit that has been previously set
+ * using the srmConnectorSetRefreshRateLimit() function.
+ *
+ * @param connector A pointer to the @ref SRMConnector instance for which the refresh rate limit is to be retrieved.
+ *
+ * @return The current refresh rate limit in hertz.
+ *         If the refresh rate limit is disabled, the returned value will be less than 0.
+ *         If the returned value is 0, means the limit is about twice the current display mode refresh rate.
+ */
+Int32 srmConnectorGetRefreshRateLimit(SRMConnector *connector);
 
 /**
  * @brief Gets the clock ID used for the timestamps returned by srmConnectorGetPresentationTime().

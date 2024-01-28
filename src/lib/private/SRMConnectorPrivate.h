@@ -102,6 +102,9 @@ struct SRMConnectorStruct
     // Requested by the user
     UInt8 pendingVsync;
 
+    // Max refresh rate when vsync is off
+    Int32 maxRefreshRate;
+
     // Protect stuff like cursor and gamma updates
     pthread_mutex_t propsMutex;
 

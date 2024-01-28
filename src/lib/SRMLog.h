@@ -7,6 +7,12 @@
 extern "C" {
 #endif
 
+#if __DOXYGEN__
+#define FORMAT_CHECK
+#else
+#define FORMAT_CHECK __attribute__((format(printf, 1, 2)))
+#endif
+
 /**
  * @defgroup SRMLog SRMLog
  *
@@ -45,8 +51,7 @@ Int32 SRMLogGetLevel();
  * @param format A format string for the message.
  * @param ... Additional arguments for the format string.
  */
-__attribute__((format(printf, 1, 2)))
-void SRMLog(const char *format, ...);
+FORMAT_CHECK void SRMLog(const char *format, ...);
 
 /**
  * @brief Report an unrecoverable error. **SRM_DEBUG** >= 1.
@@ -54,8 +59,7 @@ void SRMLog(const char *format, ...);
  * @param format A format string for the error message.
  * @param ... Additional arguments for the format string.
  */
-__attribute__((format(printf, 1, 2)))
-void SRMFatal(const char *format, ...);
+FORMAT_CHECK void SRMFatal(const char *format, ...);
 
 /**
  * @brief Report a nonfatal error. **SRM_DEBUG** >= 2.
@@ -63,8 +67,7 @@ void SRMFatal(const char *format, ...);
  * @param format A format string for the error message.
  * @param ... Additional arguments for the format string.
  */
-__attribute__((format(printf, 1, 2)))
-void SRMError(const char *format, ...);
+FORMAT_CHECK void SRMError(const char *format, ...);
 
 /**
  * @brief Report messages that indicate a risk. **SRM_DEBUG** >= 3.
@@ -72,8 +75,7 @@ void SRMError(const char *format, ...);
  * @param format A format string for the warning message.
  * @param ... Additional arguments for the format string.
  */
-__attribute__((format(printf, 1, 2)))
-void SRMWarning(const char *format, ...);
+FORMAT_CHECK void SRMWarning(const char *format, ...);
 
 /**
  * @brief Print debugging messages. **SRM_DEBUG** >= 4.
@@ -81,8 +83,7 @@ void SRMWarning(const char *format, ...);
  * @param format A format string for the debug message.
  * @param ... Additional arguments for the format string.
  */
-__attribute__((format(printf, 1, 2)))
-void SRMDebug(const char *format, ...);
+FORMAT_CHECK void SRMDebug(const char *format, ...);
 
 /**
  * @}

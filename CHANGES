@@ -6,7 +6,7 @@ SRM (0.5.0-1)
   * Added support for gamma correction through srmConnectorGetGammaSize() and srmConnectorSetGamma().
   * Introduced srmConnectorSetBufferDamageBoxes() to set connector damage using Pixman-style boxes.
   * Introduced new functions for vsync control: srmConnectorHasVsyncControlSupport(), srmConnectorIsVsyncEnabled(), and srmConnectorEnableVsync().
-    Note: This is currently only supported when using the legacy DRM API, for the atomic API, vsync is always enabled.
+    Note: Support for the atomic DRM API requires Linux >= 6.8.
   * Added srmConnectorGetPresentationClock() and srmConnectorGetPresentationTime() functions for querying presentation time information of framebuffers.
 
   # Security Improvements

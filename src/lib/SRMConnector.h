@@ -638,9 +638,8 @@ UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table);
  *
  * If the return value is 0, it indicates that vsync is always enabled.
  *
- * @note Currently, vsync disabling is only supported when using the legacy DRM API.
- *       To enforce the use of the legacy API, set the **SRM_FORCE_LEGACY_API** environment variable
- *       to 1.
+ * @note Disabling vsync for the atomic API is supported only starting from Linux version 6.8.
+ *       If you wish to enforce the use of the legacy API, set the **SRM_FORCE_LEGACY_API** environment variable to 1.
  *
  * @param connector The @ref SRMConnector instance.
  * @return 1 if vsync control is supported, 0 otherwise.
@@ -663,9 +662,8 @@ UInt8 srmConnectorIsVsyncEnabled(SRMConnector *connector);
  * Disabling vsync is only allowed if srmConnectorHasVsyncControlSupport() returns 1.
  * Vsync is enabled by default.
  *
- * @note Currently, vsync disabling is only supported when using the legacy DRM API.
- *       To enforce the use of the legacy API, set the **SRM_FORCE_LEGACY_API** environment variable
- *       to 1.
+ * @note Disabling vsync for the atomic API is supported only starting from Linux version 6.8.
+ *       If you wish to enforce the use of the legacy API, set the **SRM_FORCE_LEGACY_API** environment variable to 1.
  *
  * @param connector The @ref SRMConnector instance.
  * @param enabled Set to 1 to enable vsync, 0 to disable vsync.

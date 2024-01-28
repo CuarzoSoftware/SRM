@@ -101,7 +101,7 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
         if (connector->cursorVisible == 0)
             return 1;
 
-        if (connector->device->clientCapAtomic)
+        if (connector->device->clientCapAtomic && connector->currentVsync)
         {
             pthread_mutex_lock(&connector->propsMutex);
             connector->cursorVisible = 0;
@@ -124,7 +124,7 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
 
     pthread_mutex_lock(&connector->propsMutex);
 
-    if (connector->device->clientCapAtomic)
+    if (connector->device->clientCapAtomic && connector->currentVsync)
         connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_BUFFER;
     else
     {
@@ -137,14 +137,14 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
         connector->cursorFBPending = tmpFb;
     }
 
-    if (connector->cursorVisible == 1 && connector->device->clientCapAtomic && connector->atomicChanges)
+    if (connector->cursorVisible == 1 && connector->device->clientCapAtomic && connector->atomicChanges && connector->currentVsync)
     {
         pthread_mutex_unlock(&connector->propsMutex);
         pthread_cond_signal(&connector->repaintCond);
         return 1;
     }
 
-    if (connector->device->clientCapAtomic)
+    if (connector->device->clientCapAtomic && connector->currentVsync)
     {
         connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
         pthread_cond_signal(&connector->repaintCond);
@@ -171,7 +171,7 @@ UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
     if (connector->cursorX == x && connector->cursorY == y)
         return 1;
 
-    if (connector->device->clientCapAtomic)
+    if (connector->device->clientCapAtomic && connector->currentVsync)
     {
         pthread_mutex_lock(&connector->propsMutex);
         connector->cursorX = x;
@@ -736,7 +736,8 @@ UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table)
 
 UInt8 srmConnectorHasVsyncControlSupport(SRMConnector *connector)
 {
-    return connector->device->capAsyncPageFlip && !connector->device->clientCapAtomic;
+    return (connector->device->capAsyncPageFlip && !connector->device->clientCapAtomic) ||
+           (connector->device->capAtomicAsyncPageFlip && connector->device->clientCapAtomic);
 }
 
 UInt8 srmConnectorIsVsyncEnabled(SRMConnector *connector)
@@ -746,7 +747,7 @@ UInt8 srmConnectorIsVsyncEnabled(SRMConnector *connector)
 
 UInt8 srmConnectorEnableVsync(SRMConnector *connector, UInt8 enabled)
 {
-    if (!enabled && (!connector->device->capAsyncPageFlip || connector->device->clientCapAtomic))
+    if (!enabled && !srmConnectorHasVsyncControlSupport(connector))
         return 0;
 
     connector->pendingVsync = enabled;

@@ -553,12 +553,12 @@ UInt8 srmDeviceUpdateClientCaps(SRMDevice *device)
 
 UInt8 srmDeviceUpdateCaps(SRMDevice *device)
 {
-    UInt64 value;
+    UInt64 value = 0;
     drmGetCap(device->fd, DRM_CAP_DUMB_BUFFER, &value);
     device->capDumbBuffer = value == 1;
 
+    value = 0;
     drmGetCap(device->fd, DRM_CAP_PRIME, &value);
-
     device->capPrimeImport = value & DRM_PRIME_CAP_IMPORT;
     device->capPrimeExport = value & DRM_PRIME_CAP_EXPORT;
 
@@ -585,16 +585,24 @@ UInt8 srmDeviceUpdateCaps(SRMDevice *device)
         device->capPrimeExport = primeExport;
     }
 
-
+    value = 0;
     drmGetCap(device->fd, DRM_CAP_ADDFB2_MODIFIERS, &value);
     device->capAddFb2Modifiers = value == 1;
 
-    drmGetCap(device->fd, DRM_CAP_ASYNC_PAGE_FLIP, &value);
-    device->capAsyncPageFlip = value == 1;
-
+    value = 0;
     drmGetCap(device->fd, DRM_CAP_TIMESTAMP_MONOTONIC, &value);
     device->capTimestampMonotonic = value == 1;
     device->clock = device->capTimestampMonotonic ? CLOCK_MONOTONIC : CLOCK_REALTIME;
+
+    value = 0;
+    drmGetCap(device->fd, DRM_CAP_ASYNC_PAGE_FLIP, &value);
+    device->capAsyncPageFlip = value == 1;
+
+#ifdef DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP
+    value = 0;
+    drmGetCap(device->fd, DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP, &value);
+    device->capAtomicAsyncPageFlip = value == 1;
+#endif
 
     return 1;
 }
@@ -816,7 +824,6 @@ UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
 
                 // Uninitialize after notify so users can for example backup some data
                 srmConnectorUninitialize(connector);
-
                 srmConnectorUpdateProperties(connector);
                 srmConnectorUpdateNames(connector);
                 srmConnectorUpdateEncoders(connector);

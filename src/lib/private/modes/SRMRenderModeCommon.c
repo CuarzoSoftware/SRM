@@ -79,12 +79,14 @@ out:
 
 void srmRenderModeCommonPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec, void *data)
 {
+    SRM_UNUSED(fd);
+
     if (data)
     {
         SRMConnector *connector = data;
         connector->pendingPageFlip = 0;
 
-        if (fd)
+        if (connector->currentVsync)
         {
             connector->presentationTime.flags = SRM_PRESENTATION_TIME_FLAGS_HW_CLOCK |
                                                 SRM_PRESENTATION_TIME_FLAGS_HW_COMPLETION |
@@ -95,14 +97,12 @@ void srmRenderModeCommonPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32
             connector->presentationTime.time.tv_nsec = usec * 1000;
             connector->presentationTime.period =  connector->currentMode->info.vrefresh == 0 ? 0 : 1000000000/connector->currentMode->info.vrefresh;
         }
-
-        // If fd == 0 then vsync is disabled
         else
         {
             connector->presentationTime.flags = 0;
             connector->presentationTime.frame = 0;
-            clock_gettime(connector->device->clock, &connector->presentationTime.time);
             connector->presentationTime.period = 0;
+            clock_gettime(connector->device->clock, &connector->presentationTime.time);
         }
     }
 }
@@ -225,7 +225,7 @@ UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
     return 1;
 }
 
-void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqPtr req)
+void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqPtr req, UInt8 clearFlags)
 {
     pthread_mutex_lock(&connector->propsMutex);
 
@@ -235,7 +235,9 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
 
         if (connector->atomicChanges & SRM_ATOMIC_CHANGE_CURSOR_BUFFER)
         {
-            connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_BUFFER;
+            if (clearFlags)
+                connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_BUFFER;
+
             struct gbm_bo *tmpBo = connector->cursorBO;
             connector->cursorBO = connector->cursorBOPending;
             connector->cursorBOPending = tmpBo;
@@ -256,7 +258,8 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
 
         if (connector->atomicChanges & SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY)
         {
-            connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
+            if (clearFlags)
+                connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
 
             if (connector->cursorVisible)
             {
@@ -319,7 +322,8 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
 
         if (connector->atomicChanges & SRM_ATOMIC_CHANGE_CURSOR_POSITION)
         {
-            connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_POSITION;
+            if (clearFlags)
+                connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_POSITION;
 
             drmModeAtomicAddProperty(req,
                                     connector->currentCursorPlane->id,
@@ -335,7 +339,8 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
 
     if (connector->atomicChanges & SRM_ATOMIC_CHANGE_GAMMA_LUT)
     {
-        connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_GAMMA_LUT;
+        if (clearFlags)
+            connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_GAMMA_LUT;
 
         if (connector->gammaBlobId)
         {
@@ -415,8 +420,11 @@ void srmRenderModeCommonDestroyCursor(SRMConnector *connector)
     connector->cursorVisible = 0;
 }
 
-Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags, void *data)
+Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags, void *data, UInt8 forceRetry)
 {
+    if (!forceRetry)
+        return drmModeAtomicCommit(fd, req, flags, data);
+
     Int32 ret;
 
     retry:
@@ -542,12 +550,12 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
                                      connector->currentPrimaryPlane->propIDs.SRC_H,
                                      (UInt64)connector->currentMode->info.vdisplay << 16);
 
-            srmRenderModeCommitAtomicChanges(connector, req);
+            srmRenderModeCommitAtomicChanges(connector, req, 1);
 
             ret = srmRenderModeAtomicCommit(connector->device->fd,
                                 req,
                                 DRM_MODE_ATOMIC_ALLOW_MODESET,
-                                connector);
+                                connector, 1);
 
             if (ret)
             {
@@ -797,13 +805,13 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
                                  connector->currentPrimaryPlane->propIDs.SRC_H,
                                  (UInt64)connector->currentMode->info.vdisplay << 16);
 
-        srmRenderModeCommitAtomicChanges(connector, req);
+        srmRenderModeCommitAtomicChanges(connector, req, 1);
 
         // Commit
         ret = srmRenderModeAtomicCommit(connector->device->fd,
                                         req,
                                         DRM_MODE_ATOMIC_ALLOW_MODESET,
-                                        connector);
+                                        connector, 1);
 
         drmModeAtomicFree(req);
 
@@ -940,13 +948,13 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
                                  connector->currentPrimaryPlane->propIDs.SRC_H,
                                  (UInt64)connector->currentMode->info.vdisplay << 16);
 
-        srmRenderModeCommitAtomicChanges(connector, req);
+        srmRenderModeCommitAtomicChanges(connector, req, 1);
 
         // Commit
         ret = srmRenderModeAtomicCommit(connector->device->fd,
                                         req,
                                         DRM_MODE_ATOMIC_ALLOW_MODESET,
-                                        connector);
+                                        connector, 1);
 
         drmModeAtomicFree(req);
 
@@ -985,33 +993,91 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
 
 void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
 {
-    Int32 ret;
+    Int32 ret = 0;
 
     UInt32 buffersCount = srmConnectorGetBuffersCount(connector);
 
-    if (buffersCount == 1 || buffersCount > 2)
+    if (connector->pendingPageFlip || buffersCount == 1 || buffersCount > 2)
         srmRenderModeCommonWaitPageFlip(connector);
 
-    connector->lastFb = fb;
-    connector->pendingPageFlip = 1;
+    UInt8 fbChanged = 0;
+
+    if (fb != connector->lastFb || connector->firstPageFlip)
+    {
+        fbChanged = 1;
+        connector->lastFb = fb;
+    }
 
     if (connector->device->clientCapAtomic)
     {
-        drmModeAtomicReqPtr req;
-        req = drmModeAtomicAlloc();
+        if (connector->currentVsync)
+        {
+            drmModeAtomicReqPtr req;
+            req = drmModeAtomicAlloc();
+            srmRenderModeCommitAtomicChanges(connector, req, 1);
+            drmModeAtomicAddProperty(req,
+                                     connector->currentPrimaryPlane->id,
+                                     connector->currentPrimaryPlane->propIDs.FB_ID,
+                                     connector->lastFb);
+            ret = srmRenderModeAtomicCommit(connector->device->fd,
+                                        req,
+                                        DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
+                                        connector, 1);
+            drmModeAtomicFree(req);
+            connector->pendingPageFlip = 1;
+        }
+        else
+        {
+            if (fbChanged)
+            {
+                drmModeAtomicReqPtr req;
+                req = drmModeAtomicAlloc();
+                drmModeAtomicAddProperty(req,
+                                         connector->currentPrimaryPlane->id,
+                                         connector->currentPrimaryPlane->propIDs.FB_ID,
+                                         connector->lastFb);
+                ret = srmRenderModeAtomicCommit(connector->device->fd,
+                                                req,
+                                                DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK,
+                                                connector, 1);
+                drmModeAtomicFree(req);
+            }
 
-        srmRenderModeCommitAtomicChanges(connector, req);
+            if (!connector->pendingPageFlip && (connector->atomicChanges || ret == -22))
+            {
+                drmModeAtomicReqPtr req;
+                req = drmModeAtomicAlloc();
+                srmRenderModeCommitAtomicChanges(connector, req, 0);
 
-        drmModeAtomicAddProperty(req,
-                                 connector->currentPrimaryPlane->id,
-                                 connector->currentPrimaryPlane->propIDs.FB_ID,
-                                 connector->lastFb);
+                if (ret == -22)
+                    drmModeAtomicAddProperty(req,
+                                             connector->currentPrimaryPlane->id,
+                                             connector->currentPrimaryPlane->propIDs.FB_ID,
+                                             connector->lastFb);
 
-        ret = srmRenderModeAtomicCommit(connector->device->fd,
-                                    req,
-                                    DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
-                                    connector);
-        drmModeAtomicFree(req);
+                ret = srmRenderModeAtomicCommit(connector->device->fd,
+                                                req,
+                                                DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
+                                                connector, 1);
+
+                drmModeAtomicAddProperty(req,
+                                         connector->currentPrimaryPlane->id,
+                                         connector->currentPrimaryPlane->propIDs.FB_ID,
+                                         connector->lastFb);
+
+                drmModeAtomicFree(req);
+
+                if (!ret)
+                {
+                    connector->atomicChanges = 0;
+                    connector->pendingPageFlip = 1;
+                    ret = 0;
+                }
+
+                if (!connector->pendingPageFlip)
+                    connector->drmEventCtx.page_flip_handler(0, 0, 0, 0, connector);
+            }
+        }
     }
     else
     {
@@ -1022,6 +1088,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                                   connector->lastFb,
                                   DRM_MODE_PAGE_FLIP_EVENT,
                                   connector);
+            connector->pendingPageFlip = 1;
         }
         else
         {
@@ -1034,11 +1101,24 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
 
             if (ret == -16)
             {
-                usleep(200);
+                usleep(2000);
                 goto retry;
             }
 
-            connector->drmEventCtx.page_flip_handler(0, 0, 0, 0, connector);
+            connector->pendingPageFlip = 0;
+
+            if (ret == -22)
+            {
+                ret = drmModePageFlip(connector->device->fd,
+                                      connector->currentCrtc->id,
+                                      connector->lastFb,
+                                      DRM_MODE_PAGE_FLIP_EVENT,
+                                      connector);
+                connector->pendingPageFlip = 1;
+            }
+
+            if (!connector->pendingPageFlip)
+                connector->drmEventCtx.page_flip_handler(0, 0, 0, 0, connector);
         }
     }
 
@@ -1064,7 +1144,7 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector)
     fds.events = POLLIN;
     fds.revents = 0;
 
-    while(connector->pendingPageFlip)
+    while (connector->pendingPageFlip)
     {
         if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
             break;
@@ -1082,7 +1162,7 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector)
             break;
         }
 
-        poll(&fds, 1, 500);
+        poll(&fds, 1, 1);
 
         if(fds.revents & POLLIN)
             drmHandleEvent(fds.fd, &connector->drmEventCtx);
@@ -1173,12 +1253,12 @@ Int32 srmRenderModeAtomicResetConnectorProps(SRMConnector *connector)
                              connector->currentPrimaryPlane->propIDs.SRC_H,
                              0);
 
-    srmRenderModeCommitAtomicChanges(connector, req);
+    srmRenderModeCommitAtomicChanges(connector, req, 1);
 
     ret = srmRenderModeAtomicCommit(connector->device->fd,
                                     req,
                                     DRM_MODE_ATOMIC_ALLOW_MODESET,
-                                    connector);
+                                    connector, 1);
 
     drmModeAtomicFree(req);
 

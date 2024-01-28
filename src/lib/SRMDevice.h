@@ -133,13 +133,24 @@ UInt8 srmDeviceGetCapAddFb2Modifiers(SRMDevice *device);
 /**
  * @brief Get the driver's support for Async Page Flip capability.
  *
- * @note This specifically indicates support for the legacy API, no the atomic API.
+ * @note This specifically indicates support for the legacy API, no the atomic API @see srmDeviceGetCapAtomicAsyncPageFlip().
  *
  * @param device A pointer to the @ref SRMDevice instance.
  *
  * @return 1 if the DRM device driver supports Async Page Flip capability, 0 otherwise.
  */
 UInt8 srmDeviceGetCapAsyncPageFlip(SRMDevice *device);
+
+/**
+ * @brief Get the driver's support for Atomic Async Page Flip capability.
+ *
+ * @note Atomic async page flips are supported since Linux 6.8.
+ *
+ * @param device A pointer to the @ref SRMDevice instance.
+ *
+ * @return 1 if the DRM device driver supports Atomic Async Page Flip capability, 0 otherwise.
+ */
+UInt8 srmDeviceGetCapAtomicAsyncPageFlip(SRMDevice *device);
 
 /**
  * @brief Retrieve the driver's support for monotonic timestamps.

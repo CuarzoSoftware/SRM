@@ -19,14 +19,14 @@
 #include <unistd.h>
 
 static const EGLint eglConfigAttribs[] =
-    {
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        EGL_RED_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,
-        EGL_ALPHA_SIZE, 0,
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        EGL_NONE
+{
+    EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+    EGL_RED_SIZE, 8,
+    EGL_GREEN_SIZE, 8,
+    EGL_BLUE_SIZE, 8,
+    EGL_ALPHA_SIZE, 0,
+    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+    EGL_NONE
 };
 
 struct RenderModeDataStruct
@@ -658,7 +658,6 @@ static UInt8 flipPage(SRMConnector *connector)
     }
 
     gbm_surface_lock_front_buffer(data->connectorGBMSurface);
-
     srmRenderModeCommonPageFlip(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
 
     data->currentBufferIndex = nextBufferIndex(connector);

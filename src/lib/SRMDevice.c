@@ -71,6 +71,11 @@ UInt8 srmDeviceGetCapAsyncPageFlip(SRMDevice *device)
     return device->capAsyncPageFlip;
 }
 
+UInt8 srmDeviceGetCapAtomicAsyncPageFlip(SRMDevice *device)
+{
+    return device->capAtomicAsyncPageFlip;
+}
+
 UInt8 srmDeviceGetCapTimestampMonotonic(SRMDevice *device)
 {
     return device->capTimestampMonotonic;

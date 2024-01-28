@@ -23,9 +23,9 @@ void  srmRenderModeCommonPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt3
 UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector);
 void srmRenderModeCommonDestroyCursor(SRMConnector *connector);
 UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector);
-void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqPtr req);
+void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqPtr req, UInt8 clearFlags);
 Int32 srmRenderModeAtomicResetConnectorProps(SRMConnector *connector);
-Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags, void *data);
+Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags, void *data, UInt8 forceRetry);
 Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb);
 void srmRenderModeCommonPauseRendering(SRMConnector *connector);
 void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb);

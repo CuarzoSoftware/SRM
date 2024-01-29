@@ -30,7 +30,7 @@ SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
     connector->id = id;
     connector->device = device;
     connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
-    connector->pendingVsync = 1;
+    connector->pendingVSync = 1;
     pthread_mutex_init(&connector->stateMutex, NULL);
     pthread_mutex_init(&connector->propsMutex, NULL);
     srmConnectorUpdateProperties(connector);
@@ -481,7 +481,7 @@ void *srmConnectorRenderThread(void *conn)
     // Render loop
     while (1)
     {
-        connector->currentVsync = connector->pendingVsync;
+        connector->currentVSync = connector->pendingVSync;
 
         if (!srmRenderModeCommonWaitRepaintRequest(connector))
             break;

@@ -97,10 +97,10 @@ struct SRMConnectorStruct
     SRMPresentationTime presentationTime;
 
     // Current VSYNC state (enabled by default)
-    UInt8 currentVsync;
+    UInt8 currentVSync;
 
     // Requested by the user
-    UInt8 pendingVsync;
+    UInt8 pendingVSync;
 
     // Max refresh rate when vsync is off
     Int32 maxRefreshRate;

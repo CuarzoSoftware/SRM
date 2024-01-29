@@ -86,7 +86,7 @@ void srmRenderModeCommonPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32
         SRMConnector *connector = data;
         connector->pendingPageFlip = 0;
 
-        if (connector->currentVsync)
+        if (connector->currentVSync)
         {
             connector->presentationTime.flags = SRM_PRESENTATION_TIME_FLAGS_HW_CLOCK |
                                                 SRM_PRESENTATION_TIME_FLAGS_HW_COMPLETION |
@@ -1037,7 +1037,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
 
     if (connector->device->clientCapAtomic)
     {
-        if (connector->currentVsync)
+        if (connector->currentVSync)
         {
             drmModeAtomicReqPtr req;
             req = drmModeAtomicAlloc();
@@ -1108,7 +1108,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     }
     else
     {
-        if (connector->currentVsync)
+        if (connector->currentVSync)
         {
             ret = drmModePageFlip(connector->device->fd,
                                   connector->currentCrtc->id,
@@ -1189,7 +1189,7 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector)
             break;
         }
 
-        poll(&fds, 1, 1);
+        poll(&fds, 1, 500);
 
         if(fds.revents & POLLIN)
             drmHandleEvent(fds.fd, &connector->drmEventCtx);

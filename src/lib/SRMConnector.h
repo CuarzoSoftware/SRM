@@ -644,23 +644,23 @@ UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table);
  * @param connector The @ref SRMConnector instance.
  * @return 1 if vsync control is supported, 0 otherwise.
  */
-UInt8 srmConnectorHasVsyncControlSupport(SRMConnector *connector);
+UInt8 srmConnectorHasVSyncControlSupport(SRMConnector *connector);
 
 /**
  * @brief Returns the current vsync status.
  *
- * Returns 1 if vsync is enabled, 0 otherwise. Vsync is enabled by default.
+ * Returns 1 if vsync is enabled, 0 otherwise. V-Sync is enabled by default.
  *
  * @param connector The @ref SRMConnector instance.
  * @return 1 if vsync is enabled, 0 if not.
  */
-UInt8 srmConnectorIsVsyncEnabled(SRMConnector *connector);
+UInt8 srmConnectorIsVSyncEnabled(SRMConnector *connector);
 
 /**
  * @brief Enable or disable vsync.
  *
- * Disabling vsync is only allowed if srmConnectorHasVsyncControlSupport() returns 1.
- * Vsync is enabled by default.
+ * Disabling vsync is only allowed if srmConnectorHasVSyncControlSupport() returns 1.
+ * VSync is enabled by default.
  *
  * @note Disabling vsync for the atomic API is supported only starting from Linux version 6.8.
  *       If you wish to enforce the use of the legacy API, set the **SRM_FORCE_LEGACY_API** environment variable to 1.
@@ -669,7 +669,7 @@ UInt8 srmConnectorIsVsyncEnabled(SRMConnector *connector);
  * @param enabled Set to 1 to enable vsync, 0 to disable vsync.
  * @return 1 if the vsync change was successful, 0 otherwise.
  */
-UInt8 srmConnectorEnableVsync(SRMConnector *connector, UInt8 enabled);
+UInt8 srmConnectorEnableVSync(SRMConnector *connector, UInt8 enabled);
 
 /**
  * @brief Sets the refresh rate limit when vsync is disabled.

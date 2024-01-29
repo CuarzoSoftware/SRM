@@ -682,7 +682,7 @@ UInt64 srmConnectorGetGammaSize(SRMConnector *connector)
 
 UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table)
 {
-    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED || !connector->currentCrtc)
+    if (!connector->currentCrtc)
     {
         SRMError("Failed to set gamma for connector %d. Gamma cannot be set on an uninitialized connector.",
             connector->id);
@@ -714,6 +714,7 @@ UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table)
         
         connector->atomicChanges |= SRM_ATOMIC_CHANGE_GAMMA_LUT;
         pthread_mutex_unlock(&connector->propsMutex);
+        pthread_cond_signal(&connector->repaintCond);
         return 1;
     }
     else

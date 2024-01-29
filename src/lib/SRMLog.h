@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-#if __DOXYGEN__
+#if DOXYGEN
 #define FORMAT_CHECK
 #else
 #define FORMAT_CHECK __attribute__((format(printf, 1, 2)))

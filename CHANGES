@@ -26,7 +26,7 @@ SRM (0.5.0-1)
 
   * Transformed the SRMTypes.h header into a configuration file, including macros to access the library version statically during compilation.
   
--- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Wed, 24 Jan 2024 12:43:33 -0300
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Mon, 29 Jan 2024 19:01:59 -0300
 
 
 SRM (0.4.0-1)

@@ -268,9 +268,9 @@ static void pageFlipped(SRMConnector *connector, void *userData)
         data->sec = pt->time.tv_sec;
 
         if (msDiff != 0)
-            SRMLog("[srm-all-connectors] Connector (%d) FPS: %lu.",
+            SRMLog("[srm-all-connectors] Connector (%d) FPS: %d.",
                    srmConnectorGetID(connector),
-                   ((data->framesCount * 1000) / msDiff));
+                   (UInt32)((data->framesCount * 1000) / msDiff));
     }
 }
 

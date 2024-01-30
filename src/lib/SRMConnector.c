@@ -322,7 +322,19 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
     UInt64 gammaSize = srmCrtcGetGammaSize(connector->currentCrtc);
 
     if (gammaSize > 0 && connector->device->clientCapAtomic && connector->currentCrtc->propIDs.GAMMA_LUT_SIZE)
+    {
+        SRMDebug("[%s] Connector (%d) gamma size = %d.",
+                 connector->device->name,
+                 connector->id,
+                 (UInt32)gammaSize);
         connector->gamma = malloc(gammaSize * sizeof(*connector->gamma));
+    }
+    else
+    {
+        SRMDebug("[%s] Connector (%d) does not support gamma correction.",
+                 connector->device->name,
+                 connector->id);
+    }
 
     if (pthread_create(&connector->renderThread, NULL, srmConnectorRenderThread, connector))
     {
@@ -348,48 +360,13 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
     return 1;
 
 fail:
-    connector->renderThread = 0;
-    connector->currentEncoder = NULL;
-    connector->currentCrtc = NULL;
-    connector->currentPrimaryPlane = NULL;
-    connector->currentCursorPlane = NULL;
-
-    bestEncoder->currentConnector = NULL;
-    bestCrtc->currentConnector = NULL;
-    bestPrimaryPlane->currentConnector = NULL;
+    connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
 
     if (bestCursorPlane)
         bestCursorPlane->currentConnector = NULL;
 
-    connector->interfaceData = NULL;
-    connector->interface = NULL;
+    srmConnectorRenderThreadCleanUp(connector);
 
-    if (connector->gammaBlobId)
-    {
-        drmModeDestroyPropertyBlob(connector->device->fd, connector->gammaBlobId);
-        connector->gammaBlobId = 0;
-    }
-
-    if (connector->gamma)
-    {
-        free(connector->gamma);
-        connector->gamma = NULL;
-    }
-
-    if (connector->damageBoxes)
-    {
-        free(connector->damageBoxes);
-        connector->damageBoxes = NULL;
-        connector->damageBoxesCount = 0;
-    }
-
-    if (connector->currentModeBlobId)
-    {
-        drmModeDestroyPropertyBlob(connector->device->fd, connector->currentModeBlobId);
-        connector->currentModeBlobId = 0;
-    }
-
-    connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
     return 0;
 }
 
@@ -431,58 +408,7 @@ void srmConnectorUninitialize(SRMConnector *connector)
         usleep(1000);
     }
 
-    if (connector->currentCrtc)
-    {
-        connector->currentCrtc->currentConnector = NULL;
-        connector->currentCrtc = NULL;
-    }
-
-    if (connector->currentEncoder)
-    {
-        connector->currentEncoder->currentConnector = NULL;
-        connector->currentEncoder = NULL;
-    }
-
-    if (connector->currentPrimaryPlane)
-    {
-        connector->currentPrimaryPlane->currentConnector = NULL;
-        connector->currentPrimaryPlane = NULL;
-    }
-
-    if (connector->currentCursorPlane)
-    {
-        connector->currentCursorPlane->currentConnector = NULL;
-        srmConnectorSetCursorPlaneToNeededConnector(connector->currentCursorPlane);
-        connector->currentCursorPlane = NULL;
-    }
-
-    connector->interfaceData = NULL;
-    connector->interface = NULL;
-
-    if (connector->gamma)
-    {
-        free(connector->gamma);
-        connector->gamma = NULL;
-    }
-
-    if (connector->gammaBlobId)
-    {
-        drmModeDestroyPropertyBlob(connector->device->fd, connector->gammaBlobId);
-        connector->gammaBlobId = 0;
-    }
-
-    if (connector->damageBoxes)
-    {
-        free(connector->damageBoxes);
-        connector->damageBoxes = NULL;
-        connector->damageBoxesCount = 0;
-    }
-
-    if (connector->currentModeBlobId)
-    {
-        drmModeDestroyPropertyBlob(connector->device->fd, connector->currentModeBlobId);
-        connector->currentModeBlobId = 0;
-    }
+    srmConnectorRenderThreadCleanUp(connector);
 
     SRMDebug("[%s] Connector (%d) %s, %s, %s uninitialized.",
              connector->device->name,

@@ -87,8 +87,13 @@ struct SRMConnectorStruct
     drmEventContext drmEventCtx;
     UInt8 pendingPageFlip;
     UInt8 firstPageFlip;
+
+    UInt8 hasRepaintCond;
     pthread_cond_t repaintCond;
+
+    UInt8 hasRepaintMutex;
     pthread_mutex_t repaintMutex;
+
     UInt8 repaintRequested;
     pthread_mutex_t stateMutex;
     SRMBox *damageBoxes;
@@ -133,6 +138,7 @@ SRMConnectorMode *srmConnectorFindPreferredMode(SRMConnector *connector);
 UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane);
 void *srmConnectorRenderThread(void *conn);
 void srmConnectorUnlockRenderThread(SRMConnector *connector, UInt8 repaint);
+void srmConnectorRenderThreadCleanUp(SRMConnector *connector);
 
 #ifdef __cplusplus
 }

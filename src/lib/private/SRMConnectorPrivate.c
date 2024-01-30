@@ -443,16 +443,20 @@ void *srmConnectorRenderThread(void *conn)
         SRMError("Could not create render mutex for device %s connector %d.",
                  connector->device->name,
                  connector->id);
-        goto repaintMutexFail;
+        goto finish;
     }
+    else
+        connector->hasRepaintMutex = 1;
 
     if (pthread_cond_init(&connector->repaintCond, NULL))
     {
         SRMError("Could not create render cond for device %s connector %d.",
                  connector->device->name,
                  connector->id);
-        goto repaintCondFail;
+        goto finish;
     }
+    else
+        connector->hasRepaintCond = 1;
 
     connector->pendingPageFlip = 0;
 
@@ -471,10 +475,10 @@ void *srmConnectorRenderThread(void *conn)
     else if (srmDeviceGetRenderMode(connector->device) == SRM_RENDER_MODE_CPU)
         srmRenderModeCPUSetInterface(connector);
     else
-        goto fail;
+        goto finish;
 
     if (!connector->renderInterface.initialize(connector))
-        goto fail;
+        goto finish;
 
     connector->renderInitResult = 1;
 
@@ -545,14 +549,8 @@ void *srmConnectorRenderThread(void *conn)
         pthread_mutex_unlock(&connector->stateMutex);
     }
 
-fail:
-    srmRenderModeCommonDestroyCursor(connector);
-repaintCondFail:
-    pthread_cond_destroy(&connector->repaintCond);
-repaintMutexFail:
-    pthread_mutex_destroy(&connector->repaintMutex);
+    finish:
     connector->renderInitResult = -1;
-    connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
     return NULL;
 }
 
@@ -589,5 +587,77 @@ void srmConnectorSetCursorPlaneToNeededConnector(SRMPlane *cursorPlane)
                 }
             }
         }
+    }
+}
+
+void srmConnectorRenderThreadCleanUp(SRMConnector *connector)
+{
+    connector->renderThread = 0;
+
+    srmRenderModeCommonDestroyCursor(connector);
+
+    if (connector->hasRepaintCond)
+    {
+        pthread_cond_destroy(&connector->repaintCond);
+        connector->hasRepaintCond = 0;
+    }
+
+    if (connector->hasRepaintMutex)
+    {
+        pthread_mutex_destroy(&connector->repaintMutex);
+        connector->hasRepaintCond = 0;
+    }
+
+    if (connector->currentCrtc)
+    {
+        connector->currentCrtc->currentConnector = NULL;
+        connector->currentCrtc = NULL;
+    }
+
+    if (connector->currentEncoder)
+    {
+        connector->currentEncoder->currentConnector = NULL;
+        connector->currentEncoder = NULL;
+    }
+
+    if (connector->currentPrimaryPlane)
+    {
+        connector->currentPrimaryPlane->currentConnector = NULL;
+        connector->currentPrimaryPlane = NULL;
+    }
+
+    if (connector->currentCursorPlane)
+    {
+        connector->currentCursorPlane->currentConnector = NULL;
+        srmConnectorSetCursorPlaneToNeededConnector(connector->currentCursorPlane);
+        connector->currentCursorPlane = NULL;
+    }
+
+    connector->interfaceData = NULL;
+    connector->interface = NULL;
+
+    if (connector->gamma)
+    {
+        free(connector->gamma);
+        connector->gamma = NULL;
+    }
+
+    if (connector->gammaBlobId)
+    {
+        drmModeDestroyPropertyBlob(connector->device->fd, connector->gammaBlobId);
+        connector->gammaBlobId = 0;
+    }
+
+    if (connector->damageBoxes)
+    {
+        free(connector->damageBoxes);
+        connector->damageBoxes = NULL;
+        connector->damageBoxesCount = 0;
+    }
+
+    if (connector->currentModeBlobId)
+    {
+        drmModeDestroyPropertyBlob(connector->device->fd, connector->currentModeBlobId);
+        connector->currentModeBlobId = 0;
     }
 }

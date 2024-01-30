@@ -165,6 +165,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
             if (buffer->map == MAP_FAILED)
             {
+                buffer->map = NULL;
                 SRMWarning("[%s] Directly mapping buffer DMA fd failed. Trying gbm_bo_map.", buffer->allocator->name);
                 goto gbmMap;
             }
@@ -191,6 +192,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     if (!buffer->map)
     {
+        buffer->mapData = NULL;
         SRMWarning("[%s] Failed to map DMA FD. Tying gbm_bo_write instead.", buffer->allocator->name);
         goto gbmWrite;
     }
@@ -490,9 +492,9 @@ void srmBufferDestroy(SRMBuffer *buffer)
 {
     pthread_mutex_lock(&buffer->mutex);
 
-    if (buffer->map)
+    if (buffer->map != NULL && buffer->map != MAP_FAILED)
     {
-        if (buffer->mapData)
+        if (buffer->mapData != NULL)
             gbm_bo_unmap(buffer->bo, buffer->mapData);
         else
             munmap(buffer->map, buffer->height * buffer->strides[0]);

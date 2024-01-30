@@ -12,6 +12,7 @@ jobs:
       
       - name: Run doxygen
         run: |
+          sudo apt install -y doxygen
           cd scripts/docs
           chmod +x gen_doc.sh
           ./gen_doc.sh

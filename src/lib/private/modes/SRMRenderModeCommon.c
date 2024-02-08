@@ -245,12 +245,11 @@ UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
     if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING)
     {
         pthread_mutex_unlock(&connector->stateMutex);
-        connector->interface->uninitializeGL(connector, connector->interfaceData);
-        connector->renderInterface.uninitialize(connector);
-
         // Wait up to 1.5 sec for any pending pageflip event
         connector->pendingPageFlip = 1;
         srmRenderModeCommonWaitPageFlip(connector, 3);
+        connector->interface->uninitializeGL(connector, connector->interfaceData);
+        connector->renderInterface.uninitialize(connector);
         eglReleaseThread();
         connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
         return 0;
@@ -603,6 +602,10 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
         }
         else
         {
+            connector->pendingPageFlip = 1;
+            srmRenderModeCommonWaitPageFlip(connector, 3);
+            connector->pendingPageFlip = 0;
+
             int ret;
 
             drmModeSetCrtc(connector->device->fd,
@@ -653,6 +656,10 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
         }
         else
         {
+            connector->pendingPageFlip = 1;
+            srmRenderModeCommonWaitPageFlip(connector, 3);
+            connector->pendingPageFlip = 0;
+
             ret = drmModeSetCrtc(connector->device->fd,
                                connector->currentCrtc->id,
                                0,
@@ -1197,7 +1204,7 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector, Int32 iterLimit)
             break;
         }
 
-        if (poll(&fds, 1, 500) > 0 && (fds.revents & POLLIN))
+        if (poll(&fds, 1, 10) > 0 && (fds.revents & POLLIN))
             drmHandleEvent(fds.fd, &connector->drmEventCtx);
         else if (iterLimit > 0)
             iterLimit--;
@@ -1208,6 +1215,10 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector, Int32 iterLimit)
 
 Int32 srmRenderModeAtomicResetConnectorProps(SRMConnector *connector)
 {
+    connector->pendingPageFlip = 1;
+    srmRenderModeCommonWaitPageFlip(connector, 3);
+    connector->pendingPageFlip = 0;
+
     Int32 ret;
     drmModeAtomicReqPtr req;
     req = drmModeAtomicAlloc();

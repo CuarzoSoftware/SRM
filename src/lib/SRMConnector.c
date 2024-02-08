@@ -321,13 +321,15 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
 
     UInt64 gammaSize = srmCrtcGetGammaSize(connector->currentCrtc);
 
-    if (gammaSize > 0 && connector->device->clientCapAtomic && connector->currentCrtc->propIDs.GAMMA_LUT_SIZE)
+    if (gammaSize > 0)
     {
         SRMDebug("[%s] Connector (%d) gamma size = %d.",
-                 connector->device->name,
-                 connector->id,
-                 (UInt32)gammaSize);
-        connector->gamma = malloc(gammaSize * sizeof(*connector->gamma));
+                connector->device->name,
+                connector->id,
+                (UInt32)gammaSize);
+
+        if (connector->device->clientCapAtomic && connector->currentCrtc->propIDs.GAMMA_LUT_SIZE)
+            connector->gamma = malloc(gammaSize * sizeof(*connector->gamma));
     }
     else
     {

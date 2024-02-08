@@ -3,6 +3,7 @@ SRM (0.5.1-1)
   # Bug Fixes
 
   * Correct debugging message that incorrectly announces the absence of gamma correction support when, in fact, it is supported.
+  * Fix segmentation fault occurring during the uninitialization of multiple connectors using the DUMB rendering mode. This issue arises from the handling of a pending page flip event after the connectors have been uninitialized.
   
 -- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Thu, 08 Feb 2024 12:23:21 -0300
 

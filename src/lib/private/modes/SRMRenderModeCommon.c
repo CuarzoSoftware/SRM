@@ -86,6 +86,9 @@ void srmRenderModeCommonPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32
         SRMConnector *connector = data;
         connector->pendingPageFlip = 0;
 
+        if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED)
+            return;
+
         if (connector->currentVSync)
         {
             connector->presentationTime.flags = SRM_PRESENTATION_TIME_FLAGS_HW_CLOCK |

@@ -247,6 +247,10 @@ UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
         pthread_mutex_unlock(&connector->stateMutex);
         connector->interface->uninitializeGL(connector, connector->interfaceData);
         connector->renderInterface.uninitialize(connector);
+
+        // Wait up to 1.5 sec for any pending pageflip event
+        connector->pendingPageFlip = 1;
+        srmRenderModeCommonWaitPageFlip(connector, 3);
         eglReleaseThread();
         connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
         return 0;
@@ -1029,7 +1033,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     UInt32 buffersCount = srmConnectorGetBuffersCount(connector);
 
     if (connector->pendingPageFlip || buffersCount == 1 || buffersCount > 2)
-        srmRenderModeCommonWaitPageFlip(connector);
+        srmRenderModeCommonWaitPageFlip(connector, -1);
 
     UInt8 fbChanged = 0;
 
@@ -1164,11 +1168,11 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     if (buffersCount == 2 || connector->firstPageFlip)
     {
         connector->firstPageFlip = 0;
-        srmRenderModeCommonWaitPageFlip(connector);
+        srmRenderModeCommonWaitPageFlip(connector, -1);
     }
 }
 
-void srmRenderModeCommonWaitPageFlip(SRMConnector *connector)
+void srmRenderModeCommonWaitPageFlip(SRMConnector *connector, Int32 iterLimit)
 {
     struct pollfd fds;
     fds.fd = connector->device->fd;
@@ -1177,7 +1181,7 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector)
 
     while (connector->pendingPageFlip)
     {
-        if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
+        if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED || iterLimit == 0)
             break;
 
         // Prevent multiple threads invoking the drmHandleEvent at a time wich causes bugs
@@ -1193,10 +1197,10 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector)
             break;
         }
 
-        poll(&fds, 1, 500);
-
-        if(fds.revents & POLLIN)
+        if (poll(&fds, 1, 500) > 0 && (fds.revents & POLLIN))
             drmHandleEvent(fds.fd, &connector->drmEventCtx);
+        else if (iterLimit > 0)
+            iterLimit--;
 
         pthread_mutex_unlock(&connector->device->pageFlipMutex);
     }

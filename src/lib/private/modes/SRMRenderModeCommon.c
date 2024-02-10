@@ -1084,7 +1084,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                 ret = srmRenderModeAtomicCommit(connector->device->fd,
                                                 req,
                                                 DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK,
-                                                connector, 1);
+                                                connector, 0);
                 drmModeAtomicFree(req);
             }
 
@@ -1109,7 +1109,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                 ret = srmRenderModeAtomicCommit(connector->device->fd,
                                                 req,
                                                 DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
-                                                connector, 1);
+                                                connector, 0);
 
                 drmModeAtomicFree(req);
 

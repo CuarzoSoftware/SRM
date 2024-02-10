@@ -18,6 +18,8 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
 {
     SRMLogInit();
 
+    setenv("SRM_FORCE_LEGACY_API", "1", 0);
+
     // REF 1
     SRMCore *core = calloc(1, sizeof(SRMCore));
 

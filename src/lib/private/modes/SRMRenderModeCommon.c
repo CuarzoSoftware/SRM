@@ -98,7 +98,7 @@ void srmRenderModeCommonPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32
             connector->presentationTime.frame = seq;
             connector->presentationTime.time.tv_sec = sec;
             connector->presentationTime.time.tv_nsec = usec * 1000;
-            connector->presentationTime.period =  connector->currentMode->info.vrefresh == 0 ? 0 : 1000000000/connector->currentMode->info.vrefresh;
+            connector->presentationTime.period = connector->currentMode->info.vrefresh == 0 ? 0 : 1000000000/connector->currentMode->info.vrefresh;
         }
         else
         {
@@ -245,7 +245,6 @@ UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
     if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING)
     {
         pthread_mutex_unlock(&connector->stateMutex);
-        // Wait up to 1.5 sec for any pending pageflip event
         connector->pendingPageFlip = 1;
         srmRenderModeCommonWaitPageFlip(connector, 3);
         connector->interface->uninitializeGL(connector, connector->interfaceData);
@@ -1056,6 +1055,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
         {
             drmModeAtomicReqPtr req;
             req = drmModeAtomicAlloc();
+            UInt32 flags = connector->atomicChanges;
             srmRenderModeCommitAtomicChanges(connector, req, 1);
             drmModeAtomicAddProperty(req,
                                      connector->currentPrimaryPlane->id,
@@ -1064,7 +1064,10 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
             ret = srmRenderModeAtomicCommit(connector->device->fd,
                                         req,
                                         DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
-                                        connector, 1);
+                                        connector, 0);
+            if (ret)
+                connector->atomicChanges = flags;
+
             drmModeAtomicFree(req);
             connector->pendingPageFlip = 1;
         }

@@ -1204,7 +1204,7 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector, Int32 iterLimit)
             break;
         }
 
-        if (poll(&fds, 1, 10) > 0 && (fds.revents & POLLIN))
+        if (poll(&fds, 1, 500) > 0 && (fds.revents & POLLIN))
             drmHandleEvent(fds.fd, &connector->drmEventCtx);
         else if (iterLimit > 0)
             iterLimit--;

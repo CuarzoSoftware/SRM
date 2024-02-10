@@ -1070,6 +1070,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
 
             drmModeAtomicFree(req);
             connector->pendingPageFlip = 1;
+            connector->onlyAsyncCursorUpdate = 0;
         }
         else
         {

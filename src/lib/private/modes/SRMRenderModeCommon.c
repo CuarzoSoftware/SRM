@@ -1039,7 +1039,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
 
     UInt32 buffersCount = srmConnectorGetBuffersCount(connector);
 
-    if (connector->pendingPageFlip || buffersCount == 1 || buffersCount > 2)
+    if ((connector->pendingPageFlip && !connector->currentVSync) || buffersCount == 1 || buffersCount > 2)
         srmRenderModeCommonWaitPageFlip(connector, -1);
 
     UInt8 fbChanged = 0;
@@ -1164,9 +1164,11 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
         }
     }
 
+    Int32 limit = -1;
+
     if (ret)
     {
-        connector->pendingPageFlip = 0;
+        limit = 5;
         SRMError("Failed to page flip on device %s connector %d. Error: %d.",
                  connector->device->name,
                  connector->id, ret);
@@ -1175,7 +1177,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     if (buffersCount == 2 || connector->firstPageFlip)
     {
         connector->firstPageFlip = 0;
-        srmRenderModeCommonWaitPageFlip(connector, -1);
+        srmRenderModeCommonWaitPageFlip(connector, limit);
     }
 }
 
@@ -1204,9 +1206,10 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector, Int32 iterLimit)
             break;
         }
 
-        if (poll(&fds, 1, 500) > 0 && (fds.revents & POLLIN))
+        poll(&fds, 1, 5);
             drmHandleEvent(fds.fd, &connector->drmEventCtx);
-        else if (iterLimit > 0)
+
+        if (iterLimit > 0)
             iterLimit--;
 
         pthread_mutex_unlock(&connector->device->pageFlipMutex);

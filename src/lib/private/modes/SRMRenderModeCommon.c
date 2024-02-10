@@ -85,7 +85,6 @@ void srmRenderModeCommonPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32
     {
         SRMConnector *connector = data;
         connector->pendingPageFlip = 0;
-        connector->onlyAsyncCursorUpdate = 0;
 
         if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED)
             return;
@@ -1039,16 +1038,10 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
 
     UInt32 buffersCount = srmConnectorGetBuffersCount(connector);
 
-    if ((connector->pendingPageFlip && !connector->currentVSync) || buffersCount == 1 || buffersCount > 2)
+    if (connector->pendingPageFlip || buffersCount == 1 || buffersCount > 2)
         srmRenderModeCommonWaitPageFlip(connector, -1);
 
-    UInt8 fbChanged = 0;
-
-    if (fb != connector->lastFb || connector->firstPageFlip)
-    {
-        fbChanged = 1;
-        connector->lastFb = fb;
-    }
+    connector->lastFb = fb;
 
     if (connector->device->clientCapAtomic)
     {
@@ -1070,11 +1063,10 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
 
             drmModeAtomicFree(req);
             connector->pendingPageFlip = 1;
-            connector->onlyAsyncCursorUpdate = 0;
         }
         else
         {
-            if (fbChanged)
+            if (connector->atomicChanges == 0)
             {
                 drmModeAtomicReqPtr req;
                 req = drmModeAtomicAlloc();
@@ -1085,46 +1077,30 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                 ret = srmRenderModeAtomicCommit(connector->device->fd,
                                                 req,
                                                 DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK,
-                                                connector, 1);
+                                                connector, 0);
                 drmModeAtomicFree(req);
             }
 
-            if (connector->atomicChanges || ret)
+            if (connector->atomicChanges || ret == -22)
             {
                 drmModeAtomicReqPtr req;
                 req = drmModeAtomicAlloc();
                 srmRenderModeCommitAtomicChanges(connector, req, 0);
-
-                UInt8 syncPageFlip = 0;
-
-                // If async fails, fallback to sync
-                if (ret)
-                {
-                    syncPageFlip = 1;
-                    drmModeAtomicAddProperty(req,
-                                             connector->currentPrimaryPlane->id,
-                                             connector->currentPrimaryPlane->propIDs.FB_ID,
-                                             connector->lastFb);
-                }
-
+                drmModeAtomicAddProperty(req,
+                                         connector->currentPrimaryPlane->id,
+                                         connector->currentPrimaryPlane->propIDs.FB_ID,
+                                         connector->lastFb);
                 ret = srmRenderModeAtomicCommit(connector->device->fd,
                                                 req,
                                                 DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
                                                 connector, 0);
-
                 drmModeAtomicFree(req);
-
-                connector->pendingPageFlip = 1;
 
                 // Clear flags on success
                 if (ret == 0)
-                {
                     connector->atomicChanges = 0;
 
-                    if (!syncPageFlip)
-                        connector->onlyAsyncCursorUpdate = 1;
-                }
-
+                connector->pendingPageFlip = 1;
             }
 
             if (!connector->pendingPageFlip)
@@ -1194,9 +1170,6 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector, Int32 iterLimit)
     fds.events = POLLIN;
     fds.revents = 0;
 
-    if (connector->onlyAsyncCursorUpdate || (connector->device->clientCapAtomic && !connector->currentVSync))
-        iterLimit = 1;
-
     while (connector->pendingPageFlip)
     {
         if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED || iterLimit == 0)
@@ -1215,7 +1188,7 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector, Int32 iterLimit)
             break;
         }
 
-        poll(&fds, 1, iterLimit == -1 ? 500 : 0);
+        poll(&fds, 1, iterLimit == -1 ? 500 : 1);
         drmHandleEvent(fds.fd, &connector->drmEventCtx);
 
         if (iterLimit > 0)

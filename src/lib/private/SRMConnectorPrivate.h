@@ -87,7 +87,6 @@ struct SRMConnectorStruct
     drmEventContext drmEventCtx;
     UInt8 pendingPageFlip;
     UInt8 firstPageFlip;
-    UInt8 onlyAsyncCursorUpdate;
 
     UInt8 hasRepaintCond;
     pthread_cond_t repaintCond;

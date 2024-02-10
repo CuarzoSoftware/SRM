@@ -1084,11 +1084,11 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                 ret = srmRenderModeAtomicCommit(connector->device->fd,
                                                 req,
                                                 DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK,
-                                                connector, 0);
+                                                connector, 1);
                 drmModeAtomicFree(req);
             }
 
-            if (connector->atomicChanges || ret == -22)
+            if (connector->atomicChanges || ret)
             {
                 drmModeAtomicReqPtr req;
                 req = drmModeAtomicAlloc();
@@ -1097,7 +1097,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                 UInt8 syncPageFlip = 0;
 
                 // If async fails, fallback to sync
-                if (ret == -22)
+                if (ret)
                 {
                     syncPageFlip = 1;
                     drmModeAtomicAddProperty(req,
@@ -1113,10 +1113,11 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
 
                 drmModeAtomicFree(req);
 
+                connector->pendingPageFlip = 1;
+
                 // Clear flags on success
                 if (ret == 0)
                 {
-                    connector->pendingPageFlip = 1;
                     connector->atomicChanges = 0;
 
                     if (!syncPageFlip)

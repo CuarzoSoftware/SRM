@@ -1099,9 +1099,9 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                 // Clear flags on success
                 if (ret == 0)
                     connector->atomicChanges = 0;
-
-                connector->pendingPageFlip = 1;
             }
+
+            connector->pendingPageFlip = 1;
         }
     }
     else

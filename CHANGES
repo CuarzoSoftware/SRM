@@ -1,3 +1,12 @@
+SRM (0.5.2-1)
+
+  # Bug Fixes
+
+  * Addressed bug in the atomic API causing issues with the refresh rate and hardware cursor plane updates, thanks to @2xsaiko for reporting the issue.
+  
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sun, 11 Feb 2024 00:36:48 -0300
+
+
 SRM (0.5.1-1)
 
   # Bug Fixes

@@ -84,21 +84,26 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     UInt8 supportLinear = 0;
 
-    SRMListForeach(fmtIt, buffer->allocator->dmaTextureFormats)
+    /* Seems like Nouveau + GBM = black textures even if no errors are reported.
+     * Fallback to glTexImage2D instead. */
+    if (buffer->allocator->driver != SRM_DEVICE_DRIVER_nouveau)
     {
-        SRMFormat *fmt = srmListItemGetData(fmtIt);
-
-        if (fmt->format == format && fmt->modifier == DRM_FORMAT_MOD_LINEAR)
+        SRMListForeach(fmtIt, buffer->allocator->dmaTextureFormats)
         {
-            // Cache format
-            if (fmtIt != srmListGetFront(buffer->allocator->dmaTextureFormats))
-            {
-                srmListRemoveItem(buffer->allocator->dmaTextureFormats, fmtIt);
-                srmListPrependData(buffer->allocator->dmaTextureFormats, fmt);
-            }
+            SRMFormat *fmt = srmListItemGetData(fmtIt);
 
-            supportLinear = 1;
-            break;
+            if (fmt->format == format && fmt->modifier == DRM_FORMAT_MOD_LINEAR)
+            {
+                // Cache format
+                if (fmtIt != srmListGetFront(buffer->allocator->dmaTextureFormats))
+                {
+                    srmListRemoveItem(buffer->allocator->dmaTextureFormats, fmtIt);
+                    srmListPrependData(buffer->allocator->dmaTextureFormats, fmt);
+                }
+
+                supportLinear = 1;
+                break;
+            }
         }
     }
 
@@ -197,8 +202,6 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
         goto gbmWrite;
     }
 
-    /* SRMDebug("[%s] Buffer mapped with gbm_bo_map().", buffer->allocator->name); */
-
     mapWrite:
 
     buffer->offsets[0] = gbm_bo_get_offset(buffer->bo, 0);
@@ -207,11 +210,6 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     pthread_mutex_unlock(&buffer->mutex);
     srmBufferWrite(buffer, stride, 0, 0, width, height, pixels);
-    pthread_mutex_lock(&buffer->mutex);
-
-    /* SRMDebug("[%s] CPU buffer created using mapping.", buffer->allocator->name); */
-
-    pthread_mutex_unlock(&buffer->mutex);
 
     return buffer;
 

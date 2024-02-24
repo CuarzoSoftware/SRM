@@ -6,7 +6,7 @@
 #include <SRMList.h>
 #include <SRMLog.h>
 #include <xf86drmMode.h>
-#include <sys/poll.h>
+#include <poll.h>
 #include <sys/epoll.h>
 #include <string.h>
 #include <stdlib.h>

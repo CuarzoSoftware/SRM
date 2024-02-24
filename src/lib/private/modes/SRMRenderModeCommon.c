@@ -9,7 +9,7 @@
 #include <SRMLog.h>
 #include <stdlib.h>
 #include <xf86drmMode.h>
-#include <sys/poll.h>
+#include <poll.h>
 #include <unistd.h>
 
 // Choose EGL configurations

@@ -6,9 +6,6 @@
 #define SRM_VERSION_PATCH @SRM_VERSION_PATCH@
 #define SRM_VERSION_BUILD @SRM_VERSION_BUILD@
 
-#define SRM_PAR_CPY 0
-#define SRM_MAX_COPY_THREADS 32
-
 #include <stdint.h>
 #include <drm_fourcc.h>
 #include <time.h>

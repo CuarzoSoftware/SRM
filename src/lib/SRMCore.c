@@ -80,11 +80,6 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
     // REF 10
     srmCoreUpdateBestConfiguration(core);
 
-    // REF 11
-#if SRM_PAR_CPY == 1
-    srmCoreInitCopyThreads(core);
-#endif
-
     return core;
 
     fail:

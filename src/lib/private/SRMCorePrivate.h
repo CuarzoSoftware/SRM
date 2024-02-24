@@ -58,36 +58,7 @@ struct SRMCoreStruct
     UInt8 deallocatorRunning;
     pthread_cond_t deallocatorCond;
     pthread_mutex_t deallocatorMutex;
-
-    #if SRM_PAR_CPY == 1
-    UInt8 copyThreadsCount;
-    struct SRMCopyThread copyThreads[SRM_MAX_COPY_THREADS];
-    #endif
 };
-
-#if SRM_PAR_CPY == 1
-
-struct SRMCopyThread
-{
-    UInt8 state;
-    SRMCore *core;
-    UInt8 cpu;
-    pthread_t thread;
-    pthread_cond_t cond;
-    pthread_mutex_t mutex;
-
-    UInt8 finished;
-    UInt8 *src;
-    UInt8 *dst;
-    Int32 srcStride;
-    Int32 dstStride;
-    Int32 size; // width bytes
-    Int32 offsetY;
-    Int32 rows;
-};
-void srmCoreInitCopyThreads(SRMCore *core);
-UInt8 srmCoreCopy(SRMCore *core, UInt8 *src, UInt8 *dst, Int32 srcStride, Int32 dstStride, Int32 size, Int32 height);
-#endif
 
 UInt8 srmCoreInitDeallocator(SRMCore *core);
 void srmCoreUnitDeallocator(SRMCore *core);

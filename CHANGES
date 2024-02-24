@@ -1,3 +1,21 @@
+SRM (0.5.3-1)
+
+  # Bug Fixes
+
+  * Addressed Nouveau bug failing to allocate buffers with GBM, thanks to @okcomput3 for reporting the issue.
+
+  # Building
+
+  * Replaced `<sys/poll.h>` include with `<poll.h>` to eliminate warning when building on musl-based distros.
+
+  # Internal Changes
+
+  * Removed unused and experimental code for parallelized buffer copy.
+  * EGL and OpenGL extensions are now printed when using logging level >= 4.
+  
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sat, 24 Feb 2024 08:10:50 -0300
+
+
 SRM (0.5.2-1)
 
   # Bug Fixes

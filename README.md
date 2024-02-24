@@ -5,7 +5,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="SRM is released under the MIT license." />
   </a>
   <a href="https://github.com/CuarzoSoftware/SRM">
-    <img src="https://img.shields.io/badge/version-0.5.2-brightgreen" alt="Current SRM version." />
+    <img src="https://img.shields.io/badge/version-0.5.3-brightgreen" alt="Current SRM version." />
   </a>
 </p>
 

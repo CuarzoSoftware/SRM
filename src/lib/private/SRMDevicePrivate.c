@@ -264,13 +264,13 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
         return 0;
     }
 
+    SRMDebug("[%s] EGL Extensions: %s.", device->name, extensions);
+
     device->eglExtensions.KHR_image_base = srmEGLHasExtension(extensions, "EGL_KHR_image_base");
     device->eglExtensions.KHR_image = srmEGLHasExtension(extensions, "EGL_KHR_image");
     device->eglExtensions.EXT_image_dma_buf_import = srmEGLHasExtension(extensions, "EGL_EXT_image_dma_buf_import");
     device->eglExtensions.EXT_image_dma_buf_import_modifiers = srmEGLHasExtension(extensions, "EGL_EXT_image_dma_buf_import_modifiers");
     device->eglExtensions.EXT_create_context_robustness = srmEGLHasExtension(extensions, "EGL_EXT_create_context_robustness");
-
-    /* TODO: Which of the above are mandatory ? */
 
     const char *deviceExtensions = NULL, *driverName = NULL;
 
@@ -293,6 +293,8 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
             SRMError("eglQueryDeviceStringEXT(EGL_EXTENSIONS) failed for device %s.", device->name);
             goto skipDeviceQuery;
         }
+
+        SRMDebug("[%s] EGL Device Extensions: %s.", device->name, deviceExtensions);
 
         device->eglExtensions.MESA_device_software = srmEGLHasExtension(deviceExtensions, "EGL_MESA_device_software");
 
@@ -529,6 +531,7 @@ void srmDeviceUninitializeEGLSharedContext(SRMDevice *device)
 UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device)
 {
     const char *exts = (const char*)glGetString(GL_EXTENSIONS);
+    SRMDebug("[%s] OpenGL Extensions: %s.", device->name, exts);
     device->glExtensions.EXT_read_format_bgra = srmEGLHasExtension(exts, "GL_EXT_read_format_bgra");
     device->glExtensions.EXT_texture_format_BGRA8888 = srmEGLHasExtension(exts, "GL_EXT_texture_format_BGRA8888");
     return 1;

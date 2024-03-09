@@ -1,3 +1,12 @@
+SRM (0.5.4-1)
+
+  # Bug Fixes
+
+  * Introduced glFinish() calls after initializeGL() and resizeGL(), and glFlush() before eglSwapBuffers() to resolve an AMDGPU bug causing issues with buffer allocation and rendering command processing. Gratitude to @2xsaiko for reporting the problem and testing the applied fixes.
+  
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Fri, 08 Mar 2024 23:00:21 -0300
+
+
 SRM (0.5.3-1)
 
   # Bug Fixes

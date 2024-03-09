@@ -892,11 +892,13 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
     {
         connector->interface->initializeGL(connector,
                                            connector->interfaceData);
+        glFinish();
     }
     else if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
     {
         connector->interface->resizeGL(connector,
                                        connector->interfaceData);
+        glFinish();
     }
 
     if (connector->device->clientCapAtomic)

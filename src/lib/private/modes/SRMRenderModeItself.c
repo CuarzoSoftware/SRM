@@ -431,7 +431,9 @@ static UInt8 render(SRMConnector *connector)
 
     connector->interface->paintGL(connector, connector->interfaceData);
 
-    if (!connector->currentVSync)
+    if (connector->currentVSync)
+        glFlush();
+    else
         glFinish();
 
     return 1;

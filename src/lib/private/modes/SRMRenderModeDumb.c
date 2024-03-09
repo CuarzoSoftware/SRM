@@ -535,7 +535,10 @@ static UInt8 flipPage(SRMConnector *connector)
     UInt8 useBufferRead = data->buffers[b] && data->buffers[b]->map && data->buffers[b]->modifiers[0] == DRM_FORMAT_MOD_LINEAR;
 
     if (useBufferRead)
+    {
+        glFlush();
         goto skipGLRead;
+    }
 
     if (connector->damageBoxesCount > 0)
     {

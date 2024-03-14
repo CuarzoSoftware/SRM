@@ -354,13 +354,6 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
     }
 
     EGLint formatsCount = 0;
-
-    EGLint fallbackFormats[] =
-    {
-        DRM_FORMAT_ARGB8888,
-        DRM_FORMAT_XRGB8888,
-    };
-
     EGLint *formats = NULL;
     UInt8 allExternalOnly = 1;
 
@@ -368,8 +361,8 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
     {
         if (!device->eglFunctions.eglQueryDmaBufFormatsEXT(device->eglDisplay, 0, NULL, &formatsCount))
         {
-            SRMError("[%s] Failed to query the number of EGL DMA formats, using fallback formats.", device->name);
-            goto fallback;
+            SRMError("[%s] Failed to query the number of EGL DMA formats.", device->name);
+            return 0;
         }
 
         if (formatsCount <= 0)
@@ -389,12 +382,9 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
     }
     else
     {
-        fallback:
-        formatsCount = sizeof(fallbackFormats)/sizeof(fallbackFormats[0]);
-        formats = malloc(sizeof(fallbackFormats));
-        memcpy(formats, fallbackFormats, sizeof(fallbackFormats));
+        SRMError("[%s] Failed to query EGL DMA formats.", device->name);
+        return 0;
     }
-
 
     for (Int32 i = 0; i < formatsCount; i++)
     {
@@ -436,7 +426,6 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
         }
 
         skipModifiers:
-
 
         for (Int32 j = 0; j < modifiersCount; j++)
         {
@@ -534,6 +523,7 @@ UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device)
     SRMDebug("[%s] OpenGL Extensions: %s.", device->name, exts);
     device->glExtensions.EXT_read_format_bgra = srmEGLHasExtension(exts, "GL_EXT_read_format_bgra");
     device->glExtensions.EXT_texture_format_BGRA8888 = srmEGLHasExtension(exts, "GL_EXT_texture_format_BGRA8888");
+    device->glExtensions.OES_EGL_image_external = srmEGLHasExtension(exts, "GL_OES_EGL_image_external");
     return 1;
 }
 

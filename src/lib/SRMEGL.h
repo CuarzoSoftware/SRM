@@ -95,6 +95,7 @@ typedef struct SRMGLDeviceExtensionsStruct
 {
     UInt8 EXT_read_format_bgra;
     UInt8 EXT_texture_format_BGRA8888;
+    UInt8 OES_EGL_image_external;
 } SRMGLDeviceExtensions;
 
 /**

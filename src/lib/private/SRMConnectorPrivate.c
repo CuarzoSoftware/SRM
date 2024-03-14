@@ -468,17 +468,34 @@ void *srmConnectorRenderThread(void *conn)
 
     srmRenderModeCommonCreateCursor(connector);
 
-    if (srmDeviceGetRenderMode(connector->device) == SRM_RENDER_MODE_ITSELF)
+    SRM_RENDER_MODE renderMode = srmDeviceGetRenderMode(connector->device);
+
+    SRMDebug("Connector %d device %s render mode = %s.",
+             connector->id,
+             connector->device->name,
+             srmGetRenderModeString(renderMode));
+
+    if (renderMode == SRM_RENDER_MODE_ITSELF)
         srmRenderModeItselfSetInterface(connector);
-    else if (srmDeviceGetRenderMode(connector->device) == SRM_RENDER_MODE_DUMB)
+    else if (renderMode == SRM_RENDER_MODE_DUMB)
         srmRenderModeDumbSetInterface(connector);
-    else if (srmDeviceGetRenderMode(connector->device) == SRM_RENDER_MODE_CPU)
+    else if (renderMode == SRM_RENDER_MODE_CPU)
         srmRenderModeCPUSetInterface(connector);
     else
+    {
+        SRMError("Invalid render mode %s connector %d.",
+                 connector->device->name,
+                 connector->id);
         goto finish;
+    }
 
     if (!connector->renderInterface.initialize(connector))
+    {
+        SRMError("Render mode interface initialize() failed %s connector %d.",
+                 connector->device->name,
+                 connector->id);
         goto finish;
+    }
 
     connector->renderInitResult = 1;
 

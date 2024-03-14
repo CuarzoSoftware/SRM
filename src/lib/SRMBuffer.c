@@ -113,6 +113,16 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
         goto glesOnly;
 
     buffer->modifiers[0] = DRM_FORMAT_MOD_LINEAR;
+
+    buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
+                                       buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
+
+    if (buffer->target == GL_TEXTURE_EXTERNAL_OES)
+    {
+        buffer->target = GL_TEXTURE_2D;
+        goto glesOnly;
+    }
+
     buffer->bo = gbm_bo_create_with_modifiers(buffer->allocator->gbm,
                                               width,
                                               height,
@@ -153,10 +163,6 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     buffer->modifiers[0] = gbm_bo_get_modifier(buffer->bo);
     buffer->strides[0] = gbm_bo_get_stride(buffer->bo);
     buffer->pixelSize = buffer->bpp/8;
-
-    buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
-                                        buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
-
     buffer->fds[0] = srmBufferGetDMAFDFromBO(buffer->allocator, buffer->bo);
 
     if (buffer->fds[0] >= 0)

@@ -217,7 +217,7 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
         if (!srmDeviceIsEnabled(allocDev))
             continue;
 
-        if (allocDev->driver == SRM_DEVICE_DRIVER_nouveau && srmListGetLength(core->devices) > 1)
+        if ((allocDev->driver == SRM_DEVICE_DRIVER_nouveau || allocDev->driver == SRM_DEVICE_DRIVER_nvidia) && srmListGetLength(core->devices) > 1)
         {
             allocDev->capPrimeExport = 0;
             allocDev->capPrimeImport = 0;
@@ -231,9 +231,6 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
 
             if (!srmDeviceIsEnabled(otherDev) || allocDev == otherDev)
                 continue;
-
-            if (allocDev->driver == SRM_DEVICE_DRIVER_i915)
-                currentScore += 500;
 
             // GPU can render
             if (srmDeviceGetCapPrimeExport(allocDev) &&

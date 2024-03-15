@@ -54,6 +54,8 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
             device->driver = SRM_DEVICE_DRIVER_nouveau;
         else if (strcmp(version->name, "lima") == 0)
             device->driver = SRM_DEVICE_DRIVER_lima;
+        else if (strcmp(version->name, "nvidia-drm") == 0)
+            device->driver = SRM_DEVICE_DRIVER_nvidia;
 
         drmFreeVersion(version);
     }

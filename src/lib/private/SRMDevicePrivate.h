@@ -16,7 +16,8 @@ enum SRM_DEVICE_DRIVER
     SRM_DEVICE_DRIVER_unknown = 0,
     SRM_DEVICE_DRIVER_i915 = 1,
     SRM_DEVICE_DRIVER_nouveau = 2,
-    SRM_DEVICE_DRIVER_lima = 3
+    SRM_DEVICE_DRIVER_lima = 3,
+    SRM_DEVICE_DRIVER_nvidia = 4
 };
 
 struct SRMDeviceStruct

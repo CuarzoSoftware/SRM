@@ -232,6 +232,9 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
             if (!srmDeviceIsEnabled(otherDev) || allocDev == otherDev)
                 continue;
 
+            if (allocDev->driver == SRM_DEVICE_DRIVER_i915)
+                currentScore += 500;
+
             // GPU can render
             if (srmDeviceGetCapPrimeExport(allocDev) &&
                     srmDeviceGetCapPrimeImport(otherDev) &&
@@ -239,10 +242,6 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
             {
 
                 currentScore += 100;
-
-                if (allocDev->driver == SRM_DEVICE_DRIVER_nouveau)
-                    currentScore -= 20;
-
                 continue;
             }
             // GPU can not render but glRead > dumbBuffer

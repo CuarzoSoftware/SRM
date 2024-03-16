@@ -18,9 +18,23 @@ SRM defaults to using the Atomic DRM API for all devices (when avaliable), which
 
 Note: Disabling vsync for the atomic API is supported only starting from Linux version 6.8.
 
-## Buffering
+## Allocator Device
 
-You can customize the framebuffer count for both "ITSELF" and "DUMB" render modes using the following environment variables:
+SRM attempts to automatically select the most suitable device for buffer allocation. However, certain drivers may incorrectly report capabilities or lack certain functionalities, leading to allocation failures or the creation of black, empty textures.
+
+To override the default allocator, use the **SRM_ALLOCATOR_DEVICE** environment variable. For instance:
+
+**SRM_ALLOCATOR_DEVICE**=/dev/dri/card1
+
+## Main Memory Buffers
+
+By default, SRM uses GBM for buffer allocation from main memory, resorting to OpenGL buffer allocation if GBM fails. Nonetheless, some drivers may erroneously report successful GBM buffer allocation when it actually fails. To enforce the use of OpenGL buffer allocation, employ:
+
+**SRM_FORCE_GL_ALLOCATION**=1
+
+## Render Buffering
+
+You can customize the framebuffer count (single, double or triple buffering) for both "ITSELF" and "DUMB" render modes using the following environment variables:
 
 **SRM_RENDER_MODE_ITSELF_FB_COUNT**=[1, 2, 3]
 

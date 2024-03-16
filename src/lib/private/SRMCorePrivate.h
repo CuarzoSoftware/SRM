@@ -34,6 +34,7 @@ struct SRMCoreStruct
     void *interfaceUserData;
 
     UInt8 isSuspended;
+    UInt8 forceGlesCPUBufferAllocation;
     struct udev *udev;
     struct udev_monitor *monitor;
     struct pollfd monitorFd;

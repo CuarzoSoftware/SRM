@@ -888,19 +888,6 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
     Int32 ret;
     connector->lastFb = fb;
 
-    if (connector->state == SRM_CONNECTOR_STATE_INITIALIZING)
-    {
-        connector->interface->initializeGL(connector,
-                                           connector->interfaceData);
-        glFinish();
-    }
-    else if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
-    {
-        connector->interface->resizeGL(connector,
-                                       connector->interfaceData);
-        glFinish();
-    }
-
     if (connector->device->clientCapAtomic)
     {
         drmModeAtomicReqPtr req;
@@ -1008,7 +995,7 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
                     connector->id);
         }
         else
-            return 1;
+            goto skipLegacy;
     }
 
     /* Occasionally, the Atomic API fails to set the connector CRTC for reasons unknown.
@@ -1029,6 +1016,21 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
                     connector->device->name,
                     connector->id);
         return 0;
+    }
+
+    skipLegacy:
+
+    if (connector->state == SRM_CONNECTOR_STATE_INITIALIZING)
+    {
+        connector->interface->initializeGL(connector,
+                                           connector->interfaceData);
+        glFinish();
+    }
+    else if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
+    {
+        connector->interface->resizeGL(connector,
+                                       connector->interfaceData);
+        glFinish();
     }
     
     return 1;
@@ -1060,7 +1062,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                                         req,
                                         DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
                                         connector, 1);
-            if (ret == 0)
+            if (ret == 0 && !connector->firstPageFlip)
                 connector->atomicChanges = 0;
 
             drmModeAtomicFree(req);
@@ -1099,7 +1101,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                 drmModeAtomicFree(req);
 
                 // Clear flags on success
-                if (ret == 0)
+                if (ret == 0 && !connector->firstPageFlip)
                     connector->atomicChanges = 0;
             }
 

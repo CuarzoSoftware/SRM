@@ -210,6 +210,8 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
     SRMDevice *bestAllocatorDev = NULL;
     int bestScore = 0;
 
+    const char *preferredDevice = getenv("SRM_ALLOCATOR_DEVICE");
+
     SRMListForeach(item1, core->devices)
     {
         SRMDevice *allocDev = srmListItemGetData(item1);
@@ -217,42 +219,32 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
         if (!srmDeviceIsEnabled(allocDev))
             continue;
 
-        if ((allocDev->driver == SRM_DEVICE_DRIVER_nouveau || allocDev->driver == SRM_DEVICE_DRIVER_nvidia) && srmListGetLength(core->devices) > 1)
+        int currentScore = 10;
+
+        if (preferredDevice)
+            if (strcmp(preferredDevice, allocDev->name) == 0)
+                return allocDev;
+
+        if (allocDev->driver == SRM_DEVICE_DRIVER_i915)
+            currentScore += 1000;
+        else if (allocDev->driver == SRM_DEVICE_DRIVER_nouveau)
+            currentScore -= 5;
+        else if (allocDev->driver == SRM_DEVICE_DRIVER_nvidia)
+            currentScore -= 5;
+
+        if (!core->forceGlesCPUBufferAllocation)
         {
-            allocDev->capPrimeExport = 0;
-            allocDev->capPrimeImport = 0;
-        }
+            if (srmFormatIsInList(allocDev->dmaRenderFormats, DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR))
+                currentScore += 50;
 
-        int currentScore = srmDeviceGetCapPrimeExport(allocDev) ? 100 : 10;
+            if (srmFormatIsInList(allocDev->dmaRenderFormats, DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR))
+                currentScore += 50;
 
-        SRMListForeach(item2, core->devices)
-        {
-            SRMDevice *otherDev = srmListItemGetData(item2);
+            if (srmFormatIsInList(allocDev->dmaRenderFormats, DRM_FORMAT_BGRA8888, DRM_FORMAT_MOD_LINEAR))
+                currentScore += 25;
 
-            if (!srmDeviceIsEnabled(otherDev) || allocDev == otherDev)
-                continue;
-
-            // GPU can render
-            if (srmDeviceGetCapPrimeExport(allocDev) &&
-                    srmDeviceGetCapPrimeImport(otherDev) &&
-                    dmaFormatsHaveInCommon(allocDev->dmaTextureFormats, otherDev->dmaTextureFormats))
-            {
-
-                currentScore += 100;
-                continue;
-            }
-            // GPU can not render but glRead > dumbBuffer
-            else if (srmDeviceGetCapDumbBuffer(otherDev))
-            {
-                currentScore += 20;
-                continue;
-            }
-            // GPU can not render glRead > CPU > glTex2D > render
-            else
-            {
-                currentScore += 10;
-                continue;
-            }
+            if (srmFormatIsInList(allocDev->dmaRenderFormats, DRM_FORMAT_BGRX8888, DRM_FORMAT_MOD_LINEAR))
+                currentScore += 25;
         }
 
         if (currentScore > bestScore)
@@ -267,64 +259,10 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
 
 void srmCoreAssignRendererDevices(SRMCore *core)
 {
-    int enabledDevicesN = 0;
-
-    // Count enabled GPUs
     SRMListForeach(item, core->devices)
     {
         SRMDevice *dev = srmListItemGetData(item);
-        enabledDevicesN += dev->enabled;
-    }
-
-    SRMListForeach(item, core->devices)
-    {
-        SRMDevice *dev = srmListItemGetData(item);
-
-        if (!dev->enabled)
-        {
-            dev->rendererDevice = NULL;
-            continue;
-        }
-
-        // If only one GPU or can import from allocator
-        if (enabledDevicesN == 1 || (dev->capPrimeImport && core->allocatorDevice->capPrimeExport))
-        {
-            dev->rendererDevice = dev;
-            continue;
-        }
-
-        int bestScore = 0;
-        SRMDevice *bestRendererForDev = NULL;
-
-        SRMListForeach(item, core->devices)
-        {
-            SRMDevice *rendererDevice = srmListItemGetData(item);
-
-            if (!rendererDevice->enabled)
-                continue;
-
-            int currentScore = 0;
-
-            if (dev == rendererDevice)
-                currentScore += 10;
-
-            if (!rendererDevice->capDumbBuffer)
-                currentScore += 20;
-
-            if (rendererDevice->capPrimeImport && core->allocatorDevice->capPrimeExport)
-                currentScore += 100;
-
-            if (rendererDevice == core->allocatorDevice)
-                currentScore += 50;
-
-            if (currentScore > bestScore)
-            {
-                bestRendererForDev = rendererDevice;
-                bestScore = currentScore;
-            }
-        }
-
-        dev->rendererDevice = bestRendererForDev;
+        dev->rendererDevice = core->allocatorDevice;
     }
 }
 
@@ -343,17 +281,9 @@ UInt8 srmCoreUpdateBestConfiguration(SRMCore *core)
                    EGL_NO_SURFACE,
                    bestAllocatorDevice->eglSharedContext);
 
-    /* This should be invoked upon GPU hotplug events, but it may affect user resources.
-    if (allocatorDevice && allocatorDevice != bestAllocatorDevice)
-    {
-        // TODO may require update
-    }
-    */
-
     core->allocatorDevice = bestAllocatorDevice;
     srmCoreAssignRendererDevices(core);
     srmCoreUpdateSharedDMATextureFormats(core);
-
     return 1;
 }
 

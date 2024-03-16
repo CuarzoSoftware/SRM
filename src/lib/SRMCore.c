@@ -18,8 +18,6 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
 {
     SRMLogInit();
 
-    setenv("SRM_FORCE_LEGACY_API", "1", 0);
-
     // REF 1
     SRMCore *core = calloc(1, sizeof(SRMCore));
 
@@ -37,6 +35,11 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
     core->interface = interface;
     core->interfaceUserData = userData;
     core->isSuspended = 0;
+
+    char *forceGlesAllocation = getenv("SRM_FORCE_GL_ALLOCATION");
+
+    if (forceGlesAllocation && atoi(forceGlesAllocation) == 1)
+        core->forceGlesCPUBufferAllocation = 1;
 
     // REF -
     if (!srmCoreUpdateEGLExtensions(core))

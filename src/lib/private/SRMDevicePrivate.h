@@ -55,7 +55,10 @@ struct SRMDeviceStruct
     SRMEGLDeviceExtensions eglExtensions;
     SRMEGLDeviceFunctions eglFunctions;
     SRMGLDeviceExtensions glExtensions;
-    SRMList *dmaRenderFormats, *dmaExternalFormats, *dmaTextureFormats;
+
+    SRMList *dmaRenderFormats, // GL_TEXTURE_2D
+        *dmaExternalFormats, // GL_TEXTURE_EXTERNAL_OES
+        *dmaTextureFormats; // Render + External
 
     UInt8 clientCapStereo3D;
     UInt8 clientCapUniversalPlanes;

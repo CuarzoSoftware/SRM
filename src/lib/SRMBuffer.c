@@ -57,8 +57,6 @@ SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMDevice *allocator, SRMBuffer
     buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
                                         buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
 
-    //srmBufferGetTextureID(buffer->allocator, buffer);
-
     return buffer;
 }
 
@@ -79,26 +77,27 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     buffer->height = height;
     buffer->format = format;
     buffer->target = GL_TEXTURE_2D;
+    buffer->modifiers[0] = DRM_FORMAT_MOD_LINEAR;
 
     const SRMGLFormat *glFmt;
 
     UInt8 supportLinear = 0;
 
-    /* Seems like Nouveau + GBM = black textures even if no errors are reported.
+    /* Seems like Nouveau or Nvidia + GBM = black textures even if no errors are reported.
      * Fallback to glTexImage2D instead. */
-    if (buffer->allocator->driver != SRM_DEVICE_DRIVER_nouveau)
+    if (!core->forceGlesCPUBufferAllocation && buffer->allocator->driver != SRM_DEVICE_DRIVER_nouveau && buffer->allocator->driver != SRM_DEVICE_DRIVER_nvidia)
     {
-        SRMListForeach(fmtIt, buffer->allocator->dmaTextureFormats)
+        SRMListForeach(fmtIt, buffer->allocator->dmaRenderFormats)
         {
             SRMFormat *fmt = srmListItemGetData(fmtIt);
 
             if (fmt->format == format && fmt->modifier == DRM_FORMAT_MOD_LINEAR)
             {
-                // Cache format
-                if (fmtIt != srmListGetFront(buffer->allocator->dmaTextureFormats))
+                // Cache most used formats
+                if (fmtIt != srmListGetFront(buffer->allocator->dmaRenderFormats))
                 {
-                    srmListRemoveItem(buffer->allocator->dmaTextureFormats, fmtIt);
-                    srmListPrependData(buffer->allocator->dmaTextureFormats, fmt);
+                    srmListRemoveItem(buffer->allocator->dmaRenderFormats, fmtIt);
+                    srmListPrependData(buffer->allocator->dmaRenderFormats, fmt);
                 }
 
                 supportLinear = 1;
@@ -112,29 +111,15 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     if (!supportLinear)
         goto glesOnly;
 
-    buffer->modifiers[0] = DRM_FORMAT_MOD_LINEAR;
-
-    buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
-                                       buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
-
-    if (buffer->target == GL_TEXTURE_EXTERNAL_OES)
-    {
-        buffer->target = GL_TEXTURE_2D;
-        goto glesOnly;
-    }
-
     buffer->bo = gbm_bo_create_with_modifiers(buffer->allocator->gbm,
                                               width,
                                               height,
                                               format,
                                               &buffer->modifiers[0],
                                               1);
-
     if (!buffer->bo)
     {
         SRMWarning("[SRMBuffer] gbm_bo_create_with_modifiers failed.");
-
-        // Try to use linear so that can be mapped
         buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_SCANOUT;
         buffer->bo = gbm_bo_create(buffer->allocator->gbm, width, height, format, buffer->flags);
     }
@@ -296,7 +281,6 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     }
     else
     {
-        UInt8 tmp[width*height*buffer->pixelSize];
         glTexImage2D(GL_TEXTURE_2D,
                      0,
                      glFmt->glInternalFormat,
@@ -305,7 +289,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
                      0,
                      glFmt->glFormat,
                      glFmt->glType,
-                     tmp);
+                     NULL);
     }
 
     SRMDebug("[%s] CPU buffer created using glTexImage2D.", buffer->allocator->name);
@@ -427,18 +411,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
             goto skipDMA;
     }
     
-    if (!buffer->allocator->capPrimeExport)
-    {
-        SRMError("srmBufferGetTextureID failed. Allocator device (%s) has not the PRIME export cap.", buffer->allocator->name);
-        goto skipDMA;
-    }
-
-    if (!device->capPrimeImport)
-    {
-        SRMError("srmBufferGetTextureID failed. Target device (%s) has not the PRIME import cap.", device->name);
-        goto skipDMA;
-    }
-
     if (buffer->fds[0] == -1 && buffer->bo)
     {
         buffer->fds[0] = srmBufferGetDMAFDFromBO(buffer->allocator, buffer->bo);

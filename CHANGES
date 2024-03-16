@@ -1,3 +1,18 @@
+SRM (0.5.5-1)
+
+  # Bug Fixes
+
+  * Corrected automatic allocator device selection on multi-GPU setups. Thanks to @rafalz1978 for reporting and testing.
+  * Resolved atomic hardware cursor bug on connector initialization, ensuring the cursor pixmap update.
+
+  # Environment
+
+  * Introduced SRM_FORCE_GL_ALLOCATION environment variable to enforce main memory buffer allocation with OpenGL instead of GBM.
+  * Added SRM_ALLOCATOR_DEVICE environment variable to allow manual override of the automatic allocator device chosen by SRM.
+  
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sat, 16 Mar 2024 17:26:14 -0300
+
+
 SRM (0.5.4-1)
 
   # Bug Fixes

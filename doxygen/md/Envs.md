@@ -22,9 +22,9 @@ Note: Disabling vsync for the atomic API is supported only starting from Linux v
 
 SRM attempts to automatically select the most suitable device for buffer allocation. However, certain drivers may incorrectly report capabilities or lack certain functionalities, leading to allocation failures or the creation of black, empty textures.
 
-To override the default allocator, use the **SRM_ALLOCATOR_DEVICE** environment variable. For instance:
+To override the default allocator, employ:
 
-**SRM_ALLOCATOR_DEVICE**=/dev/dri/card1
+**SRM_ALLOCATOR_DEVICE**=/dev/dri/card[N]
 
 ## Main Memory Buffers
 

@@ -139,6 +139,14 @@ void srmRenderModeCommonPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32
 
 UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
 {
+    if (connector->device->driver == SRM_DEVICE_DRIVER_nvidia)
+    {
+        char *env = getenv("SRM_NVIDIA_CURSOR");
+
+        if (!env || atoi(env) != 1)
+            return 0;
+    }
+
     connector->cursorBO = gbm_bo_create(connector->device->gbm,
                                         64,
                                         64,

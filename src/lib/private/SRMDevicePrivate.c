@@ -275,6 +275,7 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
     device->eglExtensions.EXT_image_dma_buf_import = srmEGLHasExtension(extensions, "EGL_EXT_image_dma_buf_import");
     device->eglExtensions.EXT_image_dma_buf_import_modifiers = srmEGLHasExtension(extensions, "EGL_EXT_image_dma_buf_import_modifiers");
     device->eglExtensions.EXT_create_context_robustness = srmEGLHasExtension(extensions, "EGL_EXT_create_context_robustness");
+    device->eglExtensions.KHR_image_pixmap = srmEGLHasExtension(extensions, "EGL_KHR_image_pixmap");
 
     const char *deviceExtensions = NULL, *driverName = NULL;
 
@@ -528,6 +529,7 @@ UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device)
     device->glExtensions.EXT_read_format_bgra = srmEGLHasExtension(exts, "GL_EXT_read_format_bgra");
     device->glExtensions.EXT_texture_format_BGRA8888 = srmEGLHasExtension(exts, "GL_EXT_texture_format_BGRA8888");
     device->glExtensions.OES_EGL_image_external = srmEGLHasExtension(exts, "GL_OES_EGL_image_external");
+    device->glExtensions.OES_EGL_image = srmEGLHasExtension(exts, "GL_OES_EGL_image");
     return 1;
 }
 

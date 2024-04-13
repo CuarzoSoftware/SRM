@@ -65,6 +65,7 @@ typedef struct SRMEGLDeviceExtensionsStruct
     UInt8 EXT_image_dma_buf_import_modifiers;
     UInt8 EXT_create_context_robustness;
     UInt8 MESA_device_software;
+    UInt8 KHR_image_pixmap;
 #ifdef EGL_DRIVER_NAME_EXT
     UInt8 EXT_device_persistent_id;
 #endif
@@ -95,6 +96,7 @@ typedef struct SRMGLDeviceExtensionsStruct
 {
     UInt8 EXT_read_format_bgra;
     UInt8 EXT_texture_format_BGRA8888;
+    UInt8 OES_EGL_image;
     UInt8 OES_EGL_image_external;
 } SRMGLDeviceExtensions;
 

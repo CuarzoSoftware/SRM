@@ -40,6 +40,13 @@ SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMDevice *allocator, SRMBuffer
     }
 
     SRMBuffer *buffer = srmBufferCreate(core, allocator);
+
+    if (!buffer->allocator->eglExtensions.EXT_image_dma_buf_import_modifiers)
+    {
+        SRMError("Failed to import DMA buffer EXT_image_dma_buf_import_modifiers extension not available.");
+        goto fail;
+    }
+
     buffer->src = SRM_BUFFER_SRC_DMA;
     buffer->format = dmaData->format;
     buffer->width = dmaData->width;
@@ -57,7 +64,22 @@ SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMDevice *allocator, SRMBuffer
     buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
                                         buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
 
+    if (!buffer->allocator->glExtensions.OES_EGL_image && buffer->target == GL_TEXTURE_2D)
+    {
+        SRMError("Failed to import DMA buffer with GL_TEXTURE_2D target, OES_EGL_image extension not available.");
+        goto fail;
+    }
+
+    if (!buffer->allocator->glExtensions.OES_EGL_image_external && buffer->target == GL_TEXTURE_EXTERNAL_OES)
+    {
+        SRMError("Failed to import DMA buffer with GL_TEXTURE_EXTERNAL_OES target, OES_EGL_image_external extension not available.");
+        goto fail;
+    }
+
     return buffer;
+fail:
+    free(buffer);
+    return NULL;
 }
 
 SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
@@ -85,7 +107,10 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     /* Seems like Nouveau or Nvidia + GBM = black textures even if no errors are reported.
      * Fallback to glTexImage2D instead. */
-    if (!core->forceGlesCPUBufferAllocation && buffer->allocator->driver != SRM_DEVICE_DRIVER_nouveau && buffer->allocator->driver != SRM_DEVICE_DRIVER_nvidia)
+    if (buffer->allocator->glExtensions.OES_EGL_image &&
+        !core->forceGlesCPUBufferAllocation &&
+        buffer->allocator->driver != SRM_DEVICE_DRIVER_nouveau &&
+        buffer->allocator->driver != SRM_DEVICE_DRIVER_nvidia)
     {
         SRMListForeach(fmtIt, buffer->allocator->dmaRenderFormats)
         {
@@ -318,6 +343,13 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
     SRMBuffer *buffer = srmBufferCreate(core, NULL);
 
     pthread_mutex_lock(&buffer->mutex);
+
+    if (!buffer->allocator->eglExtensions.KHR_image_pixmap)
+    {
+        SRMError("Can not create buffer from GBM bo. KHR_image_pixmap extension not available.");
+        return NULL;
+    }
+
     buffer->src = SRM_BUFFER_SRC_WL_DRM;
 
     buffer->bo = gbm_bo_import(buffer->allocator->gbm, GBM_BO_IMPORT_WL_BUFFER, wlBuffer, GBM_BO_USE_RENDERING);
@@ -356,6 +388,12 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
 
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 {
+    if (!device || !buffer)
+    {
+        SRMError("Invalid parameters passed to srmBufferGetTextureID().");
+        return 0;
+    }
+
     if (buffer->src == SRM_BUFFER_SRC_WL_DRM && device != buffer->allocator)
     {
         SRMError("[%s] wl_drm buffers can only be accessed from allocator device.", device->name);
@@ -390,6 +428,18 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         }
     }
 
+    if (buffer->target == GL_TEXTURE_2D && !device->glExtensions.OES_EGL_image)
+    {
+        SRMError("[%s] Failed to get texture id from EGL image, OES_EGL_image extension not available.", device->name);
+        return 0;
+    }
+
+    if (buffer->target == GL_TEXTURE_EXTERNAL_OES && !device->glExtensions.OES_EGL_image_external)
+    {
+        SRMError("[%s] Failed to get texture id from EGL image, OES_EGL_image_external extension not available.", device->name);
+        return 0;
+    }
+
     pthread_mutex_lock(&buffer->mutex);
 
     // Creates the texture
@@ -400,7 +450,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     UInt32 index = 0;
     EGLAttrib imageAttribs[sizeof(EGLAttrib)*(8 + 10*buffer->planesCount) + 1];
 
-    if (device == buffer->allocator && buffer->bo)
+    if (device->eglExtensions.KHR_image_pixmap && device == buffer->allocator && buffer->bo && device)
     {
         imageAttribs[0] = EGL_IMAGE_PRESERVED_KHR;
         imageAttribs[1] = EGL_TRUE;
@@ -419,7 +469,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
             buffer->fds[i] = buffer->fds[0];
     }
 
-    if (buffer->fds[0] == -1)
+    if (buffer->fds[0] == -1 || !device->eglExtensions.EXT_image_dma_buf_import_modifiers)
         goto skipDMA;
 
     imageAttribs[index++] = EGL_WIDTH;
@@ -615,6 +665,12 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo)
     if (!allocDev)
     {
         SRMError("Can not create buffer from GBM bo. gbm_device not found.");
+        return NULL;
+    }
+
+    if (!allocDev->eglExtensions.KHR_image_pixmap)
+    {
+        SRMError("Can not create buffer from GBM bo. KHR_image_pixmap extension not available.");
         return NULL;
     }
 

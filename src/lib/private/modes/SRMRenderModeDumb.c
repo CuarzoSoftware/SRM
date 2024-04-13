@@ -447,7 +447,7 @@ static UInt8 createDRMFramebuffers(SRMConnector *connector)
         }
         else
         {
-            if (srmBufferGetTextureID(connector->device, data->buffers[i]) == 0)
+            if (srmBufferGetTextureID(connector->device->rendererDevice, data->buffers[i]) == 0)
             {
                 SRMWarning("Failed o get texture ID from buffer %d on device %s connector %d (DUMB MODE).",
                            i,

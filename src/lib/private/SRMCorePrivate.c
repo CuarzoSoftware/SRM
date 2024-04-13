@@ -112,7 +112,7 @@ UInt8 srmCoreEnumerateDevices(SRMCore *core)
 
     udev_enumerate_unref(enumerate);
 
-    return 1;
+    return !srmListIsEmpty(core->devices);
 }
 
 UInt8 srmCoreInitMonitor(SRMCore *core)
@@ -477,7 +477,7 @@ static void *srmCoreDeallocatorLoop(void *data)
 
                 if (message->textureID)
                 {
-                    SRMDebug("[%s] GL Texture (%d) deleted.", message->device->name, message->textureID);
+                    SRMDebug("[%s] GL Texture (%d) destroyed.", message->device->name, message->textureID);
                     glDeleteTextures(1, &message->textureID);
                 }
 

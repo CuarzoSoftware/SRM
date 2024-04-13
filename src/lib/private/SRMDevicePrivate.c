@@ -19,8 +19,43 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+static UInt8 srmDeviceInBlacklist(const char *deviceName)
+{
+    char *blacklist = getenv("SRM_DEVICES_BLACKLIST");
+
+    if (!blacklist)
+        return 0;
+
+    size_t extlen = strlen(deviceName);
+    const char *end = blacklist + strlen(blacklist);
+
+    while (blacklist < end)
+    {
+        if (*blacklist == ':')
+        {
+            blacklist++;
+            continue;
+        }
+
+        size_t n = strcspn(blacklist, ":");
+
+        if (n == extlen && strncmp(deviceName, blacklist, n) == 0)
+            return 1;
+
+        blacklist += n;
+    }
+
+    return 0;
+}
+
 SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
 {
+    if (srmDeviceInBlacklist(name))
+    {
+        SRMWarning("[device] %s is blacklisted. Ignoring it.", name);
+        return NULL;
+    }
+
     // REF 1
     SRMDevice *device = calloc(1, sizeof(SRMDevice));
     strncpy(device->name, name, sizeof(device->name) - 1);

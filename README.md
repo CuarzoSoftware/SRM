@@ -13,7 +13,7 @@ SRM is a C library that simplifies the development of Linux DRM/KMS applications
 
 With SRM, you can focus on the OpenGL ES 2.0 logic of your application. For each available display, you can start a rendering thread that triggers common events like **initializeGL()**, **paintGL()**, **resizeGL()**, **pageFlipped()** and **uninitializeGL()**.
 
-SRM allows you to use multiple GPUs simultaneously and automatically finds the most efficient configuration. It also offers functions for creating OpenGL textures, which are automatically shared among GPUs.
+SRM allows you to use multiple GPUs simultaneously and automatically finds the most efficient configuration.
 
 ### Links
 
@@ -21,6 +21,7 @@ SRM allows you to use multiple GPUs simultaneously and automatically finds the m
 * [🎓 Tutorial](https://cuarzosoftware.github.io/SRM/md_md__tutorial.html)
 * [🕹️ Examples](https://cuarzosoftware.github.io/SRM/md_md__examples.html)
 * [📦 Downloads](https://cuarzosoftware.github.io/SRM/md_md__downloads.html)
+* [⚙️ Environment](https://cuarzosoftware.github.io/SRM/md_md__envs.html)
 * [💬 Contact](https://cuarzosoftware.github.io/SRM/md_md__contact.html)
 
 ### Used By
@@ -33,11 +34,10 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 
 * Support for Multiple GPUs
 * Automatic Configuration of GPUs and Connectors
-* Seamless Texture Sharing Among GPUs
 * Texture Allocation from CPU Buffers, DMA Buffers, GBM BOs, Flink Handles, Wayland DRM Buffers
 * Multi-session Capability (e.g. can use [libseat](https://github.com/kennylevinsen/seatd) to open DRM devices)
 * Listener for Connectors Hot-Plugging Events
-* Hardware Cursor Compositing
+* Simple Cursor Planes Control
 * V-Sync Control (support for the atomic DRM API requires Linux >= 6.8)
 * Frame Buffer Damage (enhances performance in multi-GPU setups where DMA support is lacking)
 * Access to Screen Framebuffers as Textures
@@ -47,19 +47,21 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 ### Tested on
 
 * Intel GPUs (i915 driver)
-* NVIDIA GPUs (Nouveau works reliably, proprietary drivers are often buggy)
+* NVIDIA GPUs (see [Nvidia Configuration](https://cuarzosoftware.github.io/SRM/md_md__envs.html))
 * AMD GPUs (AMDGPU driver)
 * Mali GPUs (Lima driver)
 
-### Multi-GPU Buffer Sharing and Rendering
+### Rendering Modes
 
-Automatic buffer sharing across GPUs is accomplished through DMA. When all GPUs support it, each one can render into its own connectors (ITSELF MODE).
+In multi-GPU setups, connectors such as eDP, HDMI, DisplayPort, etc., can be attached to different GPUs. However, those GPUs may not always support buffer (texture) sharing through DMA, which can prevent textures from being rendered on all displays. Therefore, SRM supports multiple rendering modes:
 
-In cases where a GPU cannot import DMA buffers from the allocator GPU, another GPU handles the rendering for its connectors using DUMB buffers (DUMB MODE) or CPU copying (CPU MODE) as a last resort.
+* **ITSELF MODE**: If there is a single GPU or a GPU that can import buffers from the allocator device, it can directly render into its own connectors. This is the optimal scenario.
 
-Performance in the last two modes can be significantly improved by specifying rects with the damaged regions after a `paintGL()` event using `srmConnectorSetBufferDamage()`.
+* **DUMB MODE**: If there are multiple GPUs and one of them cannot import buffers from the allocator device but supports dumb buffers, rendering is performed by another GPU, and the result is copied to the dumb buffers which can be directly scanned out. This scenario is sub-optimal as only a single GPU is used for rendering.
 
-> Note: You don't need to handle buffer allocation or rendering differently depending on the mode, all of this is managed internally by SRM.
+* **CPU MODE**: Similar to the previous case, but when dumb buffers are not supported, the rendered content is copied to main memory. Then, a texture supported by the affected GPU is updated and rendered into its native framebuffer. This is the worst-case scenario as it involves CPU copying for both reading and uploading to GPUs.
+
+Performance in the last two modes can be significantly improved by specifying the damage generated after a `paintGL()` event using `srmConnectorSetBufferDamage()`.
 
 ### Basic Example
 

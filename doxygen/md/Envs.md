@@ -2,13 +2,26 @@
 
 ## Debugging
 
-To enable debug logging messages, you can set the following variables:
+To adjust the logging message level, configure the following environment variables:
 
-**SRM_DEBUG**=[0, 1, 2, 3, 4]
+**SRM_DEBUG**=N
 
-**SRM_EGL_DEBUG**=[0, 1, 2, 3, 4]
+**SRM_EGL_DEBUG**=N
 
-Please note that debugging logging is disabled by default. By assigning a value from 0 to 4 to each of these variables, you can control the level of debug messages displayed. A higher value corresponds to more detailed debug information. Set these variables to 0 to disable debug logging if you no longer need the extra logging information.
+Where N can be 0 = Disabled, 1 = Fatal, 2 = Error, 3 = Warning or 4 = Debug.
+
+## Nvidia Configuration
+
+Nvidia cards often work out of the box with nouveau, but this isn't always the case with proprietary drivers. A recommended configuration for proprietary drivers is:
+
+* **SRM_FORCE_LEGACY_API**=0<br>
+Use the Atomic DRM API if available.
+* **SRM_NVIDIA_CURSOR**=0<br>
+Disable cursor planes for nvidia_drm only, which often cause FPS drops when updated.
+* **SRM_FORCE_GL_ALLOCATION**=1<br>
+Use OpenGL for buffer allocation instead of GBM, which may not always work.
+* **SRM_RENDER_MODE_DUMB_FB_COUNT**=3<br>
+Enable triple buffering in multi-GPU setups.
 
 ## DRM API
 
@@ -17,6 +30,12 @@ SRM defaults to using the Atomic DRM API for all devices (when avaliable), which
 **SRM_FORCE_LEGACY_API**=1
 
 Note: Disabling vsync for the atomic API is supported only starting from Linux version 6.8.
+
+## Device Blacklisting
+
+To disable specific DRM devices, list the devices separated by ":", for example:
+
+**SRM_DEVICES_BLACKLIST**=/dev/dri/card0:/dev/dri/card1
 
 ## Allocator Device
 
@@ -34,11 +53,13 @@ By default, SRM uses GBM for buffer allocation from main memory, resorting to Op
 
 ## Render Buffering
 
-You can customize the framebuffer count (single, double or triple buffering) for both "ITSELF" and "DUMB" render modes using the following environment variables:
+You can customize the framebuffer count for both "ITSELF" and "DUMB" render modes using the following environment variables:
 
-**SRM_RENDER_MODE_ITSELF_FB_COUNT**=[1, 2, 3]
+**SRM_RENDER_MODE_ITSELF_FB_COUNT**=N
 
-**SRM_RENDER_MODE_DUMB_FB_COUNT**=[1, 2, 3]
+**SRM_RENDER_MODE_DUMB_FB_COUNT**=N
+
+Where N can be 1 = Single, 2 = Double or 3 = Triple buffering.
 
 Please note that the "CPU" mode always uses single buffering, and this setting cannot be changed.
 

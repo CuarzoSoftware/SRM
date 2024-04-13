@@ -1,3 +1,22 @@
+SRM (0.5.6-1)
+
+  # Bug Fixes
+
+  * Implemented GL and EGL extension checks to prevent SRMBuffers creation when conditions to use them are not met.
+  * Replaced the device used to retrieve the OpenGL texture ID of a framebuffer used in DUMB mode, resolving segfaults with nvidia-drm drivers. Special thanks to @dranull and @JaanDev for reporting and testing.
+
+  # Environment
+
+  * Added the SRM_DEVICES_BLACKLIST environment variable for disabling specific DRM devices.
+  * By default, disabled cursor planes on Nvidia proprietary drivers, which were causing significant FPS drops when the cursor was updated. Also, added the SRM_NVIDIA_CURSOR environment variable to enable it if desired.
+  
+  # Documentation
+
+  * Added Nvidia drivers section on the Environment page with recommended configurations.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sat, 13 Apr 2024 12:37:03 -0400
+
+
 SRM (0.5.5-1)
 
   # Bug Fixes

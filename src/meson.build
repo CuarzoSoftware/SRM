@@ -59,8 +59,6 @@ include_paths = []
 
 include_paths_str = [
     './lib',
-    '/usr/include/drm',
-    '/usr/include/libdrm'
 ]
 
 foreach p : include_paths_str
@@ -82,6 +80,8 @@ drm_dep          = dependency('libdrm')
 gbm_dep          = dependency('gbm')
 display_info_dep = dependency('libdisplay-info')
 pthread_dep      = c.find_library('pthread')
+
+drm_headers_dep = drm_dep.partial_dependency(compile_args: true, includes: true)
 
 # ------------ SOURCE CODE FILES ------------
 

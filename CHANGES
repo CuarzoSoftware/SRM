@@ -1,3 +1,13 @@
+SRM (0.5.6-2)
+
+  # Building
+
+  * Add DRM headers dependency to all examples to resolve issues locating the drm_fourcc.h header, thanks to @EBADBEEF.
+  * Remove unnecessary header include checks in meson.build.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Thu, 30 May 2024 21:39:15 -0400
+
+
 SRM (0.5.6-1)
 
   # Bug Fixes

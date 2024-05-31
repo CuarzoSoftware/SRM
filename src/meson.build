@@ -55,19 +55,7 @@ conf_file_inc = include_directories('.')
 
 # ------------ SETUP INCLUDE PATHS ------------
 
-include_paths = []
-
-include_paths_str = [
-    './lib',
-]
-
-foreach p : include_paths_str
-    if run_command('[', '-d', p, ']', check : false).returncode() == 0
-      include_paths += [include_directories(p)]
-    endif
-endforeach
-
-include_paths += conf_file_inc
+include_paths = ['./lib', conf_file_inc]
 
 # ------------ DEPENDENCIES ------------
 

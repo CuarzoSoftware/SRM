@@ -71,8 +71,13 @@ struct SRMConnectorStruct
     char *name, *manufacturer, *model, *serial;
 
     // Cursor
-    struct gbm_bo *cursorBO, *cursorBOPending;
-    UInt32 cursorFB, cursorFBPending;
+    struct AtomicCursor
+    {
+        struct gbm_bo *bo;
+        UInt32 fb;
+    } cursor[2];
+
+    Int32 cursorIndex;
     Int32 cursorX, cursorY;
     UInt8 cursorVisible;
     UInt32 atomicChanges;

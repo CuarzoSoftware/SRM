@@ -88,26 +88,56 @@ SRMList *srmConnectorGetModes(SRMConnector *connector)
 
 UInt8 srmConnectorHasHardwareCursor(SRMConnector *connector)
 {
-    return connector->cursorBO != NULL;
+    return connector->cursor[0].bo != NULL;
 }
 
 UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
 {
-    if (!connector->cursorBO)
+    if (!connector->cursor[0].bo)
         return 0;
 
-    if (!pixels)
-    {
-        if (connector->cursorVisible == 0)
-            return 1;
+    if (!pixels && !connector->cursorVisible)
+        return 1;
 
-        if (connector->device->clientCapAtomic && connector->currentVSync)
+    pthread_mutex_lock(&connector->propsMutex);
+
+    if (connector->device->clientCapAtomic)
+    {
+        if (pixels)
         {
-            pthread_mutex_lock(&connector->propsMutex);
+            if (!connector->cursorVisible)
+            {
+                connector->cursorVisible = 1;
+                connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
+            }
+
+            /* The index is updated during the atomic commit */
+            UInt32 pendingCursorIndex = 1 - connector->cursorIndex;
+            gbm_bo_write(connector->cursor[pendingCursorIndex].bo, pixels, 64*64*4);
+            connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_BUFFER;
+        }
+        else
+        {
             connector->cursorVisible = 0;
             connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
-            pthread_mutex_unlock(&connector->propsMutex);
-            pthread_cond_signal(&connector->repaintCond);
+        }
+
+        pthread_mutex_unlock(&connector->propsMutex);
+        pthread_cond_signal(&connector->repaintCond);
+    }
+    else
+    {
+        if (pixels)
+        {
+            connector->cursorVisible = 1;
+            connector->cursorIndex = 1 - connector->cursorIndex;
+            gbm_bo_write(connector->cursor[connector->cursorIndex].bo, pixels, 64*64*4);
+
+            drmModeSetCursor(connector->device->fd,
+                             connector->currentCrtc->id,
+                             gbm_bo_get_handle(connector->cursor[connector->cursorIndex].bo).u32,
+                             64,
+                             64);
         }
         else
         {
@@ -117,75 +147,41 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
                              0,
                              0);
         }
-        return 1;
-    }
 
-    gbm_bo_write(connector->cursorBOPending, pixels, 64*64*4);
-
-    pthread_mutex_lock(&connector->propsMutex);
-
-    if (connector->device->clientCapAtomic && connector->currentVSync)
-        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_BUFFER;
-    else
-    {
-        struct gbm_bo *tmpBo = connector->cursorBO;
-        connector->cursorBO = connector->cursorBOPending;
-        connector->cursorBOPending = tmpBo;
-
-        UInt32 tmpFb = connector->cursorFB;
-        connector->cursorFB = connector->cursorFBPending;
-        connector->cursorFBPending = tmpFb;
-    }
-
-    if (connector->cursorVisible == 1 && connector->device->clientCapAtomic && connector->atomicChanges && connector->currentVSync)
-    {
         pthread_mutex_unlock(&connector->propsMutex);
-        pthread_cond_signal(&connector->repaintCond);
-        return 1;
     }
 
-    if (connector->device->clientCapAtomic && connector->currentVSync)
-    {
-        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
-        pthread_cond_signal(&connector->repaintCond);
-    }
-    else
-    {
-        drmModeSetCursor(connector->device->fd,
-                         connector->currentCrtc->id,
-                         gbm_bo_get_handle(connector->cursorBO).u32,
-                         64,
-                         64);
-    }
-
-    connector->cursorVisible = 1;
-    pthread_mutex_unlock(&connector->propsMutex);
     return 1;
 }
 
 UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
 {
-    if (!connector->cursorBO)
+    if (!connector->cursor[0].bo)
         return 0;
 
     if (connector->cursorX == x && connector->cursorY == y)
         return 1;
 
+    pthread_mutex_lock(&connector->propsMutex);
+
     if (connector->device->clientCapAtomic && connector->currentVSync)
     {
-        pthread_mutex_lock(&connector->propsMutex);
         connector->cursorX = x;
         connector->cursorY = y;
-        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION;
+        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION | SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
         pthread_mutex_unlock(&connector->propsMutex);
         pthread_cond_signal(&connector->repaintCond);
     }
     else
     {
+        connector->cursorX = x;
+        connector->cursorY = y;
         drmModeMoveCursor(connector->device->fd,
                           connector->currentCrtc->id,
                           x,
                           y);
+
+        pthread_mutex_unlock(&connector->propsMutex);
     }
 
     return 1;

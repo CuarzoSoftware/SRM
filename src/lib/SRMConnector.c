@@ -168,7 +168,7 @@ UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
     {
         connector->cursorX = x;
         connector->cursorY = y;
-        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION | SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
+        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION;
         pthread_mutex_unlock(&connector->propsMutex);
         pthread_cond_signal(&connector->repaintCond);
     }

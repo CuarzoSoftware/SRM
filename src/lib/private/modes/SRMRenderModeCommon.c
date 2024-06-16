@@ -147,90 +147,54 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
             return 0;
     }
 
-    connector->cursorBO = gbm_bo_create(connector->device->gbm,
-                                        64,
-                                        64,
-                                        GBM_FORMAT_ARGB8888,
-                                        GBM_BO_USE_CURSOR | GBM_BO_USE_WRITE);
+    Int32 ret;
 
-    if (connector->cursorBO)
+    connector->cursorIndex = 0;
+
+    for (int i = 0; i < 2; i++)
     {
-        if (connector->device->clientCapAtomic)
-        {
-            Int32 ret = drmModeAddFB(connector->device->fd,
-                         gbm_bo_get_width(connector->cursorBO),
-                         gbm_bo_get_height(connector->cursorBO),
-                         32,
-                         gbm_bo_get_bpp(connector->cursorBO),
-                         gbm_bo_get_stride(connector->cursorBO),
-                         gbm_bo_get_handle(connector->cursorBO).u32,
-                         &connector->cursorFB);
+        connector->cursor[i].bo = gbm_bo_create(connector->device->gbm,
+                                                      64,
+                                                      64,
+                                                      GBM_FORMAT_ARGB8888,
+                                                      GBM_BO_USE_CURSOR | GBM_BO_USE_WRITE);
 
-            if (ret)
-            {
-                SRMError("Failed to setup hw cursor for connector %d.", connector->id);
-                goto fail;
-            }
-        }
+        if (!connector->cursor[i].bo)
+            goto fail;
+
+        if (!connector->device->clientCapAtomic)
+            continue;
+
+        ret = drmModeAddFB(connector->device->fd,
+                                 gbm_bo_get_width(connector->cursor[i].bo),
+                                 gbm_bo_get_height(connector->cursor[i].bo),
+                                 32,
+                                 gbm_bo_get_bpp(connector->cursor[i].bo),
+                                 gbm_bo_get_stride(connector->cursor[i].bo),
+                                 gbm_bo_get_handle(connector->cursor[i].bo).u32,
+                                 &connector->cursor[i].fb);
+
+        if (ret)
+            goto fail;
     }
-    else
-        return 0;
 
-    connector->cursorBOPending = gbm_bo_create(connector->device->gbm,
-                                        64,
-                                        64,
-                                        GBM_FORMAT_ARGB8888,
-                                        GBM_BO_USE_CURSOR | GBM_BO_USE_WRITE);
-
-    if (connector->cursorBOPending)
-    {
-        if (connector->device->clientCapAtomic)
-        {
-            Int32 ret = drmModeAddFB(connector->device->fd,
-                         gbm_bo_get_width(connector->cursorBOPending),
-                         gbm_bo_get_height(connector->cursorBOPending),
-                         32,
-                         gbm_bo_get_bpp(connector->cursorBOPending),
-                         gbm_bo_get_stride(connector->cursorBOPending),
-                         gbm_bo_get_handle(connector->cursorBOPending).u32,
-                         &connector->cursorFBPending);
-
-            if (ret)
-            {
-                SRMError("Failed to setup hw cursor for connector %d.", connector->id);
-                goto fail;
-            }
-
-            return 1;
-        }
-
-        return 1;
-    }
+    return 1;
 
     fail:
 
-    if (connector->cursorFB)
+    for (int i = 0; i < 2; i++)
     {
-        drmModeRmFB(connector->device->fd, connector->cursorFB);
-        connector->cursorFB = 0;
-    }
+        if (connector->cursor[i].fb != 0)
+        {
+            drmModeRmFB(connector->device->fd, connector->cursor[i].fb);
+            connector->cursor[i].fb = 0;
+        }
 
-    if (connector->cursorBO)
-    {
-        gbm_bo_destroy(connector->cursorBO);
-        connector->cursorBO = NULL;
-    }
-
-    if (connector->cursorFBPending)
-    {
-        drmModeRmFB(connector->device->fd, connector->cursorFBPending);
-        connector->cursorFBPending = 0;
-    }
-
-    if (connector->cursorBOPending)
-    {
-        gbm_bo_destroy(connector->cursorBOPending);
-        connector->cursorBOPending = NULL;
+        if (connector->cursor[i].bo)
+        {
+            gbm_bo_destroy(connector->cursor[i].bo);
+            connector->cursor[i].bo = NULL;
+        }
     }
 
     SRMError("Failed to setup hw cursor for connector %d.", connector->id);
@@ -279,20 +243,14 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
             if (clearFlags)
                 connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_BUFFER;
 
-            struct gbm_bo *tmpBo = connector->cursorBO;
-            connector->cursorBO = connector->cursorBOPending;
-            connector->cursorBOPending = tmpBo;
-
-            UInt32 tmpFb = connector->cursorFB;
-            connector->cursorFB = connector->cursorFBPending;
-            connector->cursorFBPending = tmpFb;
+            connector->cursorIndex = 1 - connector->cursorIndex;
 
             if (connector->cursorVisible)
             {
                 drmModeAtomicAddProperty(req,
                                         connector->currentCursorPlane->id,
                                         connector->currentCursorPlane->propIDs.FB_ID,
-                                        connector->cursorFB);
+                                        connector->cursor[connector->cursorIndex].fb);
                 updatedFB = 1;
             }
         }
@@ -309,7 +267,7 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
                     drmModeAtomicAddProperty(req,
                                             connector->currentCursorPlane->id,
                                             connector->currentCursorPlane->propIDs.FB_ID,
-                                            connector->cursorFB);
+                                            connector->cursor[connector->cursorIndex].fb);
                 }
 
                 drmModeAtomicAddProperty(req,
@@ -433,32 +391,24 @@ void srmRenderModeCommonDestroyCursor(SRMConnector *connector)
         }
     }
 
-    if (connector->cursorFB)
+    for (int i = 0; i < 2; i++)
     {
-        drmModeRmFB(connector->device->fd, connector->cursorFB);
-        connector->cursorFB = 0;
-    }
+        if (connector->cursor[i].fb != 0)
+        {
+            drmModeRmFB(connector->device->fd, connector->cursor[i].fb);
+            connector->cursor[i].fb = 0;
+        }
 
-    if (connector->cursorBO)
-    {
-        gbm_bo_destroy(connector->cursorBO);
-        connector->cursorBO = NULL;
-    }
-
-    if (connector->cursorFBPending)
-    {
-        drmModeRmFB(connector->device->fd, connector->cursorFBPending);
-        connector->cursorFBPending = 0;
-    }
-
-    if (connector->cursorBOPending)
-    {
-        gbm_bo_destroy(connector->cursorBOPending);
-        connector->cursorBOPending = NULL;
+        if (connector->cursor[i].bo)
+        {
+            gbm_bo_destroy(connector->cursor[i].bo);
+            connector->cursor[i].bo = NULL;
+        }
     }
 
     connector->atomicChanges &= ~(SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY | SRM_ATOMIC_CHANGE_CURSOR_POSITION | SRM_ATOMIC_CHANGE_CURSOR_BUFFER);
     connector->cursorVisible = 0;
+    connector->cursorIndex = 0;
 }
 
 Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags, void *data, UInt8 forceRetry)
@@ -591,7 +541,8 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
                                      connector->currentPrimaryPlane->propIDs.SRC_H,
                                      (UInt64)connector->currentMode->info.vdisplay << 16);
 
-            srmRenderModeCommitAtomicChanges(connector, req, 1);
+            UInt32 prevCursorIndex = connector->cursorIndex;
+            srmRenderModeCommitAtomicChanges(connector, req, 0);
 
             ret = srmRenderModeAtomicCommit(connector->device->fd,
                                 req,
@@ -600,10 +551,13 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
 
             if (ret)
             {
+                connector->cursorIndex = prevCursorIndex;
                 SRMError("Failed set mode with same size on device %s connector %d. Error: %d. (atomic)",
                          connector->device->name,
                          connector->id, ret);
             }
+            else
+                connector->atomicChanges = 0;
 
             drmModeAtomicFree(req);
         }
@@ -854,7 +808,8 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
                                  connector->currentPrimaryPlane->propIDs.SRC_H,
                                  (UInt64)connector->currentMode->info.vdisplay << 16);
 
-        srmRenderModeCommitAtomicChanges(connector, req, 1);
+        UInt32 prevCursorIndex = connector->cursorIndex;
+        srmRenderModeCommitAtomicChanges(connector, req, 0);
 
         // Commit
         ret = srmRenderModeAtomicCommit(connector->device->fd,
@@ -866,10 +821,13 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
 
         if (ret)
         {
+            connector->cursorIndex = prevCursorIndex;
             SRMError("Failed to resume crtc mode on device %s connector %d.",
                      connector->device->name,
                      connector->id);
         }
+        else
+            connector->atomicChanges = 0;
     }
     else
     {
@@ -986,7 +944,8 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
                                  connector->currentPrimaryPlane->propIDs.SRC_H,
                                  (UInt64)connector->currentMode->info.vdisplay << 16);
 
-        srmRenderModeCommitAtomicChanges(connector, req, 1);
+        UInt32 prevCursorIndex = connector->cursorIndex;
+        srmRenderModeCommitAtomicChanges(connector, req, 0);
 
         // Commit
         ret = srmRenderModeAtomicCommit(connector->device->fd,
@@ -998,12 +957,16 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
 
         if (ret)
         {
+            connector->cursorIndex = prevCursorIndex;
             SRMError("Failed to set crtc mode on device %s connector %d (atomic).",
                     connector->device->name,
                     connector->id);
         }
         else
+        {
+            connector->atomicChanges = 0;
             goto skipLegacy;
+        }
     }
 
     /* Occasionally, the Atomic API fails to set the connector CRTC for reasons unknown.
@@ -1061,6 +1024,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
         {
             drmModeAtomicReqPtr req;
             req = drmModeAtomicAlloc();
+            UInt32 prevCursorIndex = connector->cursorIndex;
             srmRenderModeCommitAtomicChanges(connector, req, 0);
             drmModeAtomicAddProperty(req,
                                      connector->currentPrimaryPlane->id,
@@ -1070,7 +1034,9 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                                         req,
                                         DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
                                         connector, 1);
-            if (ret == 0 && !connector->firstPageFlip)
+            if (ret)
+                connector->cursorIndex = prevCursorIndex;
+            else/* if (ret == 0 && !connector->firstPageFlip)*/
                 connector->atomicChanges = 0;
 
             drmModeAtomicFree(req);
@@ -1097,6 +1063,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
             {
                 drmModeAtomicReqPtr req;
                 req = drmModeAtomicAlloc();
+                UInt32 prevCursorIndex = connector->cursorIndex;
                 srmRenderModeCommitAtomicChanges(connector, req, 0);
                 drmModeAtomicAddProperty(req,
                                          connector->currentPrimaryPlane->id,
@@ -1108,8 +1075,10 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                                                 connector, 1);
                 drmModeAtomicFree(req);
 
+                if (ret)
+                    connector->cursorIndex = prevCursorIndex;
                 // Clear flags on success
-                if (ret == 0 && !connector->firstPageFlip)
+                else /*if (ret == 0 && !connector->firstPageFlip)*/
                     connector->atomicChanges = 0;
             }
 
@@ -1284,7 +1253,7 @@ Int32 srmRenderModeAtomicResetConnectorProps(SRMConnector *connector)
                              connector->currentPrimaryPlane->propIDs.SRC_H,
                              0);
 
-    srmRenderModeCommitAtomicChanges(connector, req, 1);
+    srmRenderModeCommitAtomicChanges(connector, req, 0);
 
     ret = srmRenderModeAtomicCommit(connector->device->fd,
                                     req,

@@ -1,3 +1,12 @@
+SRM (0.5.7-1)
+
+  # Bug Fixes
+
+  * Fix bug when using the atomic API that prevents cursor planes from being displayed when the first commit fails.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Mon, 17 Jun 2024 15:50:52 -0400
+
+
 SRM (0.5.6-2)
 
   # Building

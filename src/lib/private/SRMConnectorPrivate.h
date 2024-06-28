@@ -36,6 +36,7 @@ struct SRMConnectorPropIDs
     PATH,
     link_status,
     non_desktop,
+    content_type,
     panel_orientation,
     subconnector,
     vrr_capable;
@@ -53,6 +54,7 @@ struct SRMConnectorStruct
     SRMList *encoders, *modes;
     UInt32 mmWidth, mmHeight;
     SRM_CONNECTOR_SUBPIXEL subpixel;
+    SRM_CONNECTOR_CONTENT_TYPE contentType;
     SRMConnectorMode *preferredMode, *currentMode,
     *targetMode; // This one is used while changing mode
     UInt32 currentModeBlobId;
@@ -62,7 +64,6 @@ struct SRMConnectorStruct
     SRMPlane *currentPrimaryPlane, *currentCursorPlane;
     SRM_CONNECTOR_STATE state;
 
-    // Gamma table, used only in atomic API
     struct drm_color_lut *gamma;
     UInt32 gammaBlobId;
 
@@ -138,6 +139,7 @@ UInt8 srmConnectorUpdateModes(SRMConnector *connector);
 void srmConnectorDestroyModes(SRMConnector *connector);
 
 void srmConnectorSetCursorPlaneToNeededConnector(SRMPlane *cursorPlane);
+void srmConnectorInitGamma(SRMConnector *connector);
 
 SRMConnectorMode *srmConnectorFindPreferredMode(SRMConnector *connector);
 UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane);

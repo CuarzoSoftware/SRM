@@ -348,6 +348,47 @@ typedef enum SRM_CONNECTOR_SUBPIXEL_ENUM
 const char *srmGetConnectorSubPixelString(SRM_CONNECTOR_SUBPIXEL subpixel);
 
 /**
+ * @ingroup SRMConnector
+ * @brief Content type hint.
+ *
+ * This hint is utilized by certain hardware displays to adjust settings
+ * optimally based on the displayed content. For example, setting the
+ * @ref SRM_CONNECTOR_CONTENT_TYPE_GAME hint may prompt the hardware to minimize latency.
+ */
+typedef enum SRM_CONNECTOR_CONTENT_TYPE_ENUM
+{
+    /**
+     * @brief Graphics.
+     */
+    SRM_CONNECTOR_CONTENT_TYPE_GRAPHICS = 1,
+
+    /**
+     * @brief Photo.
+     */
+    SRM_CONNECTOR_CONTENT_TYPE_PHOTO = 2,
+
+    /**
+     * @brief Video.
+     */
+    SRM_CONNECTOR_CONTENT_TYPE_VIDEO = 3,
+
+    /**
+     * @brief Game.
+     */
+    SRM_CONNECTOR_CONTENT_TYPE_GAME = 4,
+
+} SRM_CONNECTOR_CONTENT_TYPE;
+
+/**
+ * @brief Get a string representation of a connector content type hint.
+ *
+ * @param contentType The connector content type hint to retrieve the string for.
+ *
+ * @return A pointer to the string representation of the content type hint.
+ */
+const char *srmGetConnectorContentTypeString(SRM_CONNECTOR_CONTENT_TYPE contentType);
+
+/**
  * @}
  */
 

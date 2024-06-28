@@ -164,18 +164,17 @@ UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
 
     pthread_mutex_lock(&connector->propsMutex);
 
+    connector->cursorX = x;
+    connector->cursorY = y;
+
     if (connector->device->clientCapAtomic && connector->currentVSync)
     {
-        connector->cursorX = x;
-        connector->cursorY = y;
         connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION;
         pthread_mutex_unlock(&connector->propsMutex);
         pthread_cond_signal(&connector->repaintCond);
     }
     else
     {
-        connector->cursorX = x;
-        connector->cursorY = y;
         drmModeMoveCursor(connector->device->fd,
                           connector->currentCrtc->id,
                           x,
@@ -315,24 +314,7 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
     connector->renderInitResult = 0;
     connector->firstPageFlip = 1;
 
-    UInt64 gammaSize = srmCrtcGetGammaSize(connector->currentCrtc);
-
-    if (gammaSize > 0)
-    {
-        SRMDebug("[%s] Connector (%d) gamma size = %d.",
-                connector->device->name,
-                connector->id,
-                (UInt32)gammaSize);
-
-        if (connector->device->clientCapAtomic && connector->currentCrtc->propIDs.GAMMA_LUT_SIZE)
-            connector->gamma = malloc(gammaSize * sizeof(*connector->gamma));
-    }
-    else
-    {
-        SRMDebug("[%s] Connector (%d) does not support gamma correction.",
-                 connector->device->name,
-                 connector->id);
-    }
+    srmConnectorInitGamma(connector);
 
     if (pthread_create(&connector->renderThread, NULL, srmConnectorRenderThread, connector))
     {
@@ -643,6 +625,7 @@ UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table)
     }
     else
     {
+        memcpy(connector->gamma, table, gammaSize * 3);
         if (drmModeCrtcSetGamma(connector->device->fd,
             connector->currentCrtc->id,
             (UInt32)gammaSize,
@@ -697,4 +680,44 @@ clockid_t srmConnectorGetPresentationClock(SRMConnector *connector)
 const SRMPresentationTime *srmConnectorGetPresentationTime(SRMConnector *connector)
 {
     return &connector->presentationTime;
+}
+
+void srmConnectorSetContentType(SRMConnector *connector, SRM_CONNECTOR_CONTENT_TYPE contentType)
+{
+    if (!connector->propIDs.content_type)
+    {
+        connector->contentType = contentType;
+        return;
+    }
+
+    pthread_mutex_lock(&connector->propsMutex);
+
+    if (connector->contentType == contentType)
+    {
+        pthread_mutex_unlock(&connector->propsMutex);
+        return;
+    }
+
+    connector->contentType = contentType;
+
+    if (connector->device->clientCapAtomic)
+    {
+        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CONTENT_TYPE;
+
+        pthread_mutex_unlock(&connector->propsMutex);
+        pthread_cond_signal(&connector->repaintCond);
+    }
+    else
+    {
+        drmModeConnectorSetProperty(connector->device->fd,
+                                    connector->id,
+                                    connector->propIDs.content_type,
+                                    connector->contentType);
+        pthread_mutex_unlock(&connector->propsMutex);
+    }
+}
+
+SRM_CONNECTOR_CONTENT_TYPE srmConnectorGetContentType(SRMConnector *connector)
+{
+    return connector->contentType;
 }

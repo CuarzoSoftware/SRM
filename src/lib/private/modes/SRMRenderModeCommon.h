@@ -14,7 +14,8 @@ enum SRM_ATOMIC_CHANGE
     SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY = 1 << 0,
     SRM_ATOMIC_CHANGE_CURSOR_POSITION   = 1 << 1,
     SRM_ATOMIC_CHANGE_CURSOR_BUFFER     = 1 << 2,
-    SRM_ATOMIC_CHANGE_GAMMA_LUT         = 1 << 3
+    SRM_ATOMIC_CHANGE_GAMMA_LUT         = 1 << 3,
+    SRM_ATOMIC_CHANGE_CONTENT_TYPE      = 1 << 4
 };
 
 Int8  srmRenderModeCommonMatchConfigToVisual(EGLDisplay egl_display, EGLint visual_id, EGLConfig *configs, int count);
@@ -29,6 +30,7 @@ Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags,
 Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb);
 void srmRenderModeCommonPauseRendering(SRMConnector *connector);
 void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb);
+void srmRenderModeCommonSyncState(SRMConnector *connector);
 void srmRenderModeCommonUninitialize(SRMConnector *connector);
 Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb);
 void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb);

@@ -364,6 +364,18 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
         }
     }
 
+    if (connector->atomicChanges & SRM_ATOMIC_CHANGE_CONTENT_TYPE)
+    {
+        if (clearFlags)
+            connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CONTENT_TYPE;
+
+        if (connector->propIDs.content_type)
+            drmModeAtomicAddProperty(req,
+                                     connector->id,
+                                     connector->propIDs.content_type,
+                                     connector->contentType);
+    }
+
     pthread_mutex_unlock(&connector->propsMutex);
 }
 
@@ -717,6 +729,8 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
 {
     Int32 ret;
     connector->lastFb = fb;
+
+    srmRenderModeCommonSyncState(connector);
 
     if (connector->device->clientCapAtomic)
     {
@@ -1263,4 +1277,69 @@ Int32 srmRenderModeAtomicResetConnectorProps(SRMConnector *connector)
     drmModeAtomicFree(req);
 
     return ret;
+}
+
+/* This ensures properties are restored after resuming */
+void srmRenderModeCommonSyncState(SRMConnector *connector)
+{
+    if (!connector->currentCrtc)
+        return;
+
+    if (connector->device->clientCapAtomic)
+    {
+        if (connector->propIDs.content_type)
+            connector->atomicChanges |= SRM_ATOMIC_CHANGE_CONTENT_TYPE;
+
+        if (connector->cursor[0].bo)
+            connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION | SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
+
+        if (connector->gamma)
+            connector->atomicChanges |= SRM_ATOMIC_CHANGE_GAMMA_LUT;
+    }
+    else
+    {
+        if (connector->propIDs.content_type)
+            drmModeConnectorSetProperty(connector->device->fd,
+                                        connector->id,
+                                        connector->propIDs.content_type,
+                                        connector->contentType);
+
+        if (connector->cursor[0].bo)
+        {
+            if (connector->cursorVisible)
+                drmModeSetCursor(connector->device->fd,
+                                 connector->currentCrtc->id,
+                                 gbm_bo_get_handle(connector->cursor[connector->cursorIndex].bo).u32,
+                                 64,
+                                 64);
+            else
+                drmModeSetCursor(connector->device->fd,
+                                 connector->currentCrtc->id,
+                                 0,
+                                 0,
+                                 0);
+
+            drmModeMoveCursor(connector->device->fd,
+                              connector->currentCrtc->id,
+                              connector->cursorX,
+                              connector->cursorY);
+        }
+
+        /* This is always != NULL if gammaSize > 0 */
+        if (connector->gamma)
+        {
+            UInt16 *table = (UInt16*)connector->gamma;
+            UInt64 gammaSize = srmConnectorGetGammaSize(connector);
+            if (drmModeCrtcSetGamma(connector->device->fd,
+                                    connector->currentCrtc->id,
+                                    (UInt32)gammaSize,
+                                    table,
+                                    table + gammaSize,
+                                    table + gammaSize + gammaSize))
+            {
+                SRMError("Failed to set gamma for connector %d using legacy API drmModeCrtcSetGamma().",
+                         connector->id);
+            }
+        }
+    }
 }

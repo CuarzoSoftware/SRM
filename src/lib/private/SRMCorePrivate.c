@@ -96,16 +96,7 @@ UInt8 srmCoreEnumerateDevices(SRMCore *core)
         SRMDevice *device = srmDeviceCreate(core, udev_device_get_devnode(dev));
 
         if (device)
-        {
             device->coreLink = srmListAppendData(core->devices, device);
-
-            // Update device connector names
-            SRMListForeach (item, device->connectors)
-            {
-                SRMConnector *connector = srmListItemGetData(item);
-                srmConnectorUpdateNames(connector);
-            }
-        }
 
         udev_device_unref(dev);
     }

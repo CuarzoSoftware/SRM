@@ -31,16 +31,15 @@ SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
     connector->device = device;
     connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
     connector->pendingVSync = 1;
+
     pthread_mutex_init(&connector->stateMutex, NULL);
     pthread_mutex_init(&connector->propsMutex, NULL);
+
     srmConnectorUpdateProperties(connector);
-
-    // srmConnectorUpdateNames(connector) is called after its device is added to the core devices list
-
+    srmConnectorUpdateNames(connector);
     srmConnectorUpdateEncoders(connector);
     srmConnectorUpdateModes(connector);
     srmConnectorSetContentType(connector, SRM_CONNECTOR_CONTENT_TYPE_GRAPHICS);
-
     return connector;
 }
 
@@ -60,34 +59,6 @@ void srmConnectorDestroy(SRMConnector *connector)
     free(connector);
 }
 
-// Recursively find a free id to add at the end of the name (e.g HDMI-A-0)
-// so that connectors of the same type have unique names
-UInt32 srmConnectorGetFreeNameID(SRMConnector *connector, UInt32 id)
-{
-    SRMListForeach (item1, connector->device->core->devices)
-    {
-        SRMDevice *device = srmListItemGetData(item1);
-
-        SRMListForeach (item2, device->connectors)
-        {
-            SRMConnector *otherConnector = srmListItemGetData(item2);
-
-            if (otherConnector == connector)
-                continue;
-
-            // Ups ID already used by another connector, try with the next value
-            if (otherConnector->type == connector->type && otherConnector->nameID == id)
-            {
-                id++;
-                return srmConnectorGetFreeNameID(connector, id);
-            }
-        }
-    }
-
-    // Got a free ID
-    return id;
-}
-
 UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
 {
     drmModeConnector *connectorRes = drmModeGetConnector(connector->device->fd, connector->id);
@@ -103,6 +74,7 @@ UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
     connector->mmWidth = connectorRes->mmWidth;
     connector->connected = connectorRes->connection == DRM_MODE_CONNECTED;
     connector->type = connectorRes->connector_type;
+    connector->nameID = connectorRes->connector_type_id;
 
     drmModeFreeConnector(connectorRes);
 
@@ -158,9 +130,6 @@ UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
 UInt8 srmConnectorUpdateNames(SRMConnector *connector)
 {
     srmConnectorDestroyNames(connector);
-
-    // Search a free name ID for the connector type
-    connector->nameID = srmConnectorGetFreeNameID(connector, 0);
 
     // Set name
     char name[64];

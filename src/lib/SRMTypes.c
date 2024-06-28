@@ -8,22 +8,10 @@ const char *srmGetRenderModeString(SRM_RENDER_MODE mode)
 {
     switch (mode)
     {
-        case SRM_RENDER_MODE_ITSELF:
-        {
-            return "ITSELF";
-        } break;
-        case SRM_RENDER_MODE_DUMB:
-        {
-            return "DUMB";
-        } break;
-        case SRM_RENDER_MODE_CPU:
-        {
-            return "CPU";
-        } break;
-        default:
-        {
-            return "UNKNOWN RENDER MODE";
-        }
+        case SRM_RENDER_MODE_ITSELF:    return "ITSELF";
+        case SRM_RENDER_MODE_DUMB:      return "DUMB";
+        case SRM_RENDER_MODE_CPU:       return "CPU";
+        default:                        return "UNKNOWN RENDER MODE";
     }
 }
 
@@ -31,22 +19,10 @@ const char *srmGetPlaneTypeString(SRM_PLANE_TYPE type)
 {
     switch (type)
     {
-        case SRM_PLANE_TYPE_OVERLAY:
-        {
-            return "OVERLAY";
-        } break;
-        case SRM_PLANE_TYPE_PRIMARY:
-        {
-            return "PRIMARY";
-        } break;
-        case SRM_PLANE_TYPE_CURSOR:
-        {
-            return "CURSOR";
-        } break;
-        default:
-        {
-            return "UNKNOWN PLANE TYPE";
-        }
+        case SRM_PLANE_TYPE_OVERLAY:    return "OVERLAY";
+        case SRM_PLANE_TYPE_PRIMARY:    return "PRIMARY";
+        case SRM_PLANE_TYPE_CURSOR:     return "CURSOR";
+        default:                        return "UNKNOWN PLANE TYPE";
     }
 }
 
@@ -54,30 +30,12 @@ const char *srmGetConnectorStateString(SRM_CONNECTOR_STATE state)
 {
     switch (state)
     {
-        case SRM_CONNECTOR_STATE_UNINITIALIZED:
-        {
-            return "UNINITIALIZED";
-        } break;
-        case SRM_CONNECTOR_STATE_INITIALIZED:
-        {
-            return "INITIALIZED";
-        } break;
-        case SRM_CONNECTOR_STATE_UNINITIALIZING:
-        {
-            return "UNINITIALIZING";
-        } break;
-        case SRM_CONNECTOR_STATE_INITIALIZING:
-        {
-            return "INITIALIZING";
-        } break;
-        case SRM_CONNECTOR_STATE_CHANGING_MODE:
-        {
-            return "CHANGING MODE";
-        } break;
-        default:
-        {
-            return "UNKNOWN CONNECTOR STATE";
-        }
+        case SRM_CONNECTOR_STATE_UNINITIALIZED:     return "UNINITIALIZED";
+        case SRM_CONNECTOR_STATE_INITIALIZED:       return "INITIALIZED";
+        case SRM_CONNECTOR_STATE_UNINITIALIZING:    return "UNINITIALIZING";
+        case SRM_CONNECTOR_STATE_INITIALIZING:      return "INITIALIZING";
+        case SRM_CONNECTOR_STATE_CHANGING_MODE:     return "CHANGING MODE";
+        default:                                    return "UNKNOWN CONNECTOR STATE";
     }
 }
 
@@ -119,5 +77,17 @@ const char *srmGetConnectorSubPixelString(SRM_CONNECTOR_SUBPIXEL subpixel)
         case SRM_CONNECTOR_SUBPIXEL_VERTICAL_BGR:   return "VERTICAL_BGR";
         case SRM_CONNECTOR_SUBPIXEL_NONE:           return "NONE";
         default:                                    return "unknown";
+    }
+}
+
+const char *srmGetConnectorContentTypeString(SRM_CONNECTOR_CONTENT_TYPE contentType)
+{
+    switch (contentType)
+    {
+    case SRM_CONNECTOR_CONTENT_TYPE_GRAPHICS:   return "GRAPHICS";
+    case SRM_CONNECTOR_CONTENT_TYPE_PHOTO:      return "PHOTO";
+    case SRM_CONNECTOR_CONTENT_TYPE_VIDEO:      return "VIDEO";
+    case SRM_CONNECTOR_CONTENT_TYPE_GAME:       return "GAME";
+    default:                                    return "unknown";
     }
 }

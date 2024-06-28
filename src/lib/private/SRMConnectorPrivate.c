@@ -39,6 +39,7 @@ SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
 
     srmConnectorUpdateEncoders(connector);
     srmConnectorUpdateModes(connector);
+    srmConnectorSetContentType(connector, SRM_CONNECTOR_CONTENT_TYPE_GRAPHICS);
 
     return connector;
 }
@@ -137,6 +138,8 @@ UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
             connector->propIDs.link_status = prop->prop_id;
         else if (strcmp(prop->name, "non-desktop") == 0)
             connector->propIDs.non_desktop = prop->prop_id;
+        else if (strcmp(prop->name, "content type") == 0)
+            connector->propIDs.content_type = prop->prop_id;
         else if (strcmp(prop->name, "panel orientation") == 0)
             connector->propIDs.panel_orientation = prop->prop_id;
         else if (strcmp(prop->name, "subconnector") == 0)
@@ -676,5 +679,57 @@ void srmConnectorRenderThreadCleanUp(SRMConnector *connector)
     {
         drmModeDestroyPropertyBlob(connector->device->fd, connector->currentModeBlobId);
         connector->currentModeBlobId = 0;
+    }
+}
+
+void srmConnectorInitGamma(SRMConnector *connector)
+{
+    if (!connector->currentCrtc)
+        return;
+
+    UInt64 gammaSize = srmCrtcGetGammaSize(connector->currentCrtc);
+
+    if (gammaSize > 0)
+    {
+        SRMDebug("[%s] Connector (%d) gamma size = %d.",
+                 connector->device->name,
+                 connector->id,
+                 (UInt32)gammaSize);
+
+        connector->gamma = malloc(gammaSize * sizeof(*connector->gamma));
+
+        /* Apply linear gamma */
+
+        Float64 n = gammaSize - 1.0;
+        Float64 val;
+
+        if (connector->device->clientCapAtomic)
+        {
+            struct drm_color_lut *lut = connector->gamma;
+
+            for (UInt32 i = 0; i < gammaSize; i++)
+            {
+                val = (Float64)i / n;
+                lut->red = lut->green = lut->blue = (UInt16)(UINT16_MAX * val);
+            }
+        }
+        else
+        {
+            UInt16 *r = (UInt16*)connector->gamma;
+            UInt16 *g = r + gammaSize;
+            UInt16 *b = g + gammaSize;
+
+            for (UInt32 i = 0; i < gammaSize; i++)
+            {
+                val = (Float64)i / n;
+                r[i] = g[i] = b[i] = (UInt16)(UINT16_MAX * val);
+            }
+        }
+    }
+    else
+    {
+        SRMDebug("[%s] Connector (%d) does not support gamma correction.",
+                 connector->device->name,
+                 connector->id);
     }
 }

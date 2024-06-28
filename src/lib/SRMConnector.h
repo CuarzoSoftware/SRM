@@ -617,7 +617,7 @@ UInt64 srmConnectorGetGammaSize(SRMConnector *connector);
 /**
  * @brief Sets the gamma correction curves for each RGB component.
  *
- * This method allows you to individually set the gamma correction curves for each RGB component.
+ * This method allows you to set the gamma correction curves for each RGB component.
  * The number of elements for each curve (N) should be obtained using srmConnectorGetGammaSize().
  * The table array should then have a size of `3 * N * sizeof(UInt16)` bytes, with N @ref UInt16 values for red,
  * N for green, and N for blue, in that order. Each value of the curves can represent the full range of @ref UInt16.
@@ -625,6 +625,8 @@ UInt64 srmConnectorGetGammaSize(SRMConnector *connector);
  * @note This method must only be called after the connector is initialized.
  *       If the connector is uninitialized or the driver does not support gamma correction,
  *       the function returns 0.
+ *
+ * The default gamma curves are linear.
  * 
  * @param connector Pointer to the @ref SRMConnector.
  * @param table Pointer to the array containing RGB curves for gamma correction.
@@ -722,6 +724,27 @@ clockid_t srmConnectorGetPresentationClock(SRMConnector *connector);
  * @return Pointer to the structure containing presentation time information, see @ref SRMPresentationTime.
  */
 const SRMPresentationTime *srmConnectorGetPresentationTime(SRMConnector *connector);
+
+/**
+ * @brief Sets a hint of the content type being displayed.
+ *
+ * @see @ref SRM_CONNECTOR_CONTENT_TYPE
+ *
+ * @note The default value is @ref SRM_CONNECTOR_CONTENT_TYPE_GRAPHICS
+ *
+ * @param connector A pointer to the @ref SRMConnector instance.
+ * @param contentType The content type hint.
+ */
+void srmConnectorSetContentType(SRMConnector *connector, SRM_CONNECTOR_CONTENT_TYPE contentType);
+
+/**
+ * @brief Gets the content type hint.
+ *
+ * @see srmConnectorSetContentType()
+ *
+ * @param connector A pointer to the @ref SRMConnector instance.
+ */
+SRM_CONNECTOR_CONTENT_TYPE srmConnectorGetContentType(SRMConnector *connector);
 
 /**
  * @}

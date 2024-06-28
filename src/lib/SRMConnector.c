@@ -625,7 +625,7 @@ UInt8 srmConnectorSetGamma(SRMConnector *connector, UInt16 *table)
     }
     else
     {
-        memcpy(connector->gamma, table, gammaSize * 3);
+        memcpy(connector->gamma, table, sizeof(UInt16) * gammaSize * 3);
         if (drmModeCrtcSetGamma(connector->device->fd,
             connector->currentCrtc->id,
             (UInt32)gammaSize,

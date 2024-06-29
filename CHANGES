@@ -1,3 +1,21 @@
+SRM (0.6.0-1)
+
+  # New APIs
+
+  * Introduced srmConnectorSetContentType() and srmConnectorGetContentType() functions to optimize display hardware for the type of content being displayed.
+
+  # Bug Fixes
+
+  * Ensured connector properties are re-synchronized after session switching to resolve issues with cursor visibility, position, and other related errors.
+
+  # Internal Changes
+
+  * Replaced custom connector name IDs with connector_type_id (e.g., HDMI-A-1, HDMI-A-2, etc.).
+  * Maintained a copy of gamma tables in the legacy API to ensure proper restoration during session switching.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sat, 29 Jun 2024 18:46:15 -0400
+
+
 SRM (0.5.7-1)
 
   # Bug Fixes

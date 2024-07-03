@@ -1,4 +1,3 @@
-#include <private/modes/SRMRenderModeCPU.h>
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMConnectorModePrivate.h>
 #include <private/SRMDevicePrivate.h>
@@ -6,10 +5,13 @@
 #include <private/SRMCrtcPrivate.h>
 #include <private/SRMPlanePrivate.h>
 #include <private/SRMCorePrivate.h>
+#include <private/SRMBufferPrivate.h>
 
 #include <private/modes/SRMRenderModeCommon.h>
 #include <private/modes/SRMRenderModeItself.h>
+#include <private/modes/SRMRenderModePrime.h>
 #include <private/modes/SRMRenderModeDumb.h>
+#include <private/modes/SRMRenderModeCPU.h>
 
 #include <SRMLog.h>
 #include <SRMList.h>
@@ -449,6 +451,8 @@ void *srmConnectorRenderThread(void *conn)
 
     if (renderMode == SRM_RENDER_MODE_ITSELF)
         srmRenderModeItselfSetInterface(connector);
+    else if (renderMode == SRM_RENDER_MODE_PRIME)
+        srmRenderModePrimeSetInterface(connector);
     else if (renderMode == SRM_RENDER_MODE_DUMB)
         srmRenderModeDumbSetInterface(connector);
     else if (renderMode == SRM_RENDER_MODE_CPU)
@@ -486,7 +490,9 @@ void *srmConnectorRenderThread(void *conn)
             if (connector->repaintRequested)
             {
                     connector->repaintRequested = 0;
+                    connector->internalState |= SRM_CONNECTOR_INTERNAL_STATE_PAINTING;
                     connector->renderInterface.render(connector);
+                    connector->internalState &= ~SRM_CONNECTOR_INTERNAL_STATE_PAINTING;
                     connector->renderInterface.flipPage(connector);
                     pthread_mutex_unlock(&connector->stateMutex);
                     continue;
@@ -702,3 +708,44 @@ void srmConnectorInitGamma(SRMConnector *connector)
                  connector->id);
     }
 }
+
+#include <sys/ioctl.h>
+
+/*
+void srmConnectorFreeScanoutBuffer(SRMConnector *connector, Int8 index)
+{
+    if (!connector->scanoutBuffer[index].buffer)
+        return;
+
+    if (connector->scanoutBuffer[index].tmpDRMFB)
+    {
+        drmModeRmFB(connector->device->fd, connector->scanoutBuffer[index].tmpDRMFB);
+        connector->scanoutBuffer[index].tmpDRMFB = 0;
+    }
+
+    if (connector->scanoutBuffer[index].tmpBO)
+    {
+        gbm_bo_destroy(connector->scanoutBuffer[index].tmpBO);
+        connector->scanoutBuffer[index].tmpBO = NULL;
+    }
+
+    if (connector->scanoutBuffer[index].tmpEGLImage != EGL_NO_IMAGE)
+    {
+        eglDestroyImage(connector->device->eglDevice, connector->scanoutBuffer[index].tmpEGLImage);
+        connector->scanoutBuffer[index].tmpEGLImage = EGL_NO_IMAGE;
+    }
+
+    UInt8 destroyed = 0;
+    pthread_mutex_lock(&connector->scanoutBuffer[index].buffer->mutex);
+    connector->scanoutBuffer[index].buffer->scanoutCounter--;
+    destroyed = connector->scanoutBuffer[index].buffer->destroyed;
+    pthread_mutex_unlock(&connector->scanoutBuffer[index].buffer->mutex);
+
+    if (destroyed)
+    {
+        SRMFatal("HI");
+        srmBufferDestroy(connector->scanoutBuffer[index].buffer);
+    }
+
+    connector->scanoutBuffer[index].buffer = NULL;
+}*/

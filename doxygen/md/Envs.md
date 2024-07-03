@@ -18,18 +18,12 @@ Nvidia cards often work out of the box with nouveau, but this isn't always the c
 Use the Atomic DRM API if available.
 * **SRM_NVIDIA_CURSOR**=0<br>
 Disable cursor planes for nvidia_drm only, which often cause FPS drops when updated.
-* **SRM_FORCE_GL_ALLOCATION**=1<br>
-Use OpenGL for buffer allocation instead of GBM, which may not always work.
-* **SRM_RENDER_MODE_DUMB_FB_COUNT**=3<br>
-Enable triple buffering in multi-GPU setups.
 
 ## DRM API
 
 SRM defaults to using the Atomic DRM API for all devices (when avaliable), which may occasionally result in delayed hardware cursor updates. To enforce the use of the legacy API for all devices, simply set the following variable to 1.
 
 **SRM_FORCE_LEGACY_API**=1
-
-Note: Disabling vsync for the atomic API is supported only starting from Linux version 6.8.
 
 ## Device Blacklisting
 
@@ -39,34 +33,28 @@ To disable specific DRM devices, list the devices separated by ":", for example:
 
 ## Allocator Device
 
-SRM attempts to automatically select the most suitable device for buffer allocation. However, certain drivers may incorrectly report capabilities or lack certain functionalities, leading to allocation failures or the creation of black, empty textures.
-
-To override the default allocator, employ:
+By default, SRM automatically selects the integrated GPU for buffer allocation. To override the default allocator, use:
 
 **SRM_ALLOCATOR_DEVICE**=/dev/dri/card[N]
 
 ## Main Memory Buffers
 
-By default, SRM uses GBM for buffer allocation from main memory, resorting to OpenGL buffer allocation if GBM fails. Nonetheless, some drivers may erroneously report successful GBM buffer allocation when it actually fails. To enforce the use of OpenGL buffer allocation, employ:
+SRM uses GBM for buffer allocation from main memory, resorting to OpenGL if GBM fails. To enforce the use of OpenGL employ:
 
 **SRM_FORCE_GL_ALLOCATION**=1
 
 ## Render Buffering
 
-You can customize the framebuffer count for both "ITSELF" and "DUMB" render modes using the following environment variables:
+All connectors use double buffering by default. You can customize the number of framebuffers used for each rendering mode using the following environment variables:
 
 **SRM_RENDER_MODE_ITSELF_FB_COUNT**=N
 
+**SRM_RENDER_MODE_PRIME_FB_COUNT**=N
+
 **SRM_RENDER_MODE_DUMB_FB_COUNT**=N
 
-Where N can be 1 = Single, 2 = Double or 3 = Triple buffering.
+**SRM_RENDER_MODE_CPU_FB_COUNT**=N
 
-Please note that the "CPU" mode always uses single buffering, and this setting cannot be changed.
+Where N can be 2 = Double or 3 = Triple buffering.
 
-By default, the framebuffer count for each render mode is as follows:
-
-* **ITSELF**: 2
-* **DUMB**: 2
-* **CPU**: 1
-
-Remember to adjust the values accordingly based on your specific requirements and hardware capabilities.
+> Using triple buffering can offer a smoother experience by allowing a new frame to be rendered while a page flip is pending, however, it does require more resources.

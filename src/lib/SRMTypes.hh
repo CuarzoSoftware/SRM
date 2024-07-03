@@ -213,14 +213,21 @@ typedef struct SRMBoxStruct
 
 /**
  * @ingroup SRMDevice
- * @brief Enumeration of devices rendering modes.
+ * @brief Rendering mode supported by an SRM device, listed from best to worst.
  */
 typedef enum SRM_RENDER_MODE_ENUM
 {
-    SRM_RENDER_MODE_ITSELF = 0, ///< The device is in "ITSELF" rendering mode.
-    SRM_RENDER_MODE_DUMB = 1,   ///< The device is in "DUMB" rendering mode.
-    SRM_RENDER_MODE_CPU = 2,    ///< The device is in "CPU" rendering mode.
-    SRM_RENDER_MODE_NONE = 3    ///< No rendering mode is defined.
+    /// The GPU can directly render into its own connectors (zero CPU involvement).
+    SRM_RENDER_MODE_ITSELF = 0,
+
+    /// Another GPU renders into a PRIME buffer, which is then imported and directly scanned out or blitted into a scannable buffer (zero CPU involvement).
+    SRM_RENDER_MODE_PRIME = 1,
+
+    /// Another GPU renders into an offscreen buffer, which is then copied into a DUMB buffer (GPU to CPU copy).
+    SRM_RENDER_MODE_DUMB = 2,
+
+    /// Another GPU renders into an offscreen buffer, which is then copied into main memory. A renderable texture is created from the pixels and blitted into a scannable buffer (GPU to CPU + CPU to GPU copy).
+    SRM_RENDER_MODE_CPU = 3,
 } SRM_RENDER_MODE;
 
 /**

@@ -93,7 +93,18 @@ UInt8 srmCoreEnumerateDevices(SRMCore *core)
         path = udev_list_entry_get_name(dev_list_entry);
         dev = udev_device_new_from_syspath(core->udev, path);
 
-        SRMDevice *device = srmDeviceCreate(core, udev_device_get_devnode(dev));
+        UInt8 isBootVGA = 0;
+
+        struct udev_device *pci = udev_device_get_parent_with_subsystem_devtype(dev, "pci", NULL);
+
+        if (pci)
+        {
+            const char *boot_vga = udev_device_get_sysattr_value(pci, "boot_vga");
+            if (boot_vga && strcmp(boot_vga, "1") == 0)
+                isBootVGA = 1;
+        }
+
+        SRMDevice *device = srmDeviceCreate(core, udev_device_get_devnode(dev), isBootVGA);
 
         if (device)
             device->coreLink = srmListAppendData(core->devices, device);
@@ -199,8 +210,7 @@ UInt32 dmaFormatsHaveInCommon(SRMList *formatsA, SRMList *formatsB)
 SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
 {
     SRMDevice *bestAllocatorDev = NULL;
-    int bestScore = 0;
-
+    SRMDevice *primaryGPU = NULL;
     const char *preferredDevice = getenv("SRM_ALLOCATOR_DEVICE");
 
     SRMListForeach(item1, core->devices)
@@ -210,40 +220,18 @@ SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core)
         if (!srmDeviceIsEnabled(allocDev))
             continue;
 
-        int currentScore = 10;
-
         if (preferredDevice)
             if (strcmp(preferredDevice, allocDev->name) == 0)
                 return allocDev;
 
-        if (allocDev->driver == SRM_DEVICE_DRIVER_i915)
-            currentScore += 1000;
-        else if (allocDev->driver == SRM_DEVICE_DRIVER_nouveau)
-            currentScore -= 5;
-        else if (allocDev->driver == SRM_DEVICE_DRIVER_nvidia)
-            currentScore -= 5;
+        if (allocDev->isBootVGA)
+            primaryGPU = allocDev;
 
-        if (!core->forceGlesCPUBufferAllocation)
-        {
-            if (srmFormatIsInList(allocDev->dmaRenderFormats, DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR))
-                currentScore += 50;
-
-            if (srmFormatIsInList(allocDev->dmaRenderFormats, DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR))
-                currentScore += 50;
-
-            if (srmFormatIsInList(allocDev->dmaRenderFormats, DRM_FORMAT_BGRA8888, DRM_FORMAT_MOD_LINEAR))
-                currentScore += 25;
-
-            if (srmFormatIsInList(allocDev->dmaRenderFormats, DRM_FORMAT_BGRX8888, DRM_FORMAT_MOD_LINEAR))
-                currentScore += 25;
-        }
-
-        if (currentScore > bestScore)
-        {
-            bestScore = currentScore;
-            bestAllocatorDev = allocDev;
-        }
+        bestAllocatorDev = allocDev;
     }
+
+    if (primaryGPU)
+        return primaryGPU;
 
     return bestAllocatorDev;
 }
@@ -254,6 +242,145 @@ void srmCoreAssignRendererDevices(SRMCore *core)
     {
         SRMDevice *dev = srmListItemGetData(item);
         dev->rendererDevice = core->allocatorDevice;
+    }
+}
+
+UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
+{
+    if (gbm_bo_get_modifier(renderer->gbmSurfaceTestBo) != DRM_FORMAT_MOD_LINEAR)
+        return 0;
+
+    SRMBufferDMAData dma;
+    dma.format = gbm_bo_get_format(renderer->gbmSurfaceTestBo);
+    dma.width = 64;
+    dma.height = 64;
+    dma.num_fds = 1;
+    dma.modifiers[0] = gbm_bo_get_modifier(renderer->gbmSurfaceTestBo);
+    dma.fds[0] = gbm_bo_get_fd(renderer->gbmSurfaceTestBo);
+    dma.strides[0] = gbm_bo_get_stride_for_plane(renderer->gbmSurfaceTestBo, 0);
+    dma.offsets[0] = gbm_bo_get_offset(renderer->gbmSurfaceTestBo, 0);
+
+    gbm_surface_release_buffer(renderer->gbmSurfaceTest, renderer->gbmSurfaceTestBo);
+
+    SRMBuffer *primeBuffer = srmBufferCreateFromDMA(
+        target->core,
+        target,
+        &dma);
+
+    if (!primeBuffer)
+        return 0;
+
+    UInt32 stride = 64 * 4;
+    UInt8 *targetPixels = malloc(64 * stride);
+    UInt8 *rendererPixels = malloc(64 * stride);
+
+    eglMakeCurrent(
+        renderer->eglDisplay,
+        renderer->eglSurfaceTest,
+        renderer->eglSurfaceTest,
+        renderer->eglSharedContext);
+
+    eglSwapBuffers(renderer->eglDisplay, renderer->eglSurfaceTest);
+    gbm_surface_lock_front_buffer(renderer->gbmSurfaceTest);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glScissor(0, 0, 32, 32);
+    glViewport(0, 0, 32, 32);
+    glClearColor(1.f, 0.f, 0.f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glScissor(32, 0, 32, 32);
+    glViewport(32, 0, 32, 32);
+    glClearColor(0.f, 1.f, 0.f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glScissor(0, 32, 32, 32);
+    glViewport(0, 32, 32, 32);
+    glClearColor(0.f, 0.f, 1.f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glScissor(32, 32, 32, 32);
+    glViewport(32, 32, 32, 32);
+    glClearColor(1.f, 1.f, 1.f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glFinish();
+    glReadPixels(0, 0, 64, 64, GL_RGBA, GL_UNSIGNED_BYTE, rendererPixels);
+
+    eglMakeCurrent(
+        target->eglDisplay,
+        target->eglSurfaceTest,
+        target->eglSurfaceTest,
+        target->eglSharedContext);
+
+    GLuint textureId = srmBufferGetTextureID(target, primeBuffer);
+
+    if (textureId == 0)
+    {
+        free(rendererPixels);
+        free(targetPixels);
+        srmBufferDestroy(primeBuffer);
+        return 0;
+    }
+
+    glUseProgram(target->programTest);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDisable(GL_BLEND);
+    glEnable(GL_SCISSOR_TEST);
+    glDisable(GL_DEPTH_BUFFER_BIT);
+    glScissor(0, 0, 64, 64);
+    glViewport(0, 0, 64, 64);
+    glUniform1i(target->textureUniformTest, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textureId);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glFinish();
+    glReadPixels(0, 0, 64, 64, GL_RGBA, GL_UNSIGNED_BYTE, targetPixels);
+
+    UInt8 ok = 1;
+
+    for (UInt32 i = 0; i < 64 * 64 * 4; i++)
+    {
+        if (rendererPixels[i] != targetPixels[i])
+        {
+            ok = 0;
+            break;
+        }
+    }
+
+    free(rendererPixels);
+    free(targetPixels);
+    srmBufferDestroy(primeBuffer);
+    SRMDebug("[core] PRIME import support from %s to %s: %s.", renderer->name, target->name, ok ? "YES" : "NO");
+    return ok;
+}
+
+void srmCoreAssignRenderingModes(SRMCore *core)
+{
+    SRMListForeach(item, core->devices)
+    {
+        SRMDevice *dev = srmListItemGetData(item);
+
+        if (dev == dev->rendererDevice)
+        {
+            dev->renderMode = SRM_RENDER_MODE_ITSELF;
+            continue;
+        }
+
+        if (dev->capPrimeImport && dev->rendererDevice->capPrimeExport && srmCoreCheckPRIME(dev, dev->rendererDevice))
+        {
+            dev->renderMode = SRM_RENDER_MODE_PRIME;
+            continue;
+        }
+
+        if (dev->capDumbBuffer)
+        {
+            dev->renderMode = SRM_RENDER_MODE_DUMB;
+            continue;
+        }
+
+        dev->renderMode = SRM_RENDER_MODE_CPU;
     }
 }
 
@@ -275,6 +402,7 @@ UInt8 srmCoreUpdateBestConfiguration(SRMCore *core)
     core->allocatorDevice = bestAllocatorDevice;
     srmCoreAssignRendererDevices(core);
     srmCoreUpdateSharedDMATextureFormats(core);
+    srmCoreAssignRenderingModes(core);
     return 1;
 }
 

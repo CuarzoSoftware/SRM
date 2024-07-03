@@ -1,4 +1,5 @@
 #include <GL/gl.h>
+#include <assert.h>
 #include <private/SRMBufferPrivate.h>
 #include <private/SRMCorePrivate.h>
 #include <private/SRMDevicePrivate.h>
@@ -105,12 +106,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     UInt8 supportLinear = 0;
 
-    /* Seems like Nouveau or Nvidia + GBM = black textures even if no errors are reported.
-     * Fallback to glTexImage2D instead. */
-    if (buffer->allocator->glExtensions.OES_EGL_image &&
-        !core->forceGlesCPUBufferAllocation &&
-        buffer->allocator->driver != SRM_DEVICE_DRIVER_nouveau &&
-        buffer->allocator->driver != SRM_DEVICE_DRIVER_nvidia)
+    if (buffer->allocator->cpuBufferWriteMode != SRM_BUFFER_WRITE_MODE_GLES && buffer->allocator->glExtensions.OES_EGL_image)
     {
         SRMListForeach(fmtIt, buffer->allocator->dmaRenderFormats)
         {
@@ -136,31 +132,10 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     if (!supportLinear)
         goto glesOnly;
 
-    buffer->bo = gbm_bo_create_with_modifiers(buffer->allocator->gbm,
-                                              width,
-                                              height,
-                                              format,
-                                              &buffer->modifiers[0],
-                                              1);
-    if (!buffer->bo)
-    {
-        SRMWarning("[SRMBuffer] gbm_bo_create_with_modifiers failed.");
-        buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_SCANOUT;
-        buffer->bo = gbm_bo_create(buffer->allocator->gbm, width, height, format, buffer->flags);
-    }
+    buffer->bo = srmBufferCreateLinearBO(buffer->allocator->gbm, width, height, format);
 
     if (!buffer->bo)
-    {
-        SRMWarning("[SRMBuffer] GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_SCANOUT failed.");
-        buffer->flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR;
-        buffer->bo = gbm_bo_create(buffer->allocator->gbm, width, height, format, buffer->flags);
-    }
-
-    if (!buffer->bo)
-    {
-        SRMWarning("[%s] Failed to create buffer from CPU with GBM. Trying glTexImage2D instead.", buffer->allocator->name);
         goto glesOnly;
-    }
 
     buffer->bpp = gbm_bo_get_bpp(buffer->bo);
 
@@ -173,66 +148,62 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     buffer->modifiers[0] = gbm_bo_get_modifier(buffer->bo);
     buffer->strides[0] = gbm_bo_get_stride(buffer->bo);
     buffer->pixelSize = buffer->bpp/8;
-    buffer->fds[0] = srmBufferGetDMAFDFromBO(buffer->allocator, buffer->bo);
 
-    if (buffer->fds[0] >= 0)
+    if (buffer->allocator->cpuBufferWriteMode == SRM_BUFFER_WRITE_MODE_PRIME)
     {
-        // Map the DMA buffer into user space
-        buffer->map = mmap(NULL, height * buffer->strides[0], PROT_READ | PROT_WRITE, MAP_SHARED, buffer->fds[0], 0);
+        buffer->fds[0] = srmBufferGetDMAFDFromBO(buffer->allocator, buffer->bo);
 
-        if (buffer->map == MAP_FAILED)
+        if (buffer->fds[0] >= 0)
         {
-            buffer->map = mmap(NULL, height * buffer->strides[0], PROT_WRITE, MAP_SHARED, buffer->fds[0], 0);
+            const size_t len = height * buffer->strides[0];
+            buffer->map = srmBufferMapFD(buffer->fds[0], len, &buffer->caps);
 
-            if (buffer->map == MAP_FAILED)
+            if (buffer->map)
             {
-                buffer->map = NULL;
-                SRMWarning("[%s] Directly mapping buffer DMA fd failed. Trying gbm_bo_map.", buffer->allocator->name);
-                goto gbmMap;
+                buffer->writeMode = SRM_BUFFER_WRITE_MODE_PRIME;
+                goto mapWrite;
             }
         }
-        goto mapWrite;
     }
 
-    gbmWrite:
+    /* Test if gbm_bo_map works */
 
-    if (pixels && gbm_bo_write(buffer->bo, pixels, width * stride * buffer->pixelSize) != 0)
-    {
-        SRMWarning("[%s] gbm_bo_write failed. Trying glTexImage2D instead.", buffer->allocator->name);
-        goto glesOnly;
-    }
-
-    buffer->caps |= SRM_BUFFER_CAP_WRITE;
-    SRMDebug("[%s] CPU buffer created using gbm_bo_write.", buffer->allocator->name);
-    pthread_mutex_unlock(&buffer->mutex);
-    return buffer;
-
-    gbmMap:
-
-    buffer->map = gbm_bo_map(buffer->bo, 0, 0, width, height, GBM_BO_TRANSFER_READ, &buffer->strides[0], &buffer->mapData);
+    UInt32 testStride;
+    buffer->map = gbm_bo_map(buffer->bo, 0, 0, width, height, GBM_BO_TRANSFER_READ_WRITE, &testStride, &buffer->mapData);
 
     if (!buffer->map)
     {
         buffer->mapData = NULL;
-        SRMWarning("[%s] Failed to map DMA FD. Tying gbm_bo_write instead.", buffer->allocator->name);
-        goto gbmWrite;
+        buffer->map = gbm_bo_map(buffer->bo, 0, 0, width, height, GBM_BO_TRANSFER_WRITE, &testStride, &buffer->mapData);
+
+        if (!buffer->map)
+        {
+            buffer->mapData = NULL;
+            buffer->map = NULL;
+            goto glesOnly;
+        }
+
+        buffer->caps |= SRM_BUFFER_CAP_WRITE;
     }
+    else
+        buffer->caps |= SRM_BUFFER_CAP_READ | SRM_BUFFER_CAP_WRITE;
+
+    gbm_bo_unmap(buffer->bo, buffer->mapData);
+    buffer->map = NULL;
+    buffer->mapData = NULL;
+    buffer->writeMode = SRM_BUFFER_WRITE_MODE_GBM;
 
     mapWrite:
 
     buffer->offsets[0] = gbm_bo_get_offset(buffer->bo, 0);
-
-    buffer->caps |= SRM_BUFFER_CAP_READ | SRM_BUFFER_CAP_WRITE | SRM_BUFFER_CAP_MAP;
-
+    buffer->caps |= SRM_BUFFER_CAP_MAP;
     pthread_mutex_unlock(&buffer->mutex);
     srmBufferWrite(buffer, stride, 0, 0, width, height, pixels);
-
     return buffer;
 
     glesOnly:
 
-    /* In this case the texture is only avaliable for 1 GPU */
-
+    buffer->writeMode = SRM_BUFFER_WRITE_MODE_GLES;
     glFmt = srmFormatDRMToGL(format);
 
     if (!glFmt)
@@ -287,7 +258,6 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
     srmListAppendData(buffer->textures, texture);
 
     if (pixels)
@@ -317,21 +287,20 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
                      NULL);
     }
 
-    SRMDebug("[%s] CPU buffer created using glTexImage2D.", buffer->allocator->name);
-
     glFlush();
-
     eglMakeCurrent(prevDisplay,
                    prevSurfDraw,
                    prevSurfRead,
                    prevContext);
+
+    /* TODO: Add read cap */
 
     buffer->caps |= SRM_BUFFER_CAP_WRITE;
 
     pthread_mutex_unlock(&buffer->mutex);
     return buffer;
 
-    fail:
+fail:
     SRMError("[%s] Failed to create CPU buffer.", buffer->allocator->name);
     pthread_mutex_unlock(&buffer->mutex);
     srmBufferDestroy(buffer);
@@ -548,12 +517,7 @@ void srmBufferDestroy(SRMBuffer *buffer)
     if (buffer->bo)
     {
         if (buffer->map)
-        {
-            if (buffer->mapData)
-                gbm_bo_unmap(buffer->bo, buffer->mapData);
-            else
-                munmap(buffer->map, buffer->height * buffer->strides[0]);
-        }
+            munmap(buffer->map, buffer->height * buffer->strides[0]);
 
         // Do not destroy the user's bo
         if (buffer->src != SRM_BUFFER_SRC_GBM)
@@ -579,8 +543,10 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         return 0;
     }
 
-    if (buffer->map)
+    if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_PRIME)
     {
+        assert(buffer->map != NULL);
+
         const UInt8 *src = pixels;
         UInt8 *dst = buffer->map;
         dst = &dst[buffer->offsets[0] + dstY*buffer->strides[0] + dstX*buffer->pixelSize];
@@ -613,7 +579,49 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         pthread_mutex_unlock(&buffer->mutex);
         return 1;
     }
-    else
+    else if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_GBM)
+    {
+        assert(buffer->bo != NULL);
+
+        UInt32 mapStride;
+        void *mapData = NULL;
+
+        pthread_mutex_lock(&buffer->mutex);
+
+        UInt8 *dst = gbm_bo_map(buffer->bo, dstX, dstY, dstWidth, dstHeight, GBM_BO_TRANSFER_WRITE, &mapStride, &mapData);
+
+        if (dst == NULL)
+        {
+            pthread_mutex_unlock(&buffer->mutex);
+            return 0;
+        }
+
+        const UInt8 *src = pixels;
+
+        if (dstX == 0 && dstWidth == buffer->width && stride == mapStride)
+        {
+            memcpy(dst,
+                   src,
+                   stride * dstHeight);
+        }
+        else
+        {
+            for (UInt32 i = 0; i < dstHeight; i++)
+            {
+                memcpy(dst,
+                       src,
+                       buffer->pixelSize * dstWidth);
+
+                dst += mapStride;
+                src += stride;
+            }
+        }
+
+        gbm_bo_unmap(buffer->bo, mapData);
+        pthread_mutex_unlock(&buffer->mutex);
+        return 1;
+    }
+    else if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_GLES)
     {
         glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(buffer->allocator, buffer));
         glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / buffer->pixelSize);

@@ -1,3 +1,25 @@
+SRM (0.6.1-1)
+
+  # Performance
+
+  * Added new PRIME rendering mode to enhance performance in multi-GPU setups with few common DMA formats/modifiers.
+  * Integrated GPUs are now set as the default allocator device (primary device), promoting lower power consumption and improved performance.
+
+  # Bug Fixes
+
+  * Added small validation tests to ensure proper selection of main-memory buffer allocation APIs, preventing texture glitches on drivers that do not fully support GBM APIs.
+
+  # Environment
+
+  * All rendering modes now default to double buffering, with optional support for triple buffering, while the single buffering option has been deprecated.
+
+  # Examples
+
+  * Added link to example that uses Skia as renderer.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sat, 06 Jul 2024 23:28:04 -0400
+
+
 SRM (0.6.0-1)
 
   # New APIs

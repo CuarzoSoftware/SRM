@@ -1,6 +1,7 @@
 #include <SRMFormat.h>
 #include <SRMList.h>
 
+#include <GL/gl.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #include <stdlib.h>

@@ -15,7 +15,7 @@ extern "C" {
  * @brief Representation of an open DRM device, typically a GPU.
  *
  * An @ref SRMDevice represents a DRM device, typically a GPU, which can contain multiple connectors
- * and a specific rendering mode (**ITSELF**, **DUMB** or **CPU**).
+ * and a specific rendering mode (**ITSELF**, **PRIME**, **DUMB** or **CPU**).
  *
  * @{
  */
@@ -179,8 +179,7 @@ UInt8 srmDeviceIsRenderer(SRMDevice *device);
 /**
  * @brief Get the device that performs rendering for this device.
  *
- * If the rendering device is equal to this device, then this device's rendering mode is **ITSELF**.
- * Otherwise, this device's rendering mode could be **DUMB** or **CPU**, depending on whether it can create DUMB buffers.
+ * The rendering device is equal to this device only when the **ITSELF** rendering mode is used.
  *
  * @param device A pointer to the @ref SRMDevice instance.
  *
@@ -191,8 +190,7 @@ SRMDevice *srmDeviceGetRendererDevice(SRMDevice *device);
 /**
  * @brief Get the rendering mode of the device.
  *
- * If the rendering device is equal to this device, then this device's rendering mode is **ITSELF**.
- * Otherwise, this device's rendering mode could be **DUMB** or **CPU**, depending on whether it can create DUMB buffers.
+ * If the rendering device is equal to this device, then the rendering mode is **ITSELF**.
  *
  * @param device A pointer to the @ref SRMDevice instance.
  *

@@ -18,30 +18,9 @@ extern "C" {
  *
  * @warning You must create a single @ref SRMCore instance per process, creating more than one could lead to undefined behavior.
  *
- * ### Automatic Configuration
- *
- * Here are the steps in which SRM internally finds the best configuration:
- *
- * @li Obtains the resources and capabilities of each GPU.
- * @li Determines which GPU will be used as an allocator, giving priority to allowing as many GPUs as possible to access textures through DMA.
- * @li Identifies which GPUs are capable of rendering (the ones that can import textures from the allocator GPU).
- * @li If a GPU cannot import textures from the allocator, another GPU is assigned to render for it.
- * @li In that case, to display the rendered buffer from the renderer GPU on the connector of the non renderer GPU, SRM prioritizes the use of DUMB BUFFERS and, as a last resort, CPU copying (all this is handled internally by SRM).
- * @li When initiating a connector, SRM searches for the best possible combination of ENCODER, CRTC, and PRIMARY PLANE.
- * @li SRM also looks for a CURSOR PLANE, which, if available, can assign its pixels and position using the srmConnectorSetCursor() and srmConnectorSetCursorPos() functions.
- * @li If no CURSOR PLANE is found because they are all being used by other connectors, the CURSOR PLANE will be automatically added to the connector that needs it once one of those connectors is uninitialized.
- *
- * ### Connectors Render Modes
- *
- * These are the possible connectors rendering modes form best to worst case:
- *
- * @li **ITSELF** : The connector's GPU can directly render into it.
- * @li **DUMB** : The connector' GPU creates dumb buffers and DMA map or `glReadPixels()` is used to copy the buffers rendered by another GPU.
- * @li **CPU** : Renderer GPU > CPU (DMA map or glReadPixels) > connector GPU (`glTexImage2D()`) > render.
- *
  * ### Framebuffer damage
  *
- * **DUMB** and **CPU** modes can greatly benefit from receiving information about the changes occurring in the buffer within a frame, commonly known as "damage." By providing this damage information, we can optimize the performance of these modes.
+ * **PRIME**, **DUMB** and **CPU** modes can greatly benefit from receiving information about the changes occurring in the buffer within a frame, commonly known as "damage." By providing this damage information, we can optimize the performance of these modes.
  * To define the generated damage, after rendering within a `paintGL()` event, you can add an array of rectangles (@ref SRMRect) with the damage area using the srmConnectorSetBufferDamage() function. 
  * It is important to ensure that the coordinates of these rectangles originate from the top-left corner of the framebuffer and do not extend beyond its boundaries to avoid segmentation errors.
  * The **ITSELF** mode does not benefit from buffer damages, and therefore, calling the function in that case is a no-op. To determine if a connector supports buffer damages, use the srmConnectorHasBufferDamageSupport() function.

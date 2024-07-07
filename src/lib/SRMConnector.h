@@ -133,7 +133,7 @@ SRMDevice *srmConnectorGetDevice(SRMConnector *connector);
  * This function returns the device responsible for rendering operations for the connector.
  *
  * When the **ITSELF** rendering mode is used, this device is the same as the one obtained with srmConnectorGetDevice().
- * However, in the **DUMB** or **CPU** modes, it differs.
+ * However, in the **PRIME**, **DUMB** or **CPU** modes, it differs.
  *
  * @param connector Pointer to the @ref SRMConnector for which you want to obtain the renderer device.
  * @return Pointer to the @ref SRMDevice responsible for rendering operations for the connector.
@@ -513,9 +513,9 @@ UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector);
  * @brief Returns the number of framebuffers.
  *
  * This function returns the number of framebuffers available for the given @ref SRMConnector. 
- * The count may be 1, 2, or 3, depending on the configuration (e.g., single, double or triple buffering).
+ * The count may be 2 or 3, depending on the configuration (double or triple buffering).
  *
- * The number of framebuffers can be modified by setting the **SRM_RENDER_MODE_{ITSELF, DUMB, CPU}_FB_COUNT** environment variables.
+ * The number of framebuffers can be modified by setting the **SRM_RENDER_MODE_{ITSELF, PRIME, DUMB, CPU}_FB_COUNT** environment variables.
  *
  * @param connector Pointer to the @ref SRMConnector to query for the number of framebuffers.
  * @return The number of framebuffers.

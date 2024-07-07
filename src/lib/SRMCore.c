@@ -36,11 +36,6 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
     core->interfaceUserData = userData;
     core->isSuspended = 0;
 
-    char *forceGlesAllocation = getenv("SRM_FORCE_GL_ALLOCATION");
-
-    if (forceGlesAllocation && atoi(forceGlesAllocation) == 1)
-        core->forceGlesCPUBufferAllocation = 1;
-
     // REF -
     if (!srmCoreUpdateEGLExtensions(core))
         goto fail;

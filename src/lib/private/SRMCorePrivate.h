@@ -34,7 +34,6 @@ struct SRMCoreStruct
     void *interfaceUserData;
 
     UInt8 isSuspended;
-    UInt8 forceGlesCPUBufferAllocation;
     struct udev *udev;
     struct udev_monitor *monitor;
     struct pollfd monitorFd;
@@ -76,6 +75,7 @@ UInt8 srmCoreEnumerateDevices(SRMCore *core);
 UInt8 srmCoreInitMonitor(SRMCore *core);
 SRMDevice *srmCoreFindBestAllocatorDevice(SRMCore *core);
 void srmCoreAssignRendererDevices(SRMCore *core);
+void srmCoreAssignRenderingModes(SRMCore *core);
 UInt8 srmCoreUpdateBestConfiguration(SRMCore *core);
 
 /* Intersects the compatible DMA formats of the allocator GPU

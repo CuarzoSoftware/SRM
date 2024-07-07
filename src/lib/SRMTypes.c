@@ -9,6 +9,7 @@ const char *srmGetRenderModeString(SRM_RENDER_MODE mode)
     switch (mode)
     {
         case SRM_RENDER_MODE_ITSELF:    return "ITSELF";
+        case SRM_RENDER_MODE_PRIME:     return "PRIME";
         case SRM_RENDER_MODE_DUMB:      return "DUMB";
         case SRM_RENDER_MODE_CPU:       return "CPU";
         default:                        return "UNKNOWN RENDER MODE";

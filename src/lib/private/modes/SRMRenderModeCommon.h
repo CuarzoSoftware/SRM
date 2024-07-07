@@ -4,6 +4,7 @@
 #include <EGL/egl.h>
 #include <xf86drmMode.h>
 #include <SRMTypes.h>
+#include <gbm.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,6 +36,8 @@ void srmRenderModeCommonUninitialize(SRMConnector *connector);
 Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb);
 void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb);
 void srmRenderModeCommonWaitPageFlip(SRMConnector *connector, Int32 iterLimit);
+void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector);
+void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struct gbm_surface **surface);
 
 #ifdef __cplusplus
 }

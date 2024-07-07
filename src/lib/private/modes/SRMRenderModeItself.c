@@ -62,21 +62,7 @@ static UInt8 createData(SRMConnector *connector)
     data->connectorEGLContext = EGL_NO_CONTEXT;
     data->connectorEGLSurface = EGL_NO_SURFACE;
 
-    connector->currentFormat.format = 0;
-
-    // TODO: check if match visual ID
-    if (srmFormatListFirstMatchFormat(connector->currentPrimaryPlane->inFormats, DRM_FORMAT_XRGB8888))
-        connector->currentFormat.format = DRM_FORMAT_XRGB8888;
-    else if (srmFormatListFirstMatchFormat(connector->currentPrimaryPlane->inFormats, DRM_FORMAT_XBGR8888))
-        connector->currentFormat.format = DRM_FORMAT_XBGR8888;
-    else
-    {
-        SRMError("Failed to initialize device %s connector %d. XRGB8888 and XBGR8888 not avaliable (ITSELF MODE).",
-                 connector->device->name,
-                 connector->id);
-        return 0;
-    }
-
+    srmRenderModeCommonSearchNonLinearModifier(connector);
     return 1;
 }
 
@@ -99,12 +85,7 @@ static UInt8 createGBMSurfaces(SRMConnector *connector)
         return 1;
     }
 
-    data->connectorGBMSurface = gbm_surface_create(
-        connector->device->gbm,
-        connector->currentMode->info.hdisplay,
-        connector->currentMode->info.vdisplay,
-        connector->currentFormat.format,
-        GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+    srmRenderModeCommonCreateConnectorGBMSurface(connector, &data->connectorGBMSurface);
 
     if (!data->connectorGBMSurface)
     {
@@ -160,7 +141,6 @@ static UInt8 createEGLContext(SRMConnector *connector)
 
     data->connectorEGLContext = eglCreateContext(connector->device->eglDisplay,
                                                  data->connectorEGLConfig,
-                                                 // It is EGL_NO_CONTEXT if no context was previously created in this device
                                                  connector->device->eglSharedContext,
                                                  connector->device->eglSharedContextAttribs);
 
@@ -179,10 +159,6 @@ static UInt8 createEGLContext(SRMConnector *connector)
         SRMDebug("[%s] Using %s priority EGL context.", srmConnectorGetName(connector), priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
     }
 
-    // Store it if is the first context created for this device, so that later on shared context can be created
-    if (connector->device->eglSharedContext == EGL_NO_CONTEXT)
-        connector->device->eglSharedContext = data->connectorEGLContext;
-
     return 1;
 }
 
@@ -192,9 +168,7 @@ static void destroyEGLContext(SRMConnector *connector)
 
     if (data->connectorEGLContext != EGL_NO_CONTEXT)
     {
-        if (data->connectorEGLContext != connector->device->eglSharedContext)
-            eglDestroyContext(connector->device->eglDisplay, data->connectorEGLContext);
-
+        eglDestroyContext(connector->device->eglDisplay, data->connectorEGLContext);
         data->connectorEGLContext = EGL_NO_CONTEXT;
     }
 }
@@ -239,7 +213,7 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
     {
         Int32 c = atoi(env);
 
-        if (c > 0 && c < 4)
+        if (c > 1 && c < 4)
             fbCount = c;
     }
 
@@ -325,6 +299,35 @@ static UInt8 createDRMFramebuffers(SRMConnector *connector)
 
     for (UInt32 i = 0; i < data->buffersCount; i++)
     {
+        if (connector->currentFormat.modifier != DRM_FORMAT_MOD_LINEAR)
+        {
+            UInt32 boHandles[4] = { 0 };
+            boHandles[0] = gbm_bo_get_handle_for_plane(data->connectorBOs[i], 0).u32;
+
+            UInt32 pitches[4] = { 0 };
+            pitches[0] = gbm_bo_get_stride_for_plane(data->connectorBOs[i], 0);
+
+            UInt32 offsets[4] = { 0 };
+            offsets[0] = gbm_bo_get_offset(data->connectorBOs[i], 0);
+
+            UInt64 mods[4] = { 0 };
+            mods[0] = connector->currentFormat.modifier;
+
+            ret = drmModeAddFB2WithModifiers(connector->device->fd,
+                               connector->currentMode->info.hdisplay,
+                               connector->currentMode->info.vdisplay,
+                               connector->currentFormat.format,
+                               boHandles,
+                               pitches,
+                               offsets,
+                               mods,
+                               &data->connectorDRMFramebuffers[i],
+                               DRM_MODE_FB_MODIFIERS);
+
+            if (ret == 0)
+                goto skipLegacy;
+        }
+
         ret = drmModeAddFB(connector->device->fd,
                            connector->currentMode->info.hdisplay,
                            connector->currentMode->info.vdisplay,
@@ -342,6 +345,8 @@ static UInt8 createDRMFramebuffers(SRMConnector *connector)
                      connector->id);
             return 0;
         }
+
+        skipLegacy:
 
         data->buffers[i] = srmBufferCreateFromGBM(connector->device->core, data->connectorBOs[i]);
 
@@ -420,6 +425,9 @@ static UInt8 render(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
+    if (connector->pendingPageFlip)
+        srmRenderModeCommonWaitPageFlip(connector, -1);
+
     if (connector->device->eglDisplay != eglGetCurrentDisplay() ||
         data->connectorEGLSurface != eglGetCurrentSurface(EGL_READ) ||
         data->connectorEGLSurface != eglGetCurrentSurface(EGL_DRAW) ||
@@ -442,6 +450,7 @@ static UInt8 render(SRMConnector *connector)
 static UInt8 flipPage(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
+
     swapBuffers(connector, connector->device->eglDisplay, data->connectorEGLSurface);
     gbm_surface_lock_front_buffer(data->connectorGBMSurface);
 
@@ -449,6 +458,7 @@ static UInt8 flipPage(SRMConnector *connector)
 
     data->currentBufferIndex = nextBufferIndex(connector);
     gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
+
     connector->interface->pageFlipped(connector, connector->interfaceData);
     return 1;
 }
@@ -575,6 +585,12 @@ static void resumeRendering(SRMConnector *connector)
     srmRenderModeCommonResumeRendering(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
 }
 
+static EGLContext getEGLContext(SRMConnector *connector)
+{
+    RenderModeData *data = (RenderModeData*)connector->renderData;
+    return data->connectorEGLContext;
+}
+
 void srmRenderModeItselfSetInterface(SRMConnector *connector)
 {
     connector->renderInterface.initialize = &initialize;
@@ -584,6 +600,7 @@ void srmRenderModeItselfSetInterface(SRMConnector *connector)
     connector->renderInterface.getCurrentBufferIndex = &getCurrentBufferIndex;
     connector->renderInterface.getBuffersCount = &getBuffersCount;
     connector->renderInterface.getBuffer = &getBuffer;
+    connector->renderInterface.getEGLContext = &getEGLContext;
     connector->renderInterface.uninitialize = &uninitialize;
     connector->renderInterface.pause = &pauseRendering;
     connector->renderInterface.resume = &resumeRendering;

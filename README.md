@@ -5,7 +5,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="SRM is released under the MIT license." />
   </a>
   <a href="https://github.com/CuarzoSoftware/SRM">
-    <img src="https://img.shields.io/badge/version-0.6.0-brightgreen" alt="Current SRM version." />
+    <img src="https://img.shields.io/badge/version-0.6.1-brightgreen" alt="Current SRM version." />
   </a>
 </p>
 
@@ -13,7 +13,7 @@ SRM is a C library that simplifies the development of Linux DRM/KMS applications
 
 With SRM, you can focus on the OpenGL ES 2.0 logic of your application. For each available display, you can start a rendering thread that triggers common events like **initializeGL()**, **paintGL()**, **resizeGL()**, **pageFlipped()** and **uninitializeGL()**.
 
-SRM allows you to use multiple GPUs simultaneously and automatically finds the most efficient configuration.
+SRM enables simultaneous use of multiple GPUs and ensures textures can be rendered across all screens.
 
 ### Links
 
@@ -32,17 +32,17 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 
 ### Features
 
-* Support for Multiple GPUs
-* Automatic Configuration of GPUs and Connectors
-* Texture Allocation from CPU Buffers, DMA Buffers, GBM BOs, Flink Handles, Wayland DRM Buffers
-* Multi-session Capability (e.g. can use [libseat](https://github.com/kennylevinsen/seatd) to open DRM devices)
-* Listener for Connectors Hot-Plugging Events
-* Simple Cursor Planes Control
-* V-Sync Control (support for the atomic DRM API requires Linux >= 6.8)
-* Frame Buffer Damage (enhances performance in multi-GPU setups where DMA support is lacking)
-* Access to Screen Framebuffers as Textures
-* Support for Single, Double, and Triple Buffering
-* Gamma Correction
+* Support for multi-GPU setups
+* Automatic configuration of GPUs and connectors
+* Texture allocation from main memory, DMA Buffers, GBM BOs and Wayland DRM Buffers
+* Multi-session capability (e.g. can use [libseat](https://github.com/kennylevinsen/seatd) to open DRM devices)
+* Listener for connectors hot-plugging events
+* Simple cursor planes control
+* V-Sync control (support for the atomic DRM API requires Linux >= 6.8)
+* Framebuffer damage (enhances performance in multi-GPU setups where DMA support is lacking)
+* Access to screen framebuffers as textures
+* Support for double and triple buffering
+* Gamma correction
 
 ### Tested on
 
@@ -53,15 +53,17 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 
 ### Rendering Modes
 
-In multi-GPU setups, connectors such as eDP, HDMI, DisplayPort, etc., can be attached to different GPUs. However, those GPUs may not always support buffer (texture) sharing through DMA, which can prevent textures from being rendered on all displays. Therefore, SRM supports multiple rendering modes:
+In multi-GPU setups, connectors such as eDP, HDMI, DisplayPort, etc., can be attached to different GPUs. However, not all GPUs may support texture sharing, which could prevent, for example, a compositor from dragging a window across screens. Therefore, SRM assigns one of the following rendering modes to each GPU to ensure textures can always be rendered on all displays:
 
-* **ITSELF MODE**: If there is a single GPU or a GPU that can import buffers from the allocator device, it can directly render into its own connectors. This is the optimal scenario.
+**SELF MODE**: If there's a single GPU or one that can handle all buffer formats from the allocator device, it directly renders into its own connectors, which is the best setup.
 
-* **DUMB MODE**: If there are multiple GPUs and one of them cannot import buffers from the allocator device but supports dumb buffers, rendering is performed by another GPU, and the result is copied to the dumb buffers which can be directly scanned out. This scenario is sub-optimal as only a single GPU is used for rendering.
+**PRIME MODE**: When there are multiple GPUs and one can't support all formats from the allocator, another GPU does the rendering into an importable buffer, then the content is transferred to a compatible buffer for display. It's fast but not optimal since only one GPU does the rendering.
 
-* **CPU MODE**: Similar to the previous case, but when dumb buffers are not supported, the rendered content is copied to main memory. Then, a texture supported by the affected GPU is updated and rendered into its native framebuffer. This is the worst-case scenario as it involves CPU copying for both reading and uploading to GPUs.
+**DUMB MODE**: In setups with multiple GPUs where one can't import buffers but supports [dumb buffers](https://manpages.debian.org/testing/libdrm-dev/drm-memory.7.en.html), another GPU handles rendering and copies the result to dumb buffers for direct scanout. This is sub-optimal as only one GPU does the rendering and involves a GPU-to-CPU copy.
 
-Performance in the last two modes can be significantly improved by specifying the damage generated after a `paintGL()` event using `srmConnectorSetBufferDamage()`.
+* **CPU MODE**: Similar to the previous case, but when dumb buffers are not supported, the rendered content is copied to main memory. Then, a texture supported by the affected GPU is updated and rendered into a supported framebuffer. This is the worst-case scenario as it involves CPU copying for both reading and uploading to GPUs.
+
+Performance in the last three modes can be significantly improved by specifying the damage generated after a `paintGL()` event using `srmConnectorSetBufferDamage()`.
 
 ### Basic Example
 

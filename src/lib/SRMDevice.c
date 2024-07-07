@@ -2,9 +2,7 @@
 #include <private/SRMCorePrivate.h>
 #include <SRMList.h>
 #include <SRMLog.h>
-#include <string.h>
 #include <fcntl.h>
-#include <stdio.h>
 
 const char *srmDeviceGetName(SRMDevice *device)
 {
@@ -115,12 +113,7 @@ SRMDevice *srmDeviceGetRendererDevice(SRMDevice *device)
 
 SRM_RENDER_MODE srmDeviceGetRenderMode(SRMDevice *device)
 {
-    if (device == device->rendererDevice)
-        return SRM_RENDER_MODE_ITSELF;
-    else if (device->capDumbBuffer)
-        return SRM_RENDER_MODE_DUMB;
-    else
-        return SRM_RENDER_MODE_CPU;
+    return device->renderMode;
 }
 
 SRMList *srmDeviceGetCrtcs(SRMDevice *device)

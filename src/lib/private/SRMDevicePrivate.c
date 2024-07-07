@@ -19,6 +19,17 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+static const EGLint eglConfigAttribs[] =
+{
+    EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+    EGL_RED_SIZE, 8,
+    EGL_GREEN_SIZE, 8,
+    EGL_BLUE_SIZE, 8,
+    EGL_ALPHA_SIZE, 0,
+    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+    EGL_NONE
+};
+
 static UInt8 srmDeviceInBlacklist(const char *deviceName)
 {
     char *blacklist = getenv("SRM_DEVICES_BLACKLIST");
@@ -48,7 +59,7 @@ static UInt8 srmDeviceInBlacklist(const char *deviceName)
     return 0;
 }
 
-SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
+SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
 {
     if (srmDeviceInBlacklist(name))
     {
@@ -61,8 +72,12 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
     strncpy(device->name, name, sizeof(device->name) - 1);
     device->core = core;
     device->enabled = 1;
+    device->isBootVGA = isBootVGA;
     device->eglDevice = EGL_NO_DEVICE_EXT;
+    device->eglSurfaceTest = EGL_NO_SURFACE;
     device->fd = -1;
+
+    SRMDebug("[%s] Is boot VGA: %s.", device->name, device->isBootVGA ?  "YES" : "NO");
 
     // REF 2
     device->fd = core->interface->openRestricted(name,
@@ -126,6 +141,18 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
     if (!srmDeviceInitializeEGLSharedContext(device))
         goto fail;
 
+    // REF 7-1
+    if (!srmDeviceInitializeTestGBMSurface(device))
+        goto fail;
+
+    // REF 7-2
+    if(!srmDeviceInitializeTestEGLSurface(device))
+        goto fail;
+
+    // REF 7-3
+    if (!srmDeviceInitializeTestShader(device))
+        goto fail;
+
     // REF -
     if (!srmDeviceUpdateGLExtensions(device))
         goto fail;
@@ -161,6 +188,8 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name)
     device->connectors = srmListCreate();
     if (!srmDeviceUpdateConnectors(device))
         goto fail;
+
+    srmDeviceTestCPUAllocationMode(device);
 
     return device;
 
@@ -209,6 +238,15 @@ void srmDeviceDestroy(SRMDevice *device)
 
     // UNREF 8
     srmDeviceUninitEGLDeallocatorContext(device);
+
+    // REF 7-3
+    srmDeviceUninitializeTestShader(device);
+
+    // REF 7-2
+    srmDeviceUninitializeTestEGLSurface(device);
+
+    // REF 7-1
+    srmDeviceUninitializeTestGBMSurface(device);
 
     // UNREF 7
     srmDeviceUninitializeEGLSharedContext(device);
@@ -509,6 +547,22 @@ void srmDeviceDestroyDMAFormats(SRMDevice *device)
 
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 {
+    if (!eglBindAPI(EGL_OPENGL_ES_API))
+    {
+        SRMError("Failed to bind GLES API for device %s.", device->name);
+        return 0;
+    }
+
+    if (!srmRenderModeCommonChooseEGLConfiguration(
+            device->eglDisplay,
+            eglConfigAttribs,
+            DRM_FORMAT_XRGB8888,
+            &device->eglConfigTest))
+    {
+        SRMError("Failed to choose EGL configuration for device %s.", device->name);
+        return 0;
+    }
+
     size_t atti = 0;
     device->eglSharedContextAttribs[atti++] = EGL_CONTEXT_CLIENT_VERSION;
     device->eglSharedContextAttribs[atti++] = 2;
@@ -526,7 +580,7 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
     }
 
     device->eglSharedContextAttribs[atti++] = EGL_NONE;
-    device->eglSharedContext = eglCreateContext(device->eglDisplay, NULL, EGL_NO_CONTEXT, device->eglSharedContextAttribs);
+    device->eglSharedContext = eglCreateContext(device->eglDisplay, device->eglConfigTest, EGL_NO_CONTEXT, device->eglSharedContextAttribs);
 
     if (device->eglSharedContext == EGL_NO_CONTEXT)
     {
@@ -553,6 +607,172 @@ void srmDeviceUninitializeEGLSharedContext(SRMDevice *device)
         eglReleaseThread();
         eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         eglDestroyContext(device->eglDisplay, device->eglSharedContext);
+    }
+}
+
+UInt8 srmDeviceInitializeTestGBMSurface(SRMDevice *device)
+{
+    device->gbmSurfaceTest = gbm_surface_create(
+        device->gbm,
+        64, 64,
+        DRM_FORMAT_XRGB8888,
+        GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
+
+    if (device->gbmSurfaceTest)
+        return 1;
+
+    device->gbmSurfaceTest = gbm_surface_create(
+        device->gbm,
+        64, 64,
+        DRM_FORMAT_XRGB8888,
+        GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+
+    if (!device->gbmSurfaceTest)
+    {
+        SRMError("Failed to create GBM surface for device %s.", device->name);
+        return 0;
+    }
+
+    return 1;
+}
+
+void srmDeviceUninitializeTestGBMSurface(SRMDevice *device)
+{
+    if (device->gbmSurfaceTest)
+        gbm_surface_destroy(device->gbmSurfaceTest);
+}
+
+
+UInt8 srmDeviceInitializeTestEGLSurface(SRMDevice *device)
+{
+    device->eglSurfaceTest = eglCreateWindowSurface(
+        device->eglDisplay,
+        device->eglConfigTest,
+        (EGLNativeWindowType)device->gbmSurfaceTest,
+        NULL);
+
+    if (device->eglSurfaceTest == EGL_NO_SURFACE)
+    {
+        SRMError("Failed to create EGL surface for device %s.", device->name);
+        return 0;
+    }
+
+    eglMakeCurrent(device->eglDisplay,
+                   device->eglSurfaceTest,
+                   device->eglSurfaceTest,
+                   device->eglSharedContext);
+
+    eglSwapBuffers(device->eglDisplay,
+                   device->eglSurfaceTest);
+
+    device->gbmSurfaceTestBo = gbm_surface_lock_front_buffer(device->gbmSurfaceTest);
+    return 1;
+}
+
+void srmDeviceUninitializeTestEGLSurface(SRMDevice *device)
+{
+    if (device->gbmSurfaceTestBo)
+    {
+        gbm_surface_release_buffer(device->gbmSurfaceTest, device->gbmSurfaceTestBo);
+        device->gbmSurfaceTestBo = NULL;
+    }
+
+    if (device->gbmSurfaceTest)
+    {
+        gbm_surface_destroy(device->gbmSurfaceTest);
+        device->gbmSurfaceTest = NULL;
+    }
+
+    if (device->eglSurfaceTest != EGL_NO_SURFACE)
+    {
+        eglDestroySurface(device->eglDisplay, device->eglSurfaceTest);
+        device->eglSurfaceTest = EGL_NO_SURFACE;
+    }
+}
+
+UInt8 srmDeviceInitializeTestShader(SRMDevice *device)
+{
+    static GLfloat square[] =
+    {  //  VERTEX       FRAGMENT
+        -1.0f, -1.0f,   0.f, 1.f, // TL
+        -1.0f,  1.0f,   0.f, 0.f, // BL
+        1.0f,  1.0f,   1.f, 0.f, // BR
+        1.0f, -1.0f,   1.f, 1.f  // TR
+    };
+
+   const char *vertexShaderSource = "attribute vec4 position; varying vec2 v_texcoord; void main() { gl_Position = vec4(position.xy, 0.0, 1.0); v_texcoord = position.zw; }";
+   const char *fragmentShaderSource = "precision mediump float; uniform sampler2D tex; varying vec2 v_texcoord; void main() { gl_FragColor = texture2D(tex, v_texcoord); }";
+
+   eglMakeCurrent(device->eglDisplay,
+                  device->eglSurfaceTest,
+                  device->eglSurfaceTest,
+                  device->eglSharedContext);
+
+   GLint success = 0;
+   GLchar infoLog[256];
+
+   device->vertexShaderTest = glCreateShader(GL_VERTEX_SHADER);
+   glShaderSource(device->vertexShaderTest, 1, &vertexShaderSource, NULL);
+   glCompileShader(device->vertexShaderTest);
+   glGetShaderiv(device->vertexShaderTest, GL_COMPILE_STATUS, &success);
+
+   if (!success)
+   {
+       glGetShaderInfoLog(device->vertexShaderTest, sizeof(infoLog), NULL, infoLog);
+       SRMFatal("[SRMDevice] Vertex shader compilation error: %s.", infoLog);
+       return 0;
+   }
+
+   device->fragmentShaderTest = glCreateShader(GL_FRAGMENT_SHADER);
+   glShaderSource(device->fragmentShaderTest, 1, &fragmentShaderSource, NULL);
+   glCompileShader(device->fragmentShaderTest);
+   success = 0;
+   glGetShaderiv(device->fragmentShaderTest, GL_COMPILE_STATUS, &success);
+
+   if (!success)
+   {
+       glGetShaderInfoLog(device->fragmentShaderTest, sizeof(infoLog), NULL, infoLog);
+       SRMFatal("[SRMDevice] Fragment shader compilation error: %s.", infoLog);
+       return 0;
+   }
+
+   device->programTest = glCreateProgram();
+   glAttachShader(device->programTest, device->vertexShaderTest);
+   glAttachShader(device->programTest, device->fragmentShaderTest);
+   glLinkProgram(device->programTest);
+   glUseProgram(device->programTest);
+   glBindAttribLocation(device->programTest, 0, "position");
+   glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, square);
+   glEnableVertexAttribArray(0);
+   device->textureUniformTest = glGetUniformLocation(device->programTest, "tex");
+   return 1;
+}
+
+void srmDeviceUninitializeTestShader(SRMDevice *device)
+{
+    eglMakeCurrent(device->eglDisplay,
+                   device->eglSurfaceTest,
+                   device->eglSurfaceTest,
+                   device->eglSharedContext);
+
+    if (device->programTest)
+    {
+        glDetachShader(device->programTest, device->fragmentShaderTest);
+        glDetachShader(device->programTest, device->vertexShaderTest);
+        glDeleteProgram(device->programTest);
+        device->programTest = 0;
+    }
+
+    if (device->fragmentShaderTest)
+    {
+        glDeleteShader(device->fragmentShaderTest);
+        device->fragmentShaderTest = 0;
+    }
+
+    if (device->vertexShaderTest)
+    {
+        glDeleteShader(device->vertexShaderTest);
+        device->vertexShaderTest = 0;
     }
 }
 
@@ -648,7 +868,6 @@ UInt8 srmDeviceUpdateCrtcs(SRMDevice *device)
 
     return 1;
 }
-
 
 UInt8 srmDeviceUpdateEncoders(SRMDevice *device)
 {
@@ -846,4 +1065,116 @@ UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
     }
 
     return 1;
+}
+
+static UInt8 srmDeviceTestCPUAllocation(SRMDevice *device, UInt32 width, UInt32 height)
+{
+    UInt8 *pixels = NULL;
+    UInt8 *readPixels = NULL;
+    UInt8 *pixel, *readPixel;
+    UInt8 color = 0;
+    UInt8 ok = 0;
+    UInt32 stride = width * 4;
+    SRMBuffer *buffer = NULL;
+    GLuint textureId = 0;
+
+    pixels = malloc(height * stride);
+    readPixels = malloc(height * stride);
+
+    for (UInt32 y = 0; y < height; y++)
+    {
+        for (UInt32 x = 0; x < width; x++)
+        {
+            color = 1 - color;
+            pixel = &pixels[y * stride + x * 4];
+            pixel[0] = pixel[1] = pixel[2] = rand() % 256;
+        }
+    }
+
+    eglMakeCurrent(device->eglDisplay,
+                   device->eglSurfaceTest,
+                   device->eglSurfaceTest,
+                   device->eglSharedContext);
+
+    buffer = srmBufferCreateFromCPU(device->core, device, width, height, stride, pixels, DRM_FORMAT_ARGB8888);
+
+    if (!buffer)
+        goto fail;
+
+    textureId = srmBufferGetTextureID(device, buffer);
+
+    if (textureId == 0)
+        goto fail;
+
+    glUseProgram(device->programTest);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDisable(GL_BLEND);
+    glEnable(GL_SCISSOR_TEST);
+    glDisable(GL_DEPTH_BUFFER_BIT);
+    glViewport(0, 0, width, height);
+    glScissor(0, 0, width, height);
+    glUniform1i(device->textureUniformTest, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textureId);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glFinish();
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, readPixels);
+
+    for (UInt32 y = 0; y < height; y++)
+    {
+        for (UInt32 x = 0; x < width; x++)
+        {
+            pixel = &pixels[y * stride + x * 4];
+            readPixel = &readPixels[(height - 1 - y) * stride + x * 4];
+
+            if (pixel[0] != readPixel[2] || pixel[1] != readPixel[1] || pixel[2] != readPixel[0])
+                goto fail;
+        }
+    }
+    ok = 1;
+fail:
+    if (buffer)
+        srmBufferDestroy(buffer);
+
+    if (pixels)
+        free(pixels);
+
+    if (readPixels)
+        free(readPixels);
+
+    if (ok)
+        SRMDebug("[%s] CPU buffer allocation test succeded %dx%d.", device->name, width, height);
+    else
+        SRMError("[%s] CPU buffer allocation test failed %dx%d.", device->name, width, height);
+
+    return ok;
+}
+
+void srmDeviceTestCPUAllocationMode(SRMDevice *device)
+{
+    char *forceGlesAllocation = getenv("SRM_FORCE_GL_ALLOCATION");
+
+    if (forceGlesAllocation && atoi(forceGlesAllocation) == 1)
+    {
+        device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_GLES;
+        return;
+    }
+
+    device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_PRIME;
+
+    SRMDebug("[%s] Testing PRIME map CPU buffer allocation mode.", device->name);
+
+    if (srmDeviceTestCPUAllocation(device, 13, 17))
+        return;
+
+    SRMDebug("[%s] Testing GBM bo map CPU buffer allocation mode.", device->name);
+
+    device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_GBM;
+
+    if (srmDeviceTestCPUAllocation(device, 13, 17))
+        return;
+
+    SRMDebug("[%s] Using OpenGL CPU buffer allocation mode.", device->name);
+
+    device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_GLES;
 }

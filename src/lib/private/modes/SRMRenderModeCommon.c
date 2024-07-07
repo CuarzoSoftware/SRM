@@ -4,6 +4,7 @@
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMConnectorModePrivate.h>
+#include <SRMList.h>
 
 #include <SRMCore.h>
 #include <SRMLog.h>
@@ -702,7 +703,6 @@ void srmRenderModeCommonPauseRendering(SRMConnector *connector)
             SRMWarning("Failed to reset CRTC device %s connector %d. Error: %d (not DRM master). (atomic)",
                      connector->device->name,
                      connector->id, ret);
-
         }
     }
     else
@@ -1342,4 +1342,51 @@ void srmRenderModeCommonSyncState(SRMConnector *connector)
             }
         }
     }
+}
+
+void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
+{
+    connector->currentFormat.format = DRM_FORMAT_XRGB8888;
+    connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
+
+    if (!connector->device->capAddFb2Modifiers)
+        return;
+
+    SRMListForeach(it, connector->currentPrimaryPlane->inFormats)
+    {
+        SRMFormat *fmt = srmListItemGetData(it);
+        if (fmt->format == DRM_FORMAT_XRGB8888 && fmt->modifier != DRM_FORMAT_MOD_LINEAR)
+        {
+            connector->currentFormat.modifier = fmt->modifier;
+            break;
+        }
+    }
+}
+
+
+void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struct gbm_surface **surface)
+{
+    if (connector->currentFormat.modifier != DRM_FORMAT_MOD_LINEAR)
+    {
+        *surface = gbm_surface_create_with_modifiers2(
+            connector->device->gbm,
+            connector->currentMode->info.hdisplay,
+            connector->currentMode->info.vdisplay,
+            connector->currentFormat.format,
+            &connector->currentFormat.modifier,
+            1,
+            GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+
+        if (*surface)
+            return;
+
+        connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
+    }
+
+    *surface = gbm_surface_create(
+        connector->device->gbm,
+        connector->currentMode->info.hdisplay,
+        connector->currentMode->info.vdisplay,
+        GBM_FORMAT_XRGB8888,
+        GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
 }

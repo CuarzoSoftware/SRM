@@ -13,6 +13,11 @@
 extern "C" {
 #endif
 
+enum SRM_CONNECTOR_INTERNAL_STATE
+{
+    SRM_CONNECTOR_INTERNAL_STATE_PAINTING = 1 << 0
+};
+
 struct SRMConnectorRenderInterface
 {
     UInt8(*initialize)(SRMConnector *connector);
@@ -22,6 +27,7 @@ struct SRMConnectorRenderInterface
     UInt32(*getCurrentBufferIndex)(SRMConnector *connector);
     UInt32(*getBuffersCount)(SRMConnector *connector);
     SRMBuffer*(*getBuffer)(SRMConnector *connector, UInt32 bufferIndex);
+    EGLContext (*getEGLContext)(SRMConnector *connector);
     void (*uninitialize)(SRMConnector *connector);
     void (*pause)(SRMConnector *connector);
     void (*resume)(SRMConnector *connector);
@@ -63,6 +69,7 @@ struct SRMConnectorStruct
     SRMCrtc *currentCrtc;
     SRMPlane *currentPrimaryPlane, *currentCursorPlane;
     SRM_CONNECTOR_STATE state;
+    UInt32 internalState;
 
     struct drm_color_lut *gamma;
     UInt32 gammaBlobId;
@@ -146,6 +153,7 @@ UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bes
 void *srmConnectorRenderThread(void *conn);
 void srmConnectorUnlockRenderThread(SRMConnector *connector, UInt8 repaint);
 void srmConnectorRenderThreadCleanUp(SRMConnector *connector);
+void srmConnectorFreeScanoutBuffer(SRMConnector *connector, Int8 index);
 
 #ifdef __cplusplus
 }

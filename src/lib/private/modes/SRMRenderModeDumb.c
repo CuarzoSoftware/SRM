@@ -31,8 +31,8 @@ static const EGLint eglConfigAttribs[] =
 
 struct RenderModeDataStruct
 {
-    struct gbm_surface *connectorGBMSurface;
-    struct gbm_bo **connectorBOs;
+    struct gbm_surface *rendererGBMSurface;
+    struct gbm_bo **rendererBOs;
     UInt32 *connectorDRMFramebuffers;
     SRMBuffer **buffers;
 
@@ -42,9 +42,9 @@ struct RenderModeDataStruct
 
     UInt32 buffersCount;
     UInt32 currentBufferIndex;
-    EGLConfig connectorEGLConfig;
-    EGLContext connectorEGLContext;
-    EGLSurface connectorEGLSurface;
+    EGLConfig rendererEGLConfig;
+    EGLContext rendererEGLContext;
+    EGLSurface rendererEGLSurface;
 };
 
 typedef struct RenderModeDataStruct RenderModeData;
@@ -68,8 +68,8 @@ static UInt8 createData(SRMConnector *connector)
     }
 
     connector->renderData = data;
-    data->connectorEGLContext = EGL_NO_CONTEXT;
-    data->connectorEGLSurface = EGL_NO_SURFACE;
+    data->rendererEGLContext = EGL_NO_CONTEXT;
+    data->rendererEGLSurface = EGL_NO_SURFACE;
     return 1;
 }
 
@@ -86,29 +86,29 @@ static UInt8 createGBMSurfaces(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorGBMSurface)
+    if (data->rendererGBMSurface)
     {
         // Already created
         return 1;
     }
 
-    data->connectorGBMSurface = gbm_surface_create(
+    data->rendererGBMSurface = gbm_surface_create(
         connector->device->rendererDevice->gbm,
         connector->currentMode->info.hdisplay,
         connector->currentMode->info.vdisplay,
         GBM_FORMAT_XRGB8888,
         GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
 
-    if (!data->connectorGBMSurface)
+    if (!data->rendererGBMSurface)
     {
-        data->connectorGBMSurface = gbm_surface_create(
+        data->rendererGBMSurface = gbm_surface_create(
             connector->device->rendererDevice->gbm,
             connector->currentMode->info.hdisplay,
             connector->currentMode->info.vdisplay,
             GBM_FORMAT_XRGB8888,
-            GBM_BO_USE_RENDERING | GBM_BO_USE_SCANOUT);
+            GBM_BO_USE_RENDERING);
 
-        if (!data->connectorGBMSurface)
+        if (!data->rendererGBMSurface)
         {
             SRMError("Failed to create GBM surface for device %s connector %d (DUMB MODE).",
                      connector->device->name, connector->id);
@@ -124,10 +124,10 @@ static void destroyGBMSurfaces(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorGBMSurface)
+    if (data->rendererGBMSurface)
     {
-        gbm_surface_destroy(data->connectorGBMSurface);
-        data->connectorGBMSurface = NULL;
+        gbm_surface_destroy(data->rendererGBMSurface);
+        data->rendererGBMSurface = NULL;
     }
 }
 
@@ -138,7 +138,7 @@ static UInt8 getEGLConfiguration(SRMConnector *connector)
     if (!srmRenderModeCommonChooseEGLConfiguration(connector->device->rendererDevice->eglDisplay,
                                                    eglConfigAttribs,
                                                    GBM_FORMAT_XRGB8888,
-                                                   &data->connectorEGLConfig))
+                                                   &data->rendererEGLConfig))
     {
         SRMError("Failed to choose EGL configuration for device %s connector %d (DUMB MODE).",
                  connector->device->name,
@@ -153,7 +153,7 @@ static UInt8 createEGLContext(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorEGLContext != EGL_NO_CONTEXT)
+    if (data->rendererEGLContext != EGL_NO_CONTEXT)
     {
         // Already created
         return 1;
@@ -161,23 +161,18 @@ static UInt8 createEGLContext(SRMConnector *connector)
 
     if (connector->device->rendererDevice->eglExtensions.IMG_context_priority)
         connector->device->rendererDevice->eglSharedContextAttribs[3] = EGL_CONTEXT_PRIORITY_HIGH_IMG;
-    data->connectorEGLContext = eglCreateContext(connector->device->rendererDevice->eglDisplay,
-                                                 data->connectorEGLConfig,
-                                                 // It is EGL_NO_CONTEXT if no context was previously created in this device
+    data->rendererEGLContext = eglCreateContext(connector->device->rendererDevice->eglDisplay,
+                                                 data->rendererEGLConfig,
                                                  connector->device->rendererDevice->eglSharedContext,
                                                  connector->device->rendererDevice->eglSharedContextAttribs);
 
-    if (data->connectorEGLContext == EGL_NO_CONTEXT)
+    if (data->rendererEGLContext == EGL_NO_CONTEXT)
     {
         SRMError("Failed to create EGL context for device %s connector %d (DUMB MODE).",
                  connector->device->name,
                  connector->id);
         return 0;
     }
-
-    // Store it if is the first context created for this device, so that later on shared context can be created
-    if (connector->device->rendererDevice->eglSharedContext == EGL_NO_CONTEXT)
-        connector->device->rendererDevice->eglSharedContext = data->connectorEGLContext;
 
     return 1;
 }
@@ -186,12 +181,10 @@ static void destroyEGLContext(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorEGLContext != EGL_NO_CONTEXT)
+    if (data->rendererEGLContext != EGL_NO_CONTEXT)
     {
-        if (data->connectorEGLContext != connector->device->rendererDevice->eglSharedContext)
-            eglDestroyContext(connector->device->rendererDevice->eglDisplay, data->connectorEGLContext);
-
-        data->connectorEGLContext = EGL_NO_CONTEXT;
+        eglDestroyContext(connector->device->rendererDevice->eglDisplay, data->rendererEGLContext);
+        data->rendererEGLContext = EGL_NO_CONTEXT;
     }
 }
 
@@ -199,18 +192,18 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorEGLSurface != EGL_NO_SURFACE)
+    if (data->rendererEGLSurface != EGL_NO_SURFACE)
     {
         // Already created
         return 1;
     }
 
-    data->connectorEGLSurface = eglCreateWindowSurface(connector->device->rendererDevice->eglDisplay,
-                                                       data->connectorEGLConfig,
-                                                       (EGLNativeWindowType)data->connectorGBMSurface,
+    data->rendererEGLSurface = eglCreateWindowSurface(connector->device->rendererDevice->eglDisplay,
+                                                       data->rendererEGLConfig,
+                                                       (EGLNativeWindowType)data->rendererGBMSurface,
                                                        NULL);
 
-    if (data->connectorEGLSurface == EGL_NO_SURFACE)
+    if (data->rendererEGLSurface == EGL_NO_SURFACE)
     {
         SRMError("Failed to create EGL surface for device %s connector %d (DUMB MODE).",
                  connector->device->name,
@@ -219,9 +212,9 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
     }
 
     eglMakeCurrent(connector->device->rendererDevice->eglDisplay,
-                   data->connectorEGLSurface,
-                   data->connectorEGLSurface,
-                   data->connectorEGLContext);
+                   data->rendererEGLSurface,
+                   data->rendererEGLSurface,
+                   data->rendererEGLContext);
 
     SRMList *bos = srmListCreate();
 
@@ -235,15 +228,15 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
     {
         Int32 c = atoi(env);
 
-        if (c > 0 && c < 4)
+        if (c > 1 && c < 4)
             fbCount = c;
     }
 
-    while (srmListGetLength(bos) < fbCount && gbm_surface_has_free_buffers(data->connectorGBMSurface) > 0)
+    while (srmListGetLength(bos) < fbCount && gbm_surface_has_free_buffers(data->rendererGBMSurface) > 0)
     {
         eglSwapBuffers(connector->device->rendererDevice->eglDisplay,
-                       data->connectorEGLSurface);
-        bo = gbm_surface_lock_front_buffer(data->connectorGBMSurface);
+                       data->rendererEGLSurface);
+        bo = gbm_surface_lock_front_buffer(data->rendererGBMSurface);
         srmListAppendData(bos, bo);
     }
 
@@ -256,14 +249,14 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
         return 0;
     }
 
-    data->connectorBOs = calloc(data->buffersCount, sizeof(struct gbm_bo*));
+    data->rendererBOs = calloc(data->buffersCount, sizeof(struct gbm_bo*));
 
     UInt32 i = 0;
     SRMListForeach(boIt, bos)
     {
         struct gbm_bo *b = srmListItemGetData(boIt);
-        gbm_surface_release_buffer(data->connectorGBMSurface, b);
-        data->connectorBOs[i] = b;
+        gbm_surface_release_buffer(data->rendererGBMSurface, b);
+        data->rendererBOs[i] = b;
         i++;
     }
 
@@ -275,25 +268,25 @@ static void destroyEGLSurfaces(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorBOs)
+    if (data->rendererBOs)
     {
         for (UInt32 i = 0; i < data->buffersCount; i++)
         {
-            if(data->connectorBOs[i])
+            if(data->rendererBOs[i])
             {
-                gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[i]);
-                data->connectorBOs[i] = NULL;
+                gbm_surface_release_buffer(data->rendererGBMSurface, data->rendererBOs[i]);
+                data->rendererBOs[i] = NULL;
             }
         }
 
-        free(data->connectorBOs);
-        data->connectorBOs = NULL;
+        free(data->rendererBOs);
+        data->rendererBOs = NULL;
     }
 
-    if (data->connectorEGLSurface != EGL_NO_SURFACE)
+    if (data->rendererEGLSurface != EGL_NO_SURFACE)
     {
-        eglDestroySurface(connector->device->rendererDevice->eglDisplay, data->connectorEGLSurface);
-        data->connectorEGLSurface = EGL_NO_SURFACE;
+        eglDestroySurface(connector->device->rendererDevice->eglDisplay, data->rendererEGLSurface);
+        data->rendererEGLSurface = EGL_NO_SURFACE;
     }
 }
 
@@ -321,9 +314,9 @@ static UInt8 createDumbBuffers(SRMConnector *connector)
 
     for (UInt32 i = 0; i < data->buffersCount; i++)
     {
-        data->dumbBuffers[i].height = gbm_bo_get_height(data->connectorBOs[i]);
-        data->dumbBuffers[i].width  = gbm_bo_get_width(data->connectorBOs[i]);
-        data->dumbBuffers[i].bpp    = gbm_bo_get_bpp(data->connectorBOs[i]);
+        data->dumbBuffers[i].height = gbm_bo_get_height(data->rendererBOs[i]);
+        data->dumbBuffers[i].width  = gbm_bo_get_width(data->rendererBOs[i]);
+        data->dumbBuffers[i].bpp    = gbm_bo_get_bpp(data->rendererBOs[i]);
 
         ret = ioctl(connector->device->fd,
                     DRM_IOCTL_MODE_CREATE_DUMB,
@@ -436,7 +429,7 @@ static UInt8 createDRMFramebuffers(SRMConnector *connector)
             return 0;
         }
 
-        data->buffers[i] = srmBufferCreateFromGBM(connector->device->rendererDevice->core, data->connectorBOs[i]);
+        data->buffers[i] = srmBufferCreateFromGBM(connector->device->rendererDevice->core, data->rendererBOs[i]);
 
         if (!data->buffers[i])
         {
@@ -513,9 +506,9 @@ static UInt8 render(SRMConnector *connector)
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
     eglMakeCurrent(connector->device->rendererDevice->eglDisplay,
-                   data->connectorEGLSurface,
-                   data->connectorEGLSurface,
-                   data->connectorEGLContext);
+                   data->rendererEGLSurface,
+                   data->rendererEGLSurface,
+                   data->rendererEGLContext);
 
     connector->interface->paintGL(connector, connector->interfaceData);
 
@@ -631,7 +624,7 @@ static UInt8 flipPage(SRMConnector *connector)
 
     skipGLRead:
 
-    swapBuffers(connector, connector->device->rendererDevice->eglDisplay, data->connectorEGLSurface);
+    swapBuffers(connector, connector->device->rendererDevice->eglDisplay, data->rendererEGLSurface);
 
     if (useBufferRead)
     {
@@ -660,11 +653,11 @@ static UInt8 flipPage(SRMConnector *connector)
         }
     }
 
-    gbm_surface_lock_front_buffer(data->connectorGBMSurface);
+    gbm_surface_lock_front_buffer(data->rendererGBMSurface);
     srmRenderModeCommonPageFlip(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
 
     data->currentBufferIndex = nextBufferIndex(connector);
-    gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
+    gbm_surface_release_buffer(data->rendererGBMSurface, data->rendererBOs[data->currentBufferIndex]);
     connector->interface->pageFlipped(connector, connector->interfaceData);
     return 1;
 }
@@ -785,7 +778,7 @@ static void resumeRendering(SRMConnector *connector)
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
     for (UInt32 i = 0; i < data->buffersCount; i++)
-        gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[i]);
+        gbm_surface_release_buffer(data->rendererGBMSurface, data->rendererBOs[i]);
 
     srmRenderModeCommonResumeRendering(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
 }

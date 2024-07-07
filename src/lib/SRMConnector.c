@@ -4,6 +4,10 @@
 #include <private/SRMEncoderPrivate.h>
 #include <private/SRMCrtcPrivate.h>
 #include <private/SRMPlanePrivate.h>
+#include <private/SRMBufferPrivate.h>
+#include <private/SRMCorePrivate.h>
+#include <SRMConnectorMode.h>
+#include <SRMList.h>
 #include <SRMLog.h>
 #include <stdlib.h>
 #include <string.h>
@@ -512,7 +516,7 @@ UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector)
     if (renderMode == SRM_RENDER_MODE_ITSELF)
         return 0;
 
-    // DUMB and CPU modes always support damage
+    // PRIME, DUMB and CPU modes always support damage
     return 1;
 }
 

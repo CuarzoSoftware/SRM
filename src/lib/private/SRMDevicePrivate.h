@@ -1,6 +1,7 @@
 #ifndef SRMDEVICEPRIVATE_H
 #define SRMDEVICEPRIVATE_H
 
+#include <private/SRMBufferPrivate.h>
 #include <SRMDevice.h>
 #include <SRMEGL.h>
 #include <gbm.h>
@@ -11,28 +12,30 @@
 extern "C" {
 #endif
 
-enum SRM_DEVICE_DRIVER
+typedef enum SRM_DEVICE_DRIVER_ENUM
 {
     SRM_DEVICE_DRIVER_unknown = 0,
     SRM_DEVICE_DRIVER_i915 = 1,
     SRM_DEVICE_DRIVER_nouveau = 2,
     SRM_DEVICE_DRIVER_lima = 3,
     SRM_DEVICE_DRIVER_nvidia = 4
-};
+} SRM_DEVICE_DRIVER;
 
 struct SRMDeviceStruct
 {
     SRMCore *core;
-
-    enum SRM_DEVICE_DRIVER driver;
+    SRM_DEVICE_DRIVER driver;
+    SRM_BUFFER_WRITE_MODE cpuBufferWriteMode;
+    SRM_RENDER_MODE renderMode;
 
     // All GPUs are enabled by default
     UInt8 enabled;
+    UInt8 isBootVGA;
 
     // Renderer device could be itself or another if PIRME IMPORT not supported
     SRMDevice *rendererDevice;
 
-    // Prevent multiple threads calling drmModeHandleEvent
+    // Prevents multiple threads calling drmModeHandleEvent
     pthread_mutex_t pageFlipMutex;
     UInt8 pageFlipMutexInitialized;
 
@@ -47,8 +50,14 @@ struct SRMDeviceStruct
     EGLDisplay eglDisplay;
     EGLContext eglSharedContext;
 
-    /* EGLSurface eglBaseSurface;
-    struct gbm_surface *baseSurface;*/
+    struct gbm_surface *gbmSurfaceTest;
+    struct gbm_bo *gbmSurfaceTestBo;
+    EGLConfig eglConfigTest;
+    EGLSurface eglSurfaceTest;
+    GLuint vertexShaderTest;
+    GLuint fragmentShaderTest;
+    GLuint programTest;
+    GLuint textureUniformTest;
 
     EGLContext eglDeallocatorContext;
     EGLint eglSharedContextAttribs[7];
@@ -84,7 +93,7 @@ struct SRMDeviceStruct
     UInt8 pendingUdevEvents;
 };
 
-SRMDevice *srmDeviceCreate(SRMCore *core, const char *name);
+SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA);
 void srmDeviceDestroy(SRMDevice *device);
 
 UInt8 srmDeviceInitializeGBM(SRMDevice *device);
@@ -104,6 +113,15 @@ void srmDeviceUninitializeEGLSharedContext(SRMDevice *device);
 
 UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device);
 
+UInt8 srmDeviceInitializeTestGBMSurface(SRMDevice *device);
+void srmDeviceUninitializeTestGBMSurface(SRMDevice *device);
+
+UInt8 srmDeviceInitializeTestEGLSurface(SRMDevice *device);
+void srmDeviceUninitializeTestEGLSurface(SRMDevice *device);
+
+UInt8 srmDeviceInitializeTestShader(SRMDevice *device);
+void srmDeviceUninitializeTestShader(SRMDevice *device);
+
 UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device);
 void srmDeviceUninitEGLDeallocatorContext(SRMDevice *device);
 
@@ -114,6 +132,8 @@ UInt8 srmDeviceUpdateCrtcs(SRMDevice *device);
 UInt8 srmDeviceUpdateEncoders(SRMDevice *device);
 UInt8 srmDeviceUpdatePlanes(SRMDevice *device);
 UInt8 srmDeviceUpdateConnectors(SRMDevice *device);
+
+void srmDeviceTestCPUAllocationMode(SRMDevice *device);
 
 UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device);
 

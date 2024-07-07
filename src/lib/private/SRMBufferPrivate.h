@@ -35,12 +35,21 @@ struct SRMBufferTexture
     UInt8 updated;
 };
 
+typedef enum SRM_BUFFER_WRITE_MODE_ENUM
+{
+    SRM_BUFFER_WRITE_MODE_NONE,
+    SRM_BUFFER_WRITE_MODE_PRIME,
+    SRM_BUFFER_WRITE_MODE_GBM,
+    SRM_BUFFER_WRITE_MODE_GLES
+} SRM_BUFFER_WRITE_MODE;
+
 struct SRMBufferStruct
 {
     // Common
     SRMDevice *allocator;
     pthread_mutex_t mutex;
     enum SRM_BUFFER_SRC src;
+    SRM_BUFFER_WRITE_MODE writeMode;
 
     UInt32 width;
     UInt32 height;
@@ -54,7 +63,6 @@ struct SRMBufferStruct
 
     // GBM
     struct gbm_bo *bo;
-    enum gbm_bo_flags flags;
     void *mapData;
 
     // DMA
@@ -66,8 +74,8 @@ struct SRMBufferStruct
     void *map;
     struct dma_buf_sync sync;
 
-    // Gles
-    GLenum target; // GL_TEXTURE_2D is mutable and GL_TEXTURE_EXTERNAL_OES immutable
+    // GL
+    GLenum target;
     GLint glInternalFormat;
     GLint glFormat;
     GLint glType;
@@ -75,6 +83,8 @@ struct SRMBufferStruct
 
 SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator);
 Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo);
+void *srmBufferMapFD(Int32 fd, size_t len, UInt32 *caps);
+struct gbm_bo *srmBufferCreateLinearBO(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format);
 
 #ifdef __cplusplus
 }

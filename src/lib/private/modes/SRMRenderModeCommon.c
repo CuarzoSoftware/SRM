@@ -233,8 +233,6 @@ UInt8 srmRenderModeCommonWaitRepaintRequest(SRMConnector *connector)
 
 void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqPtr req, UInt8 clearFlags)
 {
-    pthread_mutex_lock(&connector->propsMutex);
-
     if (connector->currentCursorPlane)
     {
         UInt8 updatedFB = 0;
@@ -376,8 +374,6 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
                                      connector->propIDs.content_type,
                                      connector->contentType);
     }
-
-    pthread_mutex_unlock(&connector->propsMutex);
 }
 
 void srmRenderModeCommonDestroyCursor(SRMConnector *connector)
@@ -1034,10 +1030,13 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
 
     if (connector->device->clientCapAtomic)
     {
+        pthread_mutex_lock(&connector->propsMutex);
+
         if (connector->currentVSync)
         {
             drmModeAtomicReqPtr req;
             req = drmModeAtomicAlloc();
+
             UInt32 prevCursorIndex = connector->cursorIndex;
             srmRenderModeCommitAtomicChanges(connector, req, 0);
             drmModeAtomicAddProperty(req,
@@ -1047,10 +1046,10 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
             ret = srmRenderModeAtomicCommit(connector->device->fd,
                                         req,
                                         DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
-                                        connector, 1);
+                                        connector, 0);
             if (ret)
                 connector->cursorIndex = prevCursorIndex;
-            else/* if (ret == 0 && !connector->firstPageFlip)*/
+            else
                 connector->atomicChanges = 0;
 
             drmModeAtomicFree(req);
@@ -1069,7 +1068,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                 ret = srmRenderModeAtomicCommit(connector->device->fd,
                                                 req,
                                                 DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK,
-                                                connector, 1);
+                                                connector, 0);
                 drmModeAtomicFree(req);
             }
 
@@ -1086,18 +1085,19 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                 ret = srmRenderModeAtomicCommit(connector->device->fd,
                                                 req,
                                                 DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
-                                                connector, 1);
+                                                connector, 0);
                 drmModeAtomicFree(req);
 
                 if (ret)
                     connector->cursorIndex = prevCursorIndex;
-                // Clear flags on success
-                else /*if (ret == 0 && !connector->firstPageFlip)*/
+                else
                     connector->atomicChanges = 0;
             }
 
             connector->pendingPageFlip = 1;
         }
+
+        pthread_mutex_unlock(&connector->propsMutex);
     }
     else
     {

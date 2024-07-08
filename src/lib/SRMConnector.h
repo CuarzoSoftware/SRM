@@ -3,7 +3,6 @@
 
 #include <SRMTypes.h>
 #include <xf86drmMode.h>
-#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {

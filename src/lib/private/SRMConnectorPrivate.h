@@ -13,11 +13,6 @@
 extern "C" {
 #endif
 
-enum SRM_CONNECTOR_INTERNAL_STATE
-{
-    SRM_CONNECTOR_INTERNAL_STATE_PAINTING = 1 << 0
-};
-
 struct SRMConnectorRenderInterface
 {
     UInt8(*initialize)(SRMConnector *connector);
@@ -69,7 +64,6 @@ struct SRMConnectorStruct
     SRMCrtc *currentCrtc;
     SRMPlane *currentPrimaryPlane, *currentCursorPlane;
     SRM_CONNECTOR_STATE state;
-    UInt32 internalState;
 
     struct drm_color_lut *gamma;
     UInt32 gammaBlobId;

@@ -1,3 +1,13 @@
+SRM (0.6.2-1)
+
+  # Bug Fixes
+
+  * Fixed incorrect default linear gamma table calculation in atomic API.
+  * Added mutex to prevent racing conditions with external threads when updating the atomic changes flags.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Mon, 08 Jul 2024 00:13:05 -0400
+
+
 SRM (0.6.1-1)
 
   # Performance

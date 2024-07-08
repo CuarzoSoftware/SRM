@@ -490,9 +490,7 @@ void *srmConnectorRenderThread(void *conn)
             if (connector->repaintRequested)
             {
                     connector->repaintRequested = 0;
-                    connector->internalState |= SRM_CONNECTOR_INTERNAL_STATE_PAINTING;
                     connector->renderInterface.render(connector);
-                    connector->internalState &= ~SRM_CONNECTOR_INTERNAL_STATE_PAINTING;
                     connector->renderInterface.flipPage(connector);
                     pthread_mutex_unlock(&connector->stateMutex);
                     continue;
@@ -686,7 +684,10 @@ void srmConnectorInitGamma(SRMConnector *connector)
             {
                 val = (Float64)i / n;
                 lut->red = lut->green = lut->blue = (UInt16)(UINT16_MAX * val);
+                lut++;
             }
+
+            connector->atomicChanges |= SRM_ATOMIC_CHANGE_GAMMA_LUT;
         }
         else
         {
@@ -699,6 +700,17 @@ void srmConnectorInitGamma(SRMConnector *connector)
                 val = (Float64)i / n;
                 r[i] = g[i] = b[i] = (UInt16)(UINT16_MAX * val);
             }
+
+            if (drmModeCrtcSetGamma(connector->device->fd,
+                                    connector->currentCrtc->id,
+                                    (UInt32)gammaSize,
+                                    r,
+                                    g,
+                                    b))
+            {
+                SRMError("Failed to set gamma for connector %d using legacy API drmModeCrtcSetGamma().",
+                         connector->id);
+            }
         }
     }
     else
@@ -708,44 +720,3 @@ void srmConnectorInitGamma(SRMConnector *connector)
                  connector->id);
     }
 }
-
-#include <sys/ioctl.h>
-
-/*
-void srmConnectorFreeScanoutBuffer(SRMConnector *connector, Int8 index)
-{
-    if (!connector->scanoutBuffer[index].buffer)
-        return;
-
-    if (connector->scanoutBuffer[index].tmpDRMFB)
-    {
-        drmModeRmFB(connector->device->fd, connector->scanoutBuffer[index].tmpDRMFB);
-        connector->scanoutBuffer[index].tmpDRMFB = 0;
-    }
-
-    if (connector->scanoutBuffer[index].tmpBO)
-    {
-        gbm_bo_destroy(connector->scanoutBuffer[index].tmpBO);
-        connector->scanoutBuffer[index].tmpBO = NULL;
-    }
-
-    if (connector->scanoutBuffer[index].tmpEGLImage != EGL_NO_IMAGE)
-    {
-        eglDestroyImage(connector->device->eglDevice, connector->scanoutBuffer[index].tmpEGLImage);
-        connector->scanoutBuffer[index].tmpEGLImage = EGL_NO_IMAGE;
-    }
-
-    UInt8 destroyed = 0;
-    pthread_mutex_lock(&connector->scanoutBuffer[index].buffer->mutex);
-    connector->scanoutBuffer[index].buffer->scanoutCounter--;
-    destroyed = connector->scanoutBuffer[index].buffer->destroyed;
-    pthread_mutex_unlock(&connector->scanoutBuffer[index].buffer->mutex);
-
-    if (destroyed)
-    {
-        SRMFatal("HI");
-        srmBufferDestroy(connector->scanoutBuffer[index].buffer);
-    }
-
-    connector->scanoutBuffer[index].buffer = NULL;
-}*/

@@ -1355,14 +1355,16 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
     SRMListForeach(it, connector->currentPrimaryPlane->inFormats)
     {
         SRMFormat *fmt = srmListItemGetData(it);
-        if (fmt->format == DRM_FORMAT_XRGB8888 && fmt->modifier != DRM_FORMAT_MOD_LINEAR)
+
+        if (fmt->format == DRM_FORMAT_XRGB8888
+            && fmt->modifier != DRM_FORMAT_MOD_LINEAR
+            && srmFormatIsInList(srmDeviceGetDMATextureFormats(connector->device), fmt->format, fmt->modifier))
         {
             connector->currentFormat.modifier = fmt->modifier;
             break;
         }
     }
 }
-
 
 void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struct gbm_surface **surface)
 {

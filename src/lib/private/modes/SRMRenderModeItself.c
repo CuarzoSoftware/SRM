@@ -221,6 +221,7 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
     {
         eglSwapBuffers(connector->device->rendererDevice->eglDisplay,
                        data->connectorEGLSurface);
+
         bo = gbm_surface_lock_front_buffer(data->connectorGBMSurface);
         srmListAppendData(bos, bo);
     }

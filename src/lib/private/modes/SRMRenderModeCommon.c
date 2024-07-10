@@ -1349,6 +1349,7 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
     connector->currentFormat.format = DRM_FORMAT_XRGB8888;
     connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
 
+    /* TODO: Check why this fails
     if (!connector->device->capAddFb2Modifiers)
         return;
 
@@ -1364,6 +1365,7 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
             break;
         }
     }
+    */
 }
 
 void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struct gbm_surface **surface)

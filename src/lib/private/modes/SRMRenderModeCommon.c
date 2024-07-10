@@ -653,6 +653,9 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
 
 void srmRenderModeCommonUninitialize(SRMConnector *connector)
 {
+    if (connector->state == SRM_CONNECTOR_STATE_INITIALIZING)
+        return;
+
     Int32 ret;
 
     if (connector->device->clientCapAtomic)
@@ -1349,8 +1352,7 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
     connector->currentFormat.format = DRM_FORMAT_XRGB8888;
     connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
 
-    /* TODO: Check why this fails
-    if (!connector->device->capAddFb2Modifiers)
+    if (!connector->device->capAddFb2Modifiers || !connector->allowModifiers)
         return;
 
     SRMListForeach(it, connector->currentPrimaryPlane->inFormats)
@@ -1365,7 +1367,6 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
             break;
         }
     }
-    */
 }
 
 void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struct gbm_surface **surface)

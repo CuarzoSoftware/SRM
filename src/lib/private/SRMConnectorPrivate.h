@@ -121,6 +121,7 @@ struct SRMConnectorStruct
     pthread_mutex_t propsMutex;
 
     // Render specific
+    UInt8 allowModifiers;
     struct SRMConnectorRenderInterface renderInterface;
     void *renderData;
 };

@@ -335,13 +335,16 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
             fbCount = c;
     }
 
-    while (srmListGetLength(bos) < fbCount && gbm_surface_has_free_buffers(data->connectorGBMSurface) > 0)
+    do
     {
         eglSwapBuffers(connector->device->eglDisplay,
                        data->connectorEGLSurface);
         bo = gbm_surface_lock_front_buffer(data->connectorGBMSurface);
-        srmListAppendData(bos, bo);
+
+        if (bo)
+            srmListAppendData(bos, bo);
     }
+    while (srmListGetLength(bos) < fbCount && gbm_surface_has_free_buffers(data->connectorGBMSurface) > 0 && bo);
 
     data->buffersCount = srmListGetLength(bos);
 
@@ -388,13 +391,16 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
     bos = srmListCreate();
     bo = NULL;
 
-    while (srmListGetLength(bos) < fbCount && gbm_surface_has_free_buffers(data->rendererGBMSurface) > 0)
+    do
     {
         eglSwapBuffers(connector->device->rendererDevice->eglDisplay,
                        data->rendererEGLSurface);
         bo = gbm_surface_lock_front_buffer(data->rendererGBMSurface);
-        srmListAppendData(bos, bo);
+
+        if (bo)
+            srmListAppendData(bos, bo);
     }
+    while (srmListGetLength(bos) < fbCount && gbm_surface_has_free_buffers(data->rendererGBMSurface) > 0 && bo);
 
     data->buffersCount = srmListGetLength(bos);
 
@@ -1033,9 +1039,13 @@ static void uninitialize(SRMConnector *connector)
 
 static UInt8 initialize(SRMConnector *connector)
 {
+    connector->allowModifiers = 1;
+
+retry:
+
     if (!eglBindAPI(EGL_OPENGL_ES_API))
     {
-        SRMError("Failed to bind GLES API for device %s connector %d (ITSELF MODE).",
+        SRMError("Failed to bind GLES API for device %s connector %d (CPU MODE).",
                  connector->device->name,
                  connector->id);
         goto fail;
@@ -1068,11 +1078,20 @@ static UInt8 initialize(SRMConnector *connector)
     return 1;
 
 fail:
-    SRMError("Failed to initialize render mode ITSELF for device %s connector %d.",
+    uninitialize(connector);
+
+    if (connector->allowModifiers)
+    {
+        SRMError("Failed to initialize device %s connector %d with explicit modifiers, falling back to implicit modifiers (CPU MODE).",
+                 connector->device->name,
+                 connector->id);
+        connector->allowModifiers = 0;
+        goto retry;
+    }
+
+    SRMError("Failed to initialize render mode CPU for device %s connector %d.",
              connector->device->name,
              connector->id);
-
-    uninitialize(connector);
     return 0;
 }
 

@@ -1,3 +1,12 @@
+SRM (0.6.3-1)
+
+  # Bug Fixes
+
+  * Fallback to using implicit framebuffer modifiers in all rendering modes if drmModeAddFB2WithModifiers() fails. Thanks to @RogerDavenport for reporting the issue.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Wed, 10 Jul 2024 12:44:04 -0400
+
+
 SRM (0.6.2-1)
 
   # Bug Fixes

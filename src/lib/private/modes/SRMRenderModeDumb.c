@@ -232,13 +232,16 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
             fbCount = c;
     }
 
-    while (srmListGetLength(bos) < fbCount && gbm_surface_has_free_buffers(data->rendererGBMSurface) > 0)
+    do
     {
         eglSwapBuffers(connector->device->rendererDevice->eglDisplay,
                        data->rendererEGLSurface);
         bo = gbm_surface_lock_front_buffer(data->rendererGBMSurface);
-        srmListAppendData(bos, bo);
+
+        if (bo)
+            srmListAppendData(bos, bo);
     }
+    while (srmListGetLength(bos) < fbCount && gbm_surface_has_free_buffers(data->rendererGBMSurface) > 0 && bo);
 
     data->buffersCount = srmListGetLength(bos);
 
@@ -686,7 +689,7 @@ static UInt8 initialize(SRMConnector *connector)
 {
     if (!eglBindAPI(EGL_OPENGL_ES_API))
     {
-        SRMError("Failed to bind GLES API for device %s connector %d (ITSELF MODE).",
+        SRMError("Failed to bind GLES API for device %s connector %d (DUMB MODE).",
                  connector->device->name,
                  connector->id);
         goto fail;
@@ -719,7 +722,7 @@ static UInt8 initialize(SRMConnector *connector)
     return 1;
 
 fail:
-    SRMError("Failed to initialize render mode ITSELF for device %s connector %d.",
+    SRMError("Failed to initialize render mode DUMB for device %s connector %d.",
              connector->device->name,
              connector->id);
 

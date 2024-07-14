@@ -20,9 +20,8 @@ SRMPlane *srmPlaneCreate(SRMDevice *device, UInt32 id)
     if (!srmPlaneUpdateProperties(plane))
         goto fail;
 
-    if (!plane->inFormats)
-        if (!srmPlaneUpdateFormats(plane))
-            goto fail;
+    if (!srmPlaneUpdateFormats(plane))
+        goto fail;
 
     plane->crtcs = srmListCreate();
     if (!srmPlaneUpdateCrtcs(plane))
@@ -187,8 +186,6 @@ void srmPlaneDestroyInFormats(SRMPlane *plane)
 
 UInt8 srmPlaneUpdateFormats(SRMPlane *plane)
 {
-    srmPlaneDestroyInFormats(plane);
-
     drmModePlane *planeResource = drmModeGetPlane(plane->device->fd, plane->id);
 
     if (!planeResource)
@@ -197,7 +194,8 @@ UInt8 srmPlaneUpdateFormats(SRMPlane *plane)
         return 0;
     }
 
-    plane->inFormats = srmListCreate();
+    if (!plane->inFormats)
+        plane->inFormats = srmListCreate();
 
     for (UInt32 i = 0; i < planeResource->count_formats; i++)
         srmFormatsListAddFormat(plane->inFormats, planeResource->formats[i], DRM_FORMAT_MOD_INVALID);

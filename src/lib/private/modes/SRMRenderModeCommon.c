@@ -1361,8 +1361,14 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
 
         if (fmt->format == DRM_FORMAT_XRGB8888
             && fmt->modifier != DRM_FORMAT_MOD_LINEAR
+            && fmt->modifier != DRM_FORMAT_MOD_INVALID
             && srmFormatIsInList(srmDeviceGetDMATextureFormats(connector->device), fmt->format, fmt->modifier))
         {
+            SRMDebug("[%s] Connector %d using format: %s - %s.",
+                connector->device->name,
+                connector->id,
+                drmGetFormatName(fmt->format),
+                drmGetFormatModifierName(fmt->modifier));
             connector->currentFormat.modifier = fmt->modifier;
             break;
         }

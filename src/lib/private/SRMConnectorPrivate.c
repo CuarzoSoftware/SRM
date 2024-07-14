@@ -444,9 +444,9 @@ void *srmConnectorRenderThread(void *conn)
 
     SRM_RENDER_MODE renderMode = srmDeviceGetRenderMode(connector->device);
 
-    SRMDebug("Connector %d device %s render mode = %s.",
-             connector->id,
+    SRMDebug("[%s] Connector %d render mode = %s.",
              connector->device->name,
+             connector->id,
              srmGetRenderModeString(renderMode));
 
     if (renderMode == SRM_RENDER_MODE_ITSELF)
@@ -459,7 +459,7 @@ void *srmConnectorRenderThread(void *conn)
         srmRenderModeCPUSetInterface(connector);
     else
     {
-        SRMError("Invalid render mode %s connector %d.",
+        SRMError("[%s] Invalid render mode for connector %d.",
                  connector->device->name,
                  connector->id);
         goto finish;
@@ -467,7 +467,7 @@ void *srmConnectorRenderThread(void *conn)
 
     if (!connector->renderInterface.initialize(connector))
     {
-        SRMError("Render mode interface initialize() failed %s connector %d.",
+        SRMError("[%s] Render mode interface initialize() failed for connector %d.",
                  connector->device->name,
                  connector->id);
         goto finish;

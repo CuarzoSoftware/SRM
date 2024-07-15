@@ -108,6 +108,13 @@ SRMList *srmFormatsListCopy(SRMList *formatsList);
 void srmFormatsListDestroy(SRMList **formatsList);
 
 /**
+ * @brief Returns an equivalent format with (or without) alpha channel.
+ *
+ * If the format doesn't have a substitute, the same value is returned.
+ */
+UInt32 srmFormatGetAlphaSubstitute(UInt32 format);
+
+/**
  * @}
  */
 

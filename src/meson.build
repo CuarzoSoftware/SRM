@@ -117,6 +117,7 @@ if get_option('build_examples')
     subdir('examples/srm-display-info')
     subdir('examples/srm-all-connectors')
     subdir('examples/srm-multi-session')
+    subdir('examples/srm-direct-scanout')
 endif
 
 if get_option('build_tests')

@@ -288,6 +288,17 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     }
 
     glFlush();
+
+    if (buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
+    {
+        /* This is used to later get a gbm bo if the buffer is used for scanout */
+        texture->image = eglCreateImage(buffer->allocator->eglDisplay,
+                                        buffer->allocator->eglSharedContext,
+                                        EGL_GL_TEXTURE_2D_KHR,
+                                        (EGLClientBuffer)(UInt64)texture->texture,
+                                        NULL);
+    }
+
     eglMakeCurrent(prevDisplay,
                    prevSurfDraw,
                    prevSurfRead,

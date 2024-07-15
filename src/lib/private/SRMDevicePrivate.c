@@ -350,6 +350,9 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
     device->eglExtensions.EXT_create_context_robustness = srmEGLHasExtension(extensions, "EGL_EXT_create_context_robustness");
     device->eglExtensions.KHR_image_pixmap = srmEGLHasExtension(extensions, "EGL_KHR_image_pixmap");
 
+    if (device->eglExtensions.KHR_image)
+        device->eglExtensions. KHR_gl_texture_2D_image = srmEGLHasExtension(extensions, "EGL_KHR_gl_texture_2D_image");
+
     const char *deviceExtensions = NULL, *driverName = NULL;
 
     if (device->core->eglExtensions.EXT_device_query)

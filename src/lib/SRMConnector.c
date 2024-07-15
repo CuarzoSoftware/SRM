@@ -795,16 +795,10 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
                     bo = gbm_bo_import(connector->device->gbm, GBM_BO_IMPORT_EGL_IMAGE, texture->image, GBM_BO_USE_SCANOUT);
 
                     if (!bo)
-                        return 0;
+                        break;
 
                     connector->userScanoutBuffer[0].bo = bo;
                 }
-
-                /* TODO: If allocated from GLES */
-
-                SRMError("[%s][%s] Failed to set custom scanout buffer. OpenGL allocated buffers not yet supported.",
-                         connector->device->name,
-                         connector->name);
 
                 break;
             }
@@ -812,7 +806,12 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
     }
 
     if (!bo)
+    {
+        SRMError("[%s][%s] Failed to set custom scanout buffer. Could not get a GBM bo.",
+                 connector->device->name,
+                 connector->name);
         return 0;
+    }
 
     connector->userScanoutBuffer[0].bufferRef = srmBufferGetRef(buffer);
 
@@ -823,7 +822,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
     UInt32 offsets[4] = {0};
     UInt64 modifiers[4] = {0};
 
-    Int32 planesCount = gbm_bo_get_plane_count(buffer->bo);
+    Int32 planesCount = gbm_bo_get_plane_count(bo);
     fmt.format = gbm_bo_get_format(bo);
     fmt.modifier = gbm_bo_get_modifier(bo);
 
@@ -838,19 +837,21 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
         if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, fmt.format, fmt.modifier))
         {
-            SRMError("[%s][%s] Failed to set custom scanout buffer. Unsupported format/modifier.",
+            SRMError("[%s][%s] Failed to set custom scanout buffer. Unsupported format/modifier: %s - %s.",
                      connector->device->name,
-                     connector->name);
+                     connector->name,
+                     drmGetFormatName(fmt.format),
+                     drmGetFormatModifierName(fmt.modifier));
             goto releaseAndFail;
         }
     }
 
     for (Int32 i = 0; i < planesCount; i++)
     {
-        handles[i] = gbm_bo_get_handle_for_plane(buffer->bo, i).u32;
-        pitches[i] = gbm_bo_get_stride_for_plane(buffer->bo, i);
-        offsets[i] = gbm_bo_get_offset(buffer->bo, i);
-        modifiers[i] = gbm_bo_get_modifier(buffer->bo);
+        handles[i] = gbm_bo_get_handle_for_plane(bo, i).u32;
+        pitches[i] = gbm_bo_get_stride_for_plane(bo, i);
+        offsets[i] = gbm_bo_get_offset(bo, i);
+        modifiers[i] = gbm_bo_get_modifier(bo);
     }
 
     if (connector->device->capAddFb2Modifiers && fmt.modifier != DRM_FORMAT_MOD_INVALID)

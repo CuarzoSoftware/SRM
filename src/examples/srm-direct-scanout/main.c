@@ -3,8 +3,9 @@
  *
  * Author: Eduardo Hopperdietzel
  *
- * Description: This example sets a custom scanout buffer (a black and white stripe pattern) for each initialized connector,
- *              or paints the background with a solid color on failure.
+ * Description: This example alternates between using a custom scanout buffer (black and white stripe pattern)
+ *              and rendering a solid color every second for each initialized connector.
+ *              Solid colors are displayed exclusively on failure.
  */
 
 #include <SRMBuffer.h>
@@ -25,6 +26,7 @@
 #include <unistd.h>
 
 float color = 0.f;
+static UInt32 secs = 0;
 
 /* Opens a DRM device */
 static int openRestricted(const char *path, int flags, void *userData)
@@ -56,7 +58,7 @@ static void createScanoutBuffer(SRMConnector *connector)
     UInt32 stride = width * 4;
     UInt32 format = DRM_FORMAT_XRGB8888;
     UInt8 *pixels = malloc(stride * height);
-    UInt32 lineSize = 32;
+    UInt32 lineSize = height / 25;
     UInt8 blackWhiteToggle = 0;
 
     UInt8 *pixel = pixels;
@@ -107,7 +109,12 @@ static void paintGL(SRMConnector *connector, void *userData)
 
     SRMBuffer *scanoutBuffer = srmConnectorGetUserData(connector);
 
-    if (scanoutBuffer && srmConnectorSetCustomScanoutBuffer(connector, scanoutBuffer))
+    color += 0.05f;
+
+    if (color > M_PI*4.f)
+        color = 0.f;
+
+    if (secs % 2 == 0 && scanoutBuffer && srmConnectorSetCustomScanoutBuffer(connector, scanoutBuffer))
     {
         srmConnectorRepaint(connector);
         return;
@@ -117,11 +124,6 @@ static void paintGL(SRMConnector *connector, void *userData)
                  (sinf(color * 0.5f) + 1.f) / 2.f,
                  (sinf(color * 0.25f) + 1.f) / 2.f,
                  1.f);
-
-    color += 0.01f;
-
-    if (color > M_PI*4.f)
-        color = 0.f;
 
     glClear(GL_COLOR_BUFFER_BIT);
     srmConnectorRepaint(connector);
@@ -213,8 +215,6 @@ int main(void)
         }
     }
 
-    UInt32 secs = 0;
-
     while (1)
     {
         /* Udev monitor poll DRM devices/connectors hotplugging events (-1 disables timeout).
@@ -225,7 +225,7 @@ int main(void)
 
         secs++;
 
-        if (secs > 10)
+        if (secs > 20)
         {
             srmCoreDestroy(core);
             break;

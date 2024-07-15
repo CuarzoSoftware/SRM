@@ -66,6 +66,7 @@ typedef struct SRMEGLDeviceExtensionsStruct
     UInt8 EXT_create_context_robustness;
     UInt8 MESA_device_software;
     UInt8 KHR_image_pixmap;
+    UInt8 KHR_gl_texture_2D_image;
 #ifdef EGL_DRIVER_NAME_EXT
     UInt8 EXT_device_persistent_id;
 #endif

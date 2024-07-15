@@ -487,6 +487,14 @@ void srmBufferDestroy(SRMBuffer *buffer)
 {
     pthread_mutex_lock(&buffer->mutex);
 
+    buffer->refCount--;
+
+    if (buffer->refCount > 0)
+    {
+        pthread_mutex_unlock(&buffer->mutex);
+        return;
+    }
+
     if (buffer->textures)
     {
         while (!srmListIsEmpty(buffer->textures))
@@ -509,10 +517,8 @@ void srmBufferDestroy(SRMBuffer *buffer)
         usleep(1000);
 
     for (UInt32 i = 0; i < buffer->planesCount; i++)
-    {
         if (buffer->fds[i] != -1)
             close(buffer->fds[i]);
-    }
 
     if (buffer->bo)
     {

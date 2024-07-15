@@ -43,6 +43,8 @@ typedef enum SRM_BUFFER_WRITE_MODE_ENUM
     SRM_BUFFER_WRITE_MODE_GLES
 } SRM_BUFFER_WRITE_MODE;
 
+
+
 struct SRMBufferStruct
 {
     // Common
@@ -50,6 +52,7 @@ struct SRMBufferStruct
     pthread_mutex_t mutex;
     enum SRM_BUFFER_SRC src;
     SRM_BUFFER_WRITE_MODE writeMode;
+    UInt32 refCount;
 
     UInt32 width;
     UInt32 height;
@@ -82,6 +85,9 @@ struct SRMBufferStruct
 };
 
 SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator);
+
+/* Increases the ref count by 1 */
+SRMBuffer *srmBufferGetRef(SRMBuffer *buffer);
 Int32 srmBufferGetDMAFDFromBO(SRMDevice *device, struct gbm_bo *bo);
 void *srmBufferMapFD(Int32 fd, size_t len, UInt32 *caps);
 struct gbm_bo *srmBufferCreateLinearBO(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format);

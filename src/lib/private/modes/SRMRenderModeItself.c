@@ -429,9 +429,6 @@ static UInt8 render(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (connector->pendingPageFlip)
-        srmRenderModeCommonWaitPageFlip(connector, -1);
-
     if (connector->device->eglDisplay != eglGetCurrentDisplay() ||
         data->connectorEGLSurface != eglGetCurrentSurface(EGL_READ) ||
         data->connectorEGLSurface != eglGetCurrentSurface(EGL_DRAW) ||

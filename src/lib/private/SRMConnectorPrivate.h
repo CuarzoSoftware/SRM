@@ -124,6 +124,14 @@ struct SRMConnectorStruct
     UInt8 allowModifiers;
     struct SRMConnectorRenderInterface renderInterface;
     void *renderData;
+    UInt8 inPaintGL;
+
+    // User scanout buffer (pending and current)
+    struct {
+        SRMBuffer *bufferRef;
+        UInt32 drmFB;
+        struct gbm_bo *bo; // Can be NULL
+    } userScanoutBuffer[2];
 };
 
 SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id);
@@ -148,7 +156,7 @@ UInt8 srmConnectorGetBestConfiguration(SRMConnector *connector, SRMEncoder **bes
 void *srmConnectorRenderThread(void *conn);
 void srmConnectorUnlockRenderThread(SRMConnector *connector, UInt8 repaint);
 void srmConnectorRenderThreadCleanUp(SRMConnector *connector);
-void srmConnectorFreeScanoutBuffer(SRMConnector *connector, Int8 index);
+void srmConnectorReleaseUserScanoutBuffer(SRMConnector *connector, Int8 index);
 
 #ifdef __cplusplus
 }

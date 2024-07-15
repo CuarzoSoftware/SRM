@@ -1025,6 +1025,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     Int32 ret = 0;
 
     UInt32 buffersCount = srmConnectorGetBuffersCount(connector);
+    UInt8 customScanoutBuffer = connector->userScanoutBuffer[0].bufferRef != NULL;
 
     if (connector->pendingPageFlip || buffersCount == 1 || buffersCount > 2)
         srmRenderModeCommonWaitPageFlip(connector, -1);
@@ -1142,7 +1143,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                  connector->id, ret);
     }
 
-    if (buffersCount == 2 || connector->firstPageFlip)
+    if (customScanoutBuffer || buffersCount == 2 || connector->firstPageFlip)
     {
         connector->firstPageFlip = 0;
         srmRenderModeCommonWaitPageFlip(connector, -1);

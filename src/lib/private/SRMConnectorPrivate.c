@@ -490,8 +490,29 @@ void *srmConnectorRenderThread(void *conn)
             if (connector->repaintRequested)
             {
                     connector->repaintRequested = 0;
+
+                    connector->inPaintGL = 1;
                     connector->renderInterface.render(connector);
-                    connector->renderInterface.flipPage(connector);
+                    connector->inPaintGL = 0;
+
+                    /* Scanning out a custom user buffer (skip the render mode interface) */
+                    if (connector->userScanoutBuffer[0].bufferRef)
+                    {
+                        srmRenderModeCommonPageFlip(connector, connector->userScanoutBuffer[0].drmFB);
+                        connector->interface->pageFlipped(connector, connector->interfaceData);
+                    }
+                    /* Normal connector rendering */
+                    else
+                        connector->renderInterface.flipPage(connector);
+
+                    /* Release previous custom scanout buffer if any */
+                    if (connector->userScanoutBuffer[0].bufferRef || connector->userScanoutBuffer[1].bufferRef)
+                    {
+                        srmConnectorReleaseUserScanoutBuffer(connector, 1);
+                        connector->userScanoutBuffer[1] = connector->userScanoutBuffer[0];
+                        memset(&connector->userScanoutBuffer[0], 0, sizeof(connector->userScanoutBuffer[0]));
+                    }
+
                     pthread_mutex_unlock(&connector->stateMutex);
                     continue;
             }
@@ -586,7 +607,8 @@ void srmConnectorSetCursorPlaneToNeededConnector(SRMPlane *cursorPlane)
 void srmConnectorRenderThreadCleanUp(SRMConnector *connector)
 {
     connector->renderThread = 0;
-
+    srmConnectorReleaseUserScanoutBuffer(connector, 0);
+    srmConnectorReleaseUserScanoutBuffer(connector, 1);
     srmRenderModeCommonDestroyCursor(connector);
 
     if (connector->hasRepaintCond)
@@ -718,5 +740,26 @@ void srmConnectorInitGamma(SRMConnector *connector)
         SRMDebug("[%s] Connector (%d) does not support gamma correction.",
                  connector->device->name,
                  connector->id);
+    }
+}
+
+void srmConnectorReleaseUserScanoutBuffer(SRMConnector *connector, Int8 index)
+{
+    if (connector->userScanoutBuffer[index].drmFB != 0)
+    {
+        drmModeRmFB(connector->device->fd, connector->userScanoutBuffer[index].drmFB);
+        connector->userScanoutBuffer[index].drmFB = 0;
+    }
+
+    if (connector->userScanoutBuffer[index].bo)
+    {
+        gbm_bo_destroy(connector->userScanoutBuffer[index].bo);
+        connector->userScanoutBuffer[index].bo = NULL;
+    }
+
+    if (connector->userScanoutBuffer[index].bufferRef)
+    {
+        srmBufferDestroy(connector->userScanoutBuffer[index].bufferRef);
+        connector->userScanoutBuffer[index].bufferRef = NULL;
     }
 }

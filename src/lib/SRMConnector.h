@@ -746,6 +746,26 @@ void srmConnectorSetContentType(SRMConnector *connector, SRM_CONNECTOR_CONTENT_T
 SRM_CONNECTOR_CONTENT_TYPE srmConnectorGetContentType(SRMConnector *connector);
 
 /**
+ * @brief Sets a custom scanout buffer for the primary plane.
+ *
+ * This function allows you to set a custom scanout buffer for the primary plane only during a single frame.
+ * It must called within a `paintGL()` event. Calling it outside a `paintGL()` will result in an error.
+ *
+ * If successfully set, the current buffer index is not updated, and no OpenGL rendering operations should be performed within the `paintGL()` event.
+ * If not set again in subsequent frames, the connector's framebuffers are restored, and the current buffer index continues to be updated as usual.
+ *
+ * @note The size of the buffer must match the dimensions of the current connector's mode.
+ *
+ * If successfully set, the internal reference counter of the buffer is increased, ensuring it remains scannable for at least the given frame
+ * even if it is destroyed.
+ *
+ * @param connector A pointer to the @ref SRMConnector instance.
+ * @param buffer The buffer to scan, or `NULL` to restore the default connector framebuffers.
+ * @return 1 on success, 0 on failure.
+ */
+UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buffer);
+
+/**
  * @}
  */
 

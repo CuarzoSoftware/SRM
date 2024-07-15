@@ -725,3 +725,200 @@ SRM_CONNECTOR_CONTENT_TYPE srmConnectorGetContentType(SRMConnector *connector)
 {
     return connector->contentType;
 }
+
+UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buffer)
+{
+    if (!connector->inPaintGL)
+        return 0;
+
+    if (buffer == connector->userScanoutBuffer[0].bufferRef)
+    {
+        SRMDebug("[%s][%s] Custom scanout buffer succesfully set.",
+                 connector->device->name,
+                 connector->name);
+        return 1;
+    }
+
+    srmConnectorReleaseUserScanoutBuffer(connector, 0);
+
+    if (!buffer)
+    {
+        SRMDebug("[%s][%s] Custom scanout buffer succesfully unset.",
+                 connector->device->name,
+                 connector->name);
+        return 1;
+    }
+
+    if (connector->device != buffer->allocator)
+    {
+        SRMError("[%s][%s] Failed to set custom scanout buffer. The buffer allocator must match the connector's device.",
+                 connector->device->name,
+                 connector->name);
+        return 0;
+    }
+
+    SRMConnectorMode *mode = srmConnectorGetCurrentMode(connector);
+
+    if (srmConnectorModeGetWidth(mode) != srmBufferGetWidth(buffer) || srmConnectorModeGetHeight(mode) != srmBufferGetHeight(buffer))
+    {
+        SRMError("[%s][%s] Failed to set custom scanout buffer. The buffer dimensions must match the connector's mode size.",
+                 connector->device->name,
+                 connector->name);
+        return 0;
+    }
+
+    if (srmBufferGetTextureID(connector->device, buffer) == 0)
+    {
+        SRMError("[%s][%s] Failed to set custom scanout buffer. The buffer is not supported by the connector's device.",
+                 connector->device->name,
+                 connector->name);
+        return 0;
+    }
+
+    struct gbm_bo *bo = NULL;
+
+    /* If the buffer already has a bo*/
+    if (buffer->bo)
+        bo = buffer->bo;
+    else
+    {
+        struct SRMBufferTexture *texture;
+        SRMListForeach(item, buffer->textures)
+        {
+            texture = srmListItemGetData(item);
+
+            if (texture->device == connector->device)
+            {
+                /* If already contains an EGL Image */
+                if (texture->image != EGL_NO_IMAGE)
+                {
+                    bo = gbm_bo_import(connector->device->gbm, GBM_BO_IMPORT_EGL_IMAGE, texture->image, GBM_BO_USE_SCANOUT);
+
+                    if (!bo)
+                        return 0;
+
+                    connector->userScanoutBuffer[0].bo = bo;
+                }
+
+                /* TODO: If allocated from GLES */
+
+                SRMError("[%s][%s] Failed to set custom scanout buffer. OpenGL allocated buffers not yet supported.",
+                         connector->device->name,
+                         connector->name);
+
+                break;
+            }
+        }
+    }
+
+    if (!bo)
+        return 0;
+
+    connector->userScanoutBuffer[0].bufferRef = srmBufferGetRef(buffer);
+
+    SRMFormat fmt;
+    Int32 ret = 1;
+    UInt32 handles[4] = {0};
+    UInt32 pitches[4] = {0};
+    UInt32 offsets[4] = {0};
+    UInt64 modifiers[4] = {0};
+
+    Int32 planesCount = gbm_bo_get_plane_count(buffer->bo);
+    fmt.format = gbm_bo_get_format(bo);
+    fmt.modifier = gbm_bo_get_modifier(bo);
+
+    if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, fmt.format, fmt.modifier))
+    {
+        SRMError("[%s][%s] Failed to set custom scanout buffer. Format %s not supported by primary plane. Trying alpha substitute format",
+                 connector->device->name,
+                 connector->name,
+                 drmGetFormatName(fmt.format));
+
+        fmt.format = srmFormatGetAlphaSubstitute(fmt.format);
+
+        if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, fmt.format, fmt.modifier))
+        {
+            SRMError("[%s][%s] Failed to set custom scanout buffer. Unsupported format/modifier.",
+                     connector->device->name,
+                     connector->name);
+            goto releaseAndFail;
+        }
+    }
+
+    for (Int32 i = 0; i < planesCount; i++)
+    {
+        handles[i] = gbm_bo_get_handle_for_plane(buffer->bo, i).u32;
+        pitches[i] = gbm_bo_get_stride_for_plane(buffer->bo, i);
+        offsets[i] = gbm_bo_get_offset(buffer->bo, i);
+        modifiers[i] = gbm_bo_get_modifier(buffer->bo);
+    }
+
+    if (connector->device->capAddFb2Modifiers && fmt.modifier != DRM_FORMAT_MOD_INVALID)
+    {
+        ret = drmModeAddFB2WithModifiers(
+            connector->device->fd,
+            buffer->width, buffer->height,
+            fmt.format, handles, pitches, offsets, modifiers,
+            &connector->userScanoutBuffer[0].drmFB, DRM_MODE_FB_MODIFIERS);
+    }
+
+    if (ret)
+    {
+        SRMError("[%s][%s] Failed to set custom scanout buffer using drmModeAddFB2WithModifiers(), trying drmModeAddFB2().",
+                 connector->device->name,
+                 connector->name);
+
+        if (fmt.modifier != DRM_FORMAT_MOD_INVALID && fmt.modifier != DRM_FORMAT_MOD_LINEAR)
+        {
+            SRMError("[%s][%s] Failed to set custom scanout buffer. drmModeAddFB2() and drmModeAddFB() do not support explicit modifiers.",
+                     connector->device->name,
+                     connector->name);
+            goto releaseAndFail;
+        }
+
+        ret = drmModeAddFB2(
+            connector->device->fd,
+            buffer->width, buffer->height,
+            fmt.format, handles, pitches, offsets,
+            &connector->userScanoutBuffer[0].drmFB, DRM_MODE_FB_MODIFIERS);
+    }
+
+    if (ret && planesCount == 1 && offsets[0] == 0)
+    {
+        SRMError("[%s][%s] Failed to set custom scanout buffer using drmModeAddFB2(), trying drmModeAddFB().",
+                 connector->device->name,
+                 connector->name);
+
+        UInt32 depth, bpp;
+        srmFormatGetDepthBpp(fmt.format, &depth, &bpp);
+
+        if (depth == 0 || bpp == 0)
+        {
+            SRMError("[%s][%s] Failed to set custom scanout buffer using drmModeAddFB(), could not get depth and bpp for format %s.",
+                     connector->device->name,
+                     connector->name,
+                     drmGetFormatName(fmt.format));
+            goto releaseAndFail;
+        }
+
+        ret = drmModeAddFB(
+            connector->device->fd,
+            buffer->width, buffer->height,
+            depth, bpp, pitches[0], handles[0],
+            &connector->userScanoutBuffer[0].drmFB);
+    }
+
+    if (ret)
+    {
+        SRMError("[%s][%s] Failed to set custom scanout buffer using drmModeAddFB().",
+                 connector->device->name,
+                 connector->name);
+        goto releaseAndFail;
+    }
+
+    return 1;
+
+releaseAndFail:
+    srmConnectorReleaseUserScanoutBuffer(connector, 0);
+    return 0;
+}

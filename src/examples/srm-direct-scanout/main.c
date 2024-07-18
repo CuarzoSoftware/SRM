@@ -87,9 +87,6 @@ static void initializeGL(SRMConnector *connector, void *userData)
 {
     SRM_UNUSED(userData);
 
-    /* You must not do any drawing here as it won't make it to
-     * the screen. */
-
     SRMConnectorMode *mode = srmConnectorGetCurrentMode(connector);
 
     glViewport(0, 
@@ -98,8 +95,6 @@ static void initializeGL(SRMConnector *connector, void *userData)
                srmConnectorModeGetHeight(mode));
 
     createScanoutBuffer(connector);
-
-    // Schedule a repaint (this eventually calls paintGL() later, not directly)
     srmConnectorRepaint(connector);
 }
 

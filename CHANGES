@@ -1,3 +1,23 @@
+SRM (0.7.0-1)
+
+  # API Additions
+
+  * Introduced srmConnectorSetCustomScanoutBuffer() function to override the primary plane framebuffer for specific frames.
+  * Introduced srmFormatGetAlphaSubstitute() function to retrieve the translucent or opaque version of DRM formats.
+
+  # Examples
+
+  * Added srm-direct-scanout example.
+
+  # Internal Changes
+
+  * Integrated legacy plane supported formats into SRMPlane with DRM_FORMAT_MOD_INVALID.
+  * Implemented internal EGL Image creation for CPU buffers allocated through OpenGL.
+  * Incorporated an internal reference counter to SRMBuffer.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Thu, 18 Jul 2024 08:56:15 -0400
+
+
 SRM (0.6.3-1)
 
   # Bug Fixes

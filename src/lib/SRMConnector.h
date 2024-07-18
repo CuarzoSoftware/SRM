@@ -761,7 +761,7 @@ SRM_CONNECTOR_CONTENT_TYPE srmConnectorGetContentType(SRMConnector *connector);
  *
  * @param connector A pointer to the @ref SRMConnector instance.
  * @param buffer The buffer to scan, or `NULL` to restore the default connector framebuffers.
- * @return 1 on success, 0 on failure.
+ * @return 1 if the custom buffer will be scanned, 0 otherwise.
  */
 UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buffer);
 

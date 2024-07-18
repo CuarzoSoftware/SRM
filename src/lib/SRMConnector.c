@@ -746,7 +746,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         SRMDebug("[%s][%s] Custom scanout buffer succesfully unset.",
                  connector->device->name,
                  connector->name);
-        return 1;
+        return 0;
     }
 
     if (connector->device != buffer->allocator)

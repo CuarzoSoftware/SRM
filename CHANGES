@@ -15,6 +15,10 @@ SRM (0.7.0-1)
   * Implemented internal EGL Image creation for CPU buffers allocated through OpenGL.
   * Incorporated an internal reference counter to SRMBuffer.
 
+  # Environment
+
+  * Added SRM_DISABLE_CUSTOM_SCANOUT to enforce disabling srmConnectorSetCustomScanoutBuffer().
+
 -- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Thu, 18 Jul 2024 08:56:15 -0400
 
 

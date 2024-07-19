@@ -758,6 +758,8 @@ SRM_CONNECTOR_CONTENT_TYPE srmConnectorGetContentType(SRMConnector *connector);
  *
  * If successfully set, the internal reference counter of the buffer is increased, ensuring it remains scannable for at least the given frame
  * even if it is destroyed.
+ * 
+ * @note If `SRM_DISABLE_CUSTOM_SCANOUT` is set to 1, this function always return 0.
  *
  * @param connector A pointer to the @ref SRMConnector instance.
  * @param buffer The buffer to scan, or `NULL` to restore the default connector framebuffers.

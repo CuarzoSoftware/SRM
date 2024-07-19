@@ -728,7 +728,7 @@ SRM_CONNECTOR_CONTENT_TYPE srmConnectorGetContentType(SRMConnector *connector)
 
 UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buffer)
 {
-    if (!connector->inPaintGL)
+    if (!connector->inPaintGL || connector->device->core->customBufferScanoutIsDisabled)
         return 0;
 
     if (buffer == connector->userScanoutBuffer[0].bufferRef)

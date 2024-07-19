@@ -36,6 +36,13 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
     core->interfaceUserData = userData;
     core->isSuspended = 0;
 
+    const char *env = getenv("SRM_DISABLE_CUSTOM_SCANOUT");
+
+    core->customBufferScanoutIsDisabled = env && atoi(env) == 1;
+
+    SRMDebug("[core] Custom scanout enabled: %s.",
+        core->customBufferScanoutIsDisabled ? "NO" : "YES");
+
     // REF -
     if (!srmCoreUpdateEGLExtensions(core))
         goto fail;

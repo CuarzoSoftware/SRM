@@ -58,6 +58,8 @@ struct SRMCoreStruct
     UInt8 deallocatorRunning;
     pthread_cond_t deallocatorCond;
     pthread_mutex_t deallocatorMutex;
+
+    UInt8 customBufferScanoutIsDisabled;
 };
 
 UInt8 srmCoreInitDeallocator(SRMCore *core);

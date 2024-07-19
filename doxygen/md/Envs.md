@@ -58,3 +58,11 @@ All connectors use double buffering by default. You can customize the number of 
 Where N can be 2 = Double or 3 = Triple buffering.
 
 > Using triple buffering can offer a smoother experience by allowing a new frame to be rendered while a page flip is pending, however, it does require more resources.
+
+## Direct Scanout
+
+Scanning out custom buffers is allowed by default (see `srmConnectorSetCustomScanoutBuffer()`). This allows, for example, compositors to directly present fullscreen application windows without needing to render them using OpenGL.
+
+To disable it, set:
+
+**SRM_DISABLE_CUSTOM_SCANOUT**=1

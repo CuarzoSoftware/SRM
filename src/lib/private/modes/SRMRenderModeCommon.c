@@ -1027,7 +1027,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     UInt32 buffersCount = srmConnectorGetBuffersCount(connector);
     UInt8 customScanoutBuffer = connector->userScanoutBuffer[0].bufferRef != NULL;
 
-    if (connector->pendingPageFlip || buffersCount == 1 || buffersCount > 2)
+    if (customScanoutBuffer || connector->pendingPageFlip || buffersCount == 1 || buffersCount > 2)
         srmRenderModeCommonWaitPageFlip(connector, -1);
 
     connector->lastFb = fb;
@@ -1141,6 +1141,18 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
         SRMError("Failed to page flip on device %s connector %d. Error: %d.",
                  connector->device->name,
                  connector->id, ret);
+
+        if (customScanoutBuffer && ret == -22)
+        {
+            if (!srmFormatIsInList(
+                    connector->currentPrimaryPlane->inFormatsBlacklist,
+                    connector->userScanoutBuffer[0].fmt.format,
+                    connector->userScanoutBuffer[0].fmt.modifier))
+                srmFormatsListAddFormat(
+                    connector->currentPrimaryPlane->inFormatsBlacklist,
+                    connector->userScanoutBuffer[0].fmt.format,
+                    connector->userScanoutBuffer[0].fmt.modifier);
+        }
     }
 
     if (customScanoutBuffer || buffersCount == 2 || connector->firstPageFlip)
@@ -1353,7 +1365,7 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
     connector->currentFormat.format = DRM_FORMAT_XRGB8888;
     connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
 
-    if (!connector->device->capAddFb2Modifiers || !connector->allowModifiers)
+    if (!connector->device->clientCapAtomic || !connector->device->capAddFb2Modifiers || !connector->allowModifiers)
         return;
 
     SRMListForeach(it, connector->currentPrimaryPlane->inFormats)

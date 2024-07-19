@@ -32,7 +32,7 @@ struct SRMPlaneStruct
     SRMDevice *device;
     SRMListItem *deviceLink;
     SRMConnector *currentConnector;
-    SRMList *crtcs, *inFormats;
+    SRMList *crtcs, *inFormats, *inFormatsBlacklist;
     SRM_PLANE_TYPE type;
     struct SRMPlanePropIDs propIDs;
 };

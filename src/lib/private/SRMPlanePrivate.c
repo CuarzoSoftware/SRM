@@ -157,6 +157,7 @@ void srmPlaneUpdateInFormats(SRMPlane *plane, UInt64 blobID)
         {
             srmPlaneDestroyInFormats(plane);
             plane->inFormats = srmListCreate();
+            plane->inFormatsBlacklist = srmListCreate();
 
             drmModeFormatModifierIterator iter = {0};
 
@@ -182,6 +183,19 @@ void srmPlaneDestroyInFormats(SRMPlane *plane)
         srmListDestroy(plane->inFormats);
         plane->inFormats = NULL;
     }
+
+    if (plane->inFormatsBlacklist)
+    {
+        while (!srmListIsEmpty(plane->inFormatsBlacklist))
+        {
+            SRMFormat *format = srmListItemGetData(srmListGetBack(plane->inFormatsBlacklist));
+            free(format);
+            srmListPopBack(plane->inFormatsBlacklist);
+        }
+
+        srmListDestroy(plane->inFormatsBlacklist);
+        plane->inFormatsBlacklist = NULL;
+    }
 }
 
 UInt8 srmPlaneUpdateFormats(SRMPlane *plane)
@@ -193,6 +207,9 @@ UInt8 srmPlaneUpdateFormats(SRMPlane *plane)
         SRMError("Failed to get device %s plane %d formats.", plane->device->name, plane->id);
         return 0;
     }
+
+    if (!plane->inFormatsBlacklist)
+        plane->inFormatsBlacklist = srmListCreate();
 
     if (!plane->inFormats)
         plane->inFormats = srmListCreate();

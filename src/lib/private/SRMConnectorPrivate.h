@@ -131,6 +131,7 @@ struct SRMConnectorStruct
         SRMBuffer *bufferRef;
         UInt32 drmFB;
         struct gbm_bo *bo; // Can be NULL
+        SRMFormat fmt;
     } userScanoutBuffer[2];
 };
 

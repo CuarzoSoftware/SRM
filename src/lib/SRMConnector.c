@@ -826,16 +826,20 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
     fmt.format = gbm_bo_get_format(bo);
     fmt.modifier = gbm_bo_get_modifier(bo);
 
-    if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, fmt.format, fmt.modifier))
+    if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, fmt.format, fmt.modifier)
+        || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, fmt.format, fmt.modifier))
     {
-        SRMError("[%s][%s] Failed to set custom scanout buffer. Format %s not supported by primary plane. Trying alpha substitute format",
-                 connector->device->name,
-                 connector->name,
-                 drmGetFormatName(fmt.format));
-
+        UInt32 oldFmt = fmt.format;
         fmt.format = srmFormatGetAlphaSubstitute(fmt.format);
 
-        if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, fmt.format, fmt.modifier))
+        SRMError("[%s][%s] Failed to set custom scanout buffer. Format %s not supported by primary plane. Trying alpha substitute format %s",
+                 connector->device->name,
+                 connector->name,
+                 drmGetFormatName(oldFmt),
+                 drmGetFormatName(fmt.format));
+
+        if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, fmt.format, fmt.modifier)
+            || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, fmt.format, fmt.modifier))
         {
             SRMError("[%s][%s] Failed to set custom scanout buffer. Unsupported format/modifier: %s - %s.",
                      connector->device->name,
@@ -917,6 +921,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         goto releaseAndFail;
     }
 
+    connector->userScanoutBuffer[0].fmt = fmt;
     return 1;
 
 releaseAndFail:

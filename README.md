@@ -41,6 +41,7 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 * V-Sync control (support for the atomic DRM API requires Linux >= 6.8)
 * Framebuffer damage (enhances performance in multi-GPU setups where DMA support is lacking)
 * Access to screen framebuffers as textures
+* Direct Scanout (primary plane)
 * Support for double and triple buffering
 * Gamma correction
 

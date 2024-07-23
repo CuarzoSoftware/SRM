@@ -171,9 +171,10 @@ UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
     connector->cursorX = x;
     connector->cursorY = y;
 
-    if (connector->device->clientCapAtomic && connector->currentVSync)
+    if (connector->device->clientCapAtomic)
     {
-        connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION;
+        if (connector->cursorVisible)
+            connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION;
         pthread_mutex_unlock(&connector->propsMutex);
         pthread_cond_signal(&connector->repaintCond);
     }
@@ -731,7 +732,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
     if (!connector->inPaintGL || connector->device->core->customBufferScanoutIsDisabled)
         return 0;
 
-    if (buffer == connector->userScanoutBuffer[0].bufferRef)
+    if (buffer == connector->userScanoutBufferRef[0])
     {
         SRMDebug("[%s][%s] Custom scanout buffer succesfully set.",
                  connector->device->name,
@@ -775,6 +776,23 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         return 0;
     }
 
+    /* Already created */
+
+    if (buffer->scanout.fb)
+    {
+        if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier)
+            || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier))
+        {
+            SRMError("[%s][%s] Failed to set custom scanout buffer. Format not supported by the primary plane.",
+                     connector->device->name,
+                     connector->name);
+            return 0;
+        }
+
+        connector->userScanoutBufferRef[0] = srmBufferGetRef(buffer);
+        return 1;
+    }
+
     struct gbm_bo *bo = NULL;
 
     /* If the buffer already has a bo*/
@@ -797,7 +815,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
                     if (!bo)
                         break;
 
-                    connector->userScanoutBuffer[0].bo = bo;
+                    buffer->scanout.bo = bo;
                 }
 
                 break;
@@ -813,9 +831,8 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         return 0;
     }
 
-    connector->userScanoutBuffer[0].bufferRef = srmBufferGetRef(buffer);
+    connector->userScanoutBufferRef[0] = srmBufferGetRef(buffer);
 
-    SRMFormat fmt;
     Int32 ret = 1;
     UInt32 handles[4] = {0};
     UInt32 pitches[4] = {0};
@@ -823,29 +840,29 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
     UInt64 modifiers[4] = {0};
 
     Int32 planesCount = gbm_bo_get_plane_count(bo);
-    fmt.format = gbm_bo_get_format(bo);
-    fmt.modifier = gbm_bo_get_modifier(bo);
+    buffer->scanout.fmt.format = gbm_bo_get_format(bo);
+    buffer->scanout.fmt.modifier = gbm_bo_get_modifier(bo);
 
-    if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, fmt.format, fmt.modifier)
-        || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, fmt.format, fmt.modifier))
+    if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier)
+        || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier))
     {
-        UInt32 oldFmt = fmt.format;
-        fmt.format = srmFormatGetAlphaSubstitute(fmt.format);
+        UInt32 oldFmt = buffer->scanout.fmt.format;
+        buffer->scanout.fmt.format = srmFormatGetAlphaSubstitute(buffer->scanout.fmt.format);
 
         SRMError("[%s][%s] Failed to set custom scanout buffer. Format %s not supported by primary plane. Trying alpha substitute format %s",
                  connector->device->name,
                  connector->name,
                  drmGetFormatName(oldFmt),
-                 drmGetFormatName(fmt.format));
+                 drmGetFormatName(buffer->scanout.fmt.format));
 
-        if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, fmt.format, fmt.modifier)
-            || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, fmt.format, fmt.modifier))
+        if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier)
+            || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier))
         {
             SRMError("[%s][%s] Failed to set custom scanout buffer. Unsupported format/modifier: %s - %s.",
                      connector->device->name,
                      connector->name,
-                     drmGetFormatName(fmt.format),
-                     drmGetFormatModifierName(fmt.modifier));
+                     drmGetFormatName(buffer->scanout.fmt.format),
+                     drmGetFormatModifierName(buffer->scanout.fmt.modifier));
             goto releaseAndFail;
         }
     }
@@ -858,13 +875,13 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         modifiers[i] = gbm_bo_get_modifier(bo);
     }
 
-    if (connector->device->capAddFb2Modifiers && fmt.modifier != DRM_FORMAT_MOD_INVALID)
+    if (connector->device->capAddFb2Modifiers && buffer->scanout.fmt.modifier != DRM_FORMAT_MOD_INVALID)
     {
         ret = drmModeAddFB2WithModifiers(
             connector->device->fd,
             buffer->width, buffer->height,
-            fmt.format, handles, pitches, offsets, modifiers,
-            &connector->userScanoutBuffer[0].drmFB, DRM_MODE_FB_MODIFIERS);
+            buffer->scanout.fmt.format, handles, pitches, offsets, modifiers,
+            &buffer->scanout.fb, DRM_MODE_FB_MODIFIERS);
     }
 
     if (ret)
@@ -873,7 +890,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
                  connector->device->name,
                  connector->name);
 
-        if (fmt.modifier != DRM_FORMAT_MOD_INVALID && fmt.modifier != DRM_FORMAT_MOD_LINEAR)
+        if (buffer->scanout.fmt.modifier != DRM_FORMAT_MOD_INVALID && buffer->scanout.fmt.modifier != DRM_FORMAT_MOD_LINEAR)
         {
             SRMError("[%s][%s] Failed to set custom scanout buffer. drmModeAddFB2() and drmModeAddFB() do not support explicit modifiers.",
                      connector->device->name,
@@ -884,8 +901,8 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         ret = drmModeAddFB2(
             connector->device->fd,
             buffer->width, buffer->height,
-            fmt.format, handles, pitches, offsets,
-            &connector->userScanoutBuffer[0].drmFB, DRM_MODE_FB_MODIFIERS);
+            buffer->scanout.fmt.format, handles, pitches, offsets,
+            &buffer->scanout.fb, DRM_MODE_FB_MODIFIERS);
     }
 
     if (ret && planesCount == 1 && offsets[0] == 0)
@@ -895,14 +912,14 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
                  connector->name);
 
         UInt32 depth, bpp;
-        srmFormatGetDepthBpp(fmt.format, &depth, &bpp);
+        srmFormatGetDepthBpp(buffer->scanout.fmt.format, &depth, &bpp);
 
         if (depth == 0 || bpp == 0)
         {
             SRMError("[%s][%s] Failed to set custom scanout buffer using drmModeAddFB(), could not get depth and bpp for format %s.",
                      connector->device->name,
                      connector->name,
-                     drmGetFormatName(fmt.format));
+                     drmGetFormatName(buffer->scanout.fmt.format));
             goto releaseAndFail;
         }
 
@@ -910,7 +927,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
             connector->device->fd,
             buffer->width, buffer->height,
             depth, bpp, pitches[0], handles[0],
-            &connector->userScanoutBuffer[0].drmFB);
+            &buffer->scanout.fb);
     }
 
     if (ret)
@@ -921,7 +938,6 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         goto releaseAndFail;
     }
 
-    connector->userScanoutBuffer[0].fmt = fmt;
     return 1;
 
 releaseAndFail:

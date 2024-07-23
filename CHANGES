@@ -2,7 +2,7 @@ SRM (0.7.0-1)
 
   # API Additions
 
-  * Introduced srmConnectorSetCustomScanoutBuffer() function to override the primary plane framebuffer for specific frames.
+  * Added srmConnectorSetCustomScanoutBuffer() function to override the primary plane framebuffer for specific frames.
   * Introduced srmFormatGetAlphaSubstitute() function to retrieve the translucent or opaque version of DRM formats.
 
   # Examples
@@ -17,9 +17,9 @@ SRM (0.7.0-1)
 
   # Environment
 
-  * Added SRM_DISABLE_CUSTOM_SCANOUT to enforce disabling srmConnectorSetCustomScanoutBuffer().
+  * Added SRM_DISABLE_CUSTOM_SCANOUT env to enforce disabling srmConnectorSetCustomScanoutBuffer().
 
--- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Thu, 18 Jul 2024 08:56:15 -0400
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Mon, 22 Jul 2024 21:53:53 -0400
 
 
 SRM (0.6.3-1)

@@ -1,6 +1,7 @@
 #ifndef SRMBUFFERPRIVATE_H
 #define SRMBUFFERPRIVATE_H
 
+#include <SRMFormat.h>
 #include <SRMBuffer.h>
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
@@ -67,6 +68,13 @@ struct SRMBufferStruct
     // GBM
     struct gbm_bo *bo;
     void *mapData;
+
+    // Scanout
+    struct {
+        UInt32 fb;
+        struct gbm_bo *bo; // Can be NULL
+        SRMFormat fmt;
+    } scanout;
 
     // DMA
     UInt32 planesCount;

@@ -127,12 +127,7 @@ struct SRMConnectorStruct
     UInt8 inPaintGL;
 
     // User scanout buffer (pending and current)
-    struct {
-        SRMBuffer *bufferRef;
-        UInt32 drmFB;
-        struct gbm_bo *bo; // Can be NULL
-        SRMFormat fmt;
-    } userScanoutBuffer[2];
+    SRMBuffer *userScanoutBufferRef[2];
 };
 
 SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id);

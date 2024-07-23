@@ -496,9 +496,9 @@ void *srmConnectorRenderThread(void *conn)
                     connector->inPaintGL = 0;
 
                     /* Scanning out a custom user buffer (skip the render mode interface) */
-                    if (connector->userScanoutBuffer[0].bufferRef)
+                    if (connector->userScanoutBufferRef[0])
                     {
-                        srmRenderModeCommonPageFlip(connector, connector->userScanoutBuffer[0].drmFB);
+                        srmRenderModeCommonPageFlip(connector, connector->userScanoutBufferRef[0]->scanout.fb);
                         connector->interface->pageFlipped(connector, connector->interfaceData);
                     }
                     /* Normal connector rendering */
@@ -506,11 +506,11 @@ void *srmConnectorRenderThread(void *conn)
                         connector->renderInterface.flipPage(connector);
 
                     /* Release previous custom scanout buffer if any */
-                    if (connector->userScanoutBuffer[0].bufferRef || connector->userScanoutBuffer[1].bufferRef)
+                    if (connector->userScanoutBufferRef[0] || connector->userScanoutBufferRef[1])
                     {
                         srmConnectorReleaseUserScanoutBuffer(connector, 1);
-                        connector->userScanoutBuffer[1] = connector->userScanoutBuffer[0];
-                        memset(&connector->userScanoutBuffer[0], 0, sizeof(connector->userScanoutBuffer[0]));
+                        connector->userScanoutBufferRef[1] = connector->userScanoutBufferRef[0];
+                        connector->userScanoutBufferRef[0] = NULL;
                     }
 
                     pthread_mutex_unlock(&connector->stateMutex);
@@ -745,21 +745,9 @@ void srmConnectorInitGamma(SRMConnector *connector)
 
 void srmConnectorReleaseUserScanoutBuffer(SRMConnector *connector, Int8 index)
 {
-    if (connector->userScanoutBuffer[index].drmFB != 0)
+    if (connector->userScanoutBufferRef[index])
     {
-        drmModeRmFB(connector->device->fd, connector->userScanoutBuffer[index].drmFB);
-        connector->userScanoutBuffer[index].drmFB = 0;
-    }
-
-    if (connector->userScanoutBuffer[index].bo)
-    {
-        gbm_bo_destroy(connector->userScanoutBuffer[index].bo);
-        connector->userScanoutBuffer[index].bo = NULL;
-    }
-
-    if (connector->userScanoutBuffer[index].bufferRef)
-    {
-        srmBufferDestroy(connector->userScanoutBuffer[index].bufferRef);
-        connector->userScanoutBuffer[index].bufferRef = NULL;
+        srmBufferDestroy(connector->userScanoutBufferRef[index]);
+        connector->userScanoutBufferRef[index] = NULL;
     }
 }

@@ -254,6 +254,8 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
             }
         }
 
+        UInt8 updatedVisibility = 0;
+
         if (connector->atomicChanges & SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY)
         {
             if (clearFlags)
@@ -261,6 +263,8 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
 
             if (connector->cursorVisible)
             {
+                updatedVisibility = 1;
+
                 if (!updatedFB)
                 {
                     drmModeAtomicAddProperty(req,
@@ -273,6 +277,16 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
                                         connector->currentCursorPlane->id,
                                         connector->currentCursorPlane->propIDs.CRTC_ID,
                                         connector->currentCrtc->id);
+
+                drmModeAtomicAddProperty(req,
+                                         connector->currentCursorPlane->id,
+                                         connector->currentCursorPlane->propIDs.CRTC_X,
+                                         connector->cursorX);
+
+                drmModeAtomicAddProperty(req,
+                                         connector->currentCursorPlane->id,
+                                         connector->currentCursorPlane->propIDs.CRTC_Y,
+                                         connector->cursorY);
 
                 drmModeAtomicAddProperty(req,
                                         connector->currentCursorPlane->id,
@@ -323,15 +337,18 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
             if (clearFlags)
                 connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_POSITION;
 
-            drmModeAtomicAddProperty(req,
-                                    connector->currentCursorPlane->id,
-                                    connector->currentCursorPlane->propIDs.CRTC_X,
-                                    connector->cursorX);
+            if (!updatedVisibility)
+            {
+                drmModeAtomicAddProperty(req,
+                                        connector->currentCursorPlane->id,
+                                        connector->currentCursorPlane->propIDs.CRTC_X,
+                                        connector->cursorX);
 
-            drmModeAtomicAddProperty(req,
-                                    connector->currentCursorPlane->id,
-                                    connector->currentCursorPlane->propIDs.CRTC_Y,
-                                    connector->cursorY);
+                drmModeAtomicAddProperty(req,
+                                        connector->currentCursorPlane->id,
+                                        connector->currentCursorPlane->propIDs.CRTC_Y,
+                                        connector->cursorY);
+            }
         }
     }
 
@@ -1025,7 +1042,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     Int32 ret = 0;
 
     UInt32 buffersCount = srmConnectorGetBuffersCount(connector);
-    UInt8 customScanoutBuffer = connector->userScanoutBuffer[0].bufferRef != NULL;
+    UInt8 customScanoutBuffer = connector->userScanoutBufferRef[0] != NULL;
 
     if (customScanoutBuffer || connector->pendingPageFlip || buffersCount == 1 || buffersCount > 2)
         srmRenderModeCommonWaitPageFlip(connector, -1);
@@ -1146,12 +1163,12 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
         {
             if (!srmFormatIsInList(
                     connector->currentPrimaryPlane->inFormatsBlacklist,
-                    connector->userScanoutBuffer[0].fmt.format,
-                    connector->userScanoutBuffer[0].fmt.modifier))
+                    connector->userScanoutBufferRef[0]->scanout.fmt.format,
+                    connector->userScanoutBufferRef[0]->scanout.fmt.modifier))
                 srmFormatsListAddFormat(
                     connector->currentPrimaryPlane->inFormatsBlacklist,
-                    connector->userScanoutBuffer[0].fmt.format,
-                    connector->userScanoutBuffer[0].fmt.modifier);
+                    connector->userScanoutBufferRef[0]->scanout.fmt.format,
+                    connector->userScanoutBufferRef[0]->scanout.fmt.modifier);
         }
     }
 

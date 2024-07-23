@@ -506,6 +506,18 @@ void srmBufferDestroy(SRMBuffer *buffer)
         return;
     }
 
+    if (buffer->scanout.fb != 0)
+    {
+        drmModeRmFB(buffer->allocator->fd, buffer->scanout.fb);
+        buffer->scanout.fb = 0;
+    }
+
+    if (buffer->scanout.bo)
+    {
+        gbm_bo_destroy(buffer->scanout.bo);
+        buffer->scanout.bo = NULL;
+    }
+
     if (buffer->textures)
     {
         while (!srmListIsEmpty(buffer->textures))

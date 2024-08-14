@@ -296,7 +296,14 @@ void srmDeviceUninitializeGBM(SRMDevice *device)
 
 UInt8 srmDeviceInitializeEGL(SRMDevice *device)
 {
+    #ifdef EGL_PLATFORM_GBM_KHR
+    if (device->core->eglFunctions.eglGetPlatformDisplayEXT)
+        device->eglDisplay = device->core->eglFunctions.eglGetPlatformDisplayEXT(EGL_PLATFORM_GBM_KHR, device->gbm, NULL);
+    else
+        device->eglDisplay = eglGetDisplay(device->gbm);
+    #else
     device->eglDisplay = eglGetDisplay(device->gbm);
+    #endif
 
     if (device->eglDisplay == EGL_NO_DISPLAY)
     {

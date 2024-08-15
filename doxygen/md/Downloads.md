@@ -6,6 +6,7 @@ Pre-built binaries are provided for the following distributions. Please be aware
 
 * **Arch** : [libsrm](https://aur.archlinux.org/packages/libsrm) - *Thanks to [@TrialnError](https://aur.archlinux.org/account/TrialnError)*.
 * **Debian** : [libsrm](https://packages.debian.org/source/sid/libsrm) - *Thanks to [Sudip Mukherjee](https://github.com/sudipm-mukherjee)*.
+* **Fedora** : [libsrm](https://copr.fedorainfracloud.org/coprs/ngompa/louvre) - *Thanks to [Neal Gompa](https://github.com/Conan-Kudo)*.
 * **NixOS** : [srm-cuarzo](https://search.nixos.org/packages?channel=unstable&show=srm-cuarzo&from=0&size=50&sort=relevance&type=packages&query=srm) - *Thanks to [Marco Rebhan](https://github.com/2xsaiko)*.
 
 ## Manual Building
@@ -17,7 +18,7 @@ SRM depends on the following libraries:
 * libudev
 * libdrm
 * libgbm
-* libEGL
+* libEGL >= 1.5
 * libGLESv2
 
 The **srm-multi-session** example also require:

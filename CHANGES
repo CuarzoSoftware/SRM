@@ -1,3 +1,20 @@
+SRM (0.7.1-1)
+
+  # Bug Fixes
+
+  * Resolved a crash on certain EGL implementations when obtaining a GBM EGLDisplay through eglGetDisplay(). This was fixed by using eglGetPlatformDisplay() instead. Credits to @burgerindividual.
+
+  # Downloads
+
+  * Added link to Fedora package. Credits to @Conan-Kudo.
+
+  # Dependencies
+
+  * Updated EGL dependency to version 1.5 or higher.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Wed, 14 Aug 2024 22:06:30 -0400
+
+
 SRM (0.7.0-1)
 
   # API Additions

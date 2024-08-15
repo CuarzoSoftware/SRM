@@ -61,7 +61,7 @@ include_paths = ['./lib', conf_file_inc]
 
 pkg              = import('pkgconfig')
 gl_dep           = dependency('gl')
-egl_dep          = dependency('egl')
+egl_dep          = dependency('egl', version: '>= 1.5')
 glesv2_dep       = dependency('glesv2')
 udev_dep         = dependency('libudev')
 drm_dep          = dependency('libdrm')

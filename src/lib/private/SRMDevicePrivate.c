@@ -795,20 +795,32 @@ UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device)
     return 1;
 }
 
-
 UInt8 srmDeviceUpdateClientCaps(SRMDevice *device)
 {
-    device->clientCapStereo3D            = drmSetClientCap(device->fd, DRM_CLIENT_CAP_STEREO_3D, 1)             == 0;
-    device->clientCapUniversalPlanes     = drmSetClientCap(device->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)      == 0;
-    device->clientCapAtomic              = drmSetClientCap(device->fd, DRM_CLIENT_CAP_ATOMIC, 1)                == 0;
+    device->clientCapStereo3D = drmSetClientCap(device->fd, DRM_CLIENT_CAP_STEREO_3D, 1) == 0;
 
-    char *atomicENV = getenv("SRM_FORCE_LEGACY_API");
+    char *forceLegacyENV = getenv("SRM_FORCE_LEGACY_API");
 
-    if (atomicENV && atoi(atomicENV) == 1)
-        device->clientCapAtomic = 0;
+    if (!forceLegacyENV || atoi(forceLegacyENV) != 1)
+        device->clientCapAtomic = drmSetClientCap(device->fd, DRM_CLIENT_CAP_ATOMIC, 1) == 0;
 
-    device->clientCapAspectRatio         = drmSetClientCap(device->fd, DRM_CLIENT_CAP_ASPECT_RATIO, 1)          == 0;
-    device->clientCapWritebackConnectors = drmSetClientCap(device->fd, DRM_CLIENT_CAP_WRITEBACK_CONNECTORS, 1)  == 0;
+    if (device->clientCapAtomic)
+    {
+        // Enabled implicitly by atomic
+        device->clientCapAspectRatio = 1;
+        device->clientCapUniversalPlanes = 1;
+
+        char *writebackENV = getenv("SRM_ENABLE_WRITEBACK_CONNECTORS");
+
+        if (writebackENV && atoi(writebackENV) == 1)
+            device->clientCapWritebackConnectors = drmSetClientCap(device->fd, DRM_CLIENT_CAP_WRITEBACK_CONNECTORS, 1)  == 0;
+    }
+    else
+    {
+        device->clientCapAspectRatio = drmSetClientCap(device->fd, DRM_CLIENT_CAP_ASPECT_RATIO, 1) == 0;
+        device->clientCapUniversalPlanes = drmSetClientCap(device->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1) == 0;
+    }
+
     return 1;
 }
 

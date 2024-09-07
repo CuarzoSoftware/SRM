@@ -105,7 +105,7 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
 
     pthread_mutex_lock(&connector->propsMutex);
 
-    if (connector->device->clientCapAtomic)
+    if (connector->currentCursorPlane)
     {
         if (pixels)
         {
@@ -171,7 +171,7 @@ UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
     connector->cursorX = x;
     connector->cursorY = y;
 
-    if (connector->device->clientCapAtomic)
+    if (connector->currentCursorPlane)
     {
         if (connector->cursorVisible)
             connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION;
@@ -304,14 +304,22 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
     connector->currentEncoder = bestEncoder;
     connector->currentCrtc = bestCrtc;
     connector->currentPrimaryPlane = bestPrimaryPlane;
-    connector->currentCursorPlane = bestCursorPlane;
 
     bestEncoder->currentConnector = connector;
     bestCrtc->currentConnector = connector;
     bestPrimaryPlane->currentConnector = connector;
 
-    if (bestCursorPlane)
-        bestCursorPlane->currentConnector = connector;
+    // When using legacy cursor IOCTLs, the plane is choosen by the driver
+    if (!connector->device->core->forceLegacyCursor && connector->device->clientCapAtomic)
+    {
+        connector->currentCursorPlane = bestCursorPlane;
+
+        if (bestCursorPlane)
+            bestCursorPlane->currentConnector = connector;
+    }
+    else
+        connector->currentCursorPlane = NULL;
+
 
     connector->interfaceData = userData;
     connector->interface = interface;

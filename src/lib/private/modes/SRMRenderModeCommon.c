@@ -1,6 +1,7 @@
+#include <private/modes/SRMRenderModeCommon.h>
+#include <private/SRMCorePrivate.h>
 #include <private/SRMCrtcPrivate.h>
 #include <private/SRMPlanePrivate.h>
-#include <private/modes/SRMRenderModeCommon.h>
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMConnectorModePrivate.h>
@@ -9,6 +10,7 @@
 #include <SRMCore.h>
 #include <SRMLog.h>
 #include <stdlib.h>
+#include <string.h>
 #include <xf86drmMode.h>
 #include <poll.h>
 #include <unistd.h>
@@ -31,7 +33,7 @@ Int8 srmRenderModeCommonMatchConfigToVisual(EGLDisplay egl_display, EGLint visua
     return -1;
 }
 
-Int8  srmRenderModeCommonChooseEGLConfiguration(EGLDisplay egl_display, const EGLint *attribs, EGLint visual_id, EGLConfig *config_out)
+Int8 srmRenderModeCommonChooseEGLConfiguration(EGLDisplay egl_display, const EGLint *attribs, EGLint visual_id, EGLConfig *config_out)
 {
     EGLint count = 0;
     EGLint matched = 0;
@@ -56,22 +58,17 @@ Int8  srmRenderModeCommonChooseEGLConfiguration(EGLDisplay egl_display, const EG
     }
 
     if (!visual_id)
-    {
         config_index = 0;
-    }
 
     if (config_index == -1)
-    {
         config_index = srmRenderModeCommonMatchConfigToVisual(egl_display, visual_id, configs, matched);
-    }
 
     if (config_index != -1)
-    {
         *config_out = configs[config_index];
-    }
 
 out:
     free(configs);
+
     if (config_index == -1)
         return 0;
 
@@ -148,9 +145,15 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
             return 0;
     }
 
+    if (connector->device->core->disableCursorPlanes)
+        return 0;
+
     Int32 ret;
 
     connector->cursorIndex = 0;
+
+    UInt8 blankBuffer[64*64*4];
+    memset(blankBuffer, 0, sizeof(blankBuffer));
 
     for (int i = 0; i < 2; i++)
     {
@@ -163,7 +166,7 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
         if (!connector->cursor[i].bo)
             goto fail;
 
-        if (!connector->device->clientCapAtomic)
+        if (!connector->currentCursorPlane)
             continue;
 
         ret = drmModeAddFB(connector->device->fd,
@@ -175,6 +178,16 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
                                  gbm_bo_get_handle(connector->cursor[i].bo).u32,
                                  &connector->cursor[i].fb);
 
+        if (ret)
+            goto fail;
+    }
+
+    if (!connector->currentCursorPlane)
+    {
+        ret = drmModeSetCursor(connector->device->fd,
+                               connector->currentCrtc->id,
+                               gbm_bo_get_handle(connector->cursor[0].bo).u32,
+                               64, 64);
         if (ret)
             goto fail;
     }
@@ -397,7 +410,7 @@ void srmRenderModeCommonDestroyCursor(SRMConnector *connector)
 {
     if (connector->cursorVisible)
     {
-        if (connector->device->clientCapAtomic)
+        if (connector->currentCursorPlane)
         {
             drmModeAtomicReqPtr req;
             req = drmModeAtomicAlloc();
@@ -577,7 +590,8 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
 
             if (ret)
             {
-                connector->cursorIndex = prevCursorIndex;
+                if (connector->currentCursorPlane)
+                    connector->cursorIndex = prevCursorIndex;
                 SRMError("Failed set mode with same size on device %s connector %d. Error: %d. (atomic)",
                          connector->device->name,
                          connector->id, ret);
@@ -851,7 +865,8 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
 
         if (ret)
         {
-            connector->cursorIndex = prevCursorIndex;
+            if (connector->currentCursorPlane)
+                connector->cursorIndex = prevCursorIndex;
             SRMError("Failed to resume crtc mode on device %s connector %d.",
                      connector->device->name,
                      connector->id);
@@ -987,7 +1002,8 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
 
         if (ret)
         {
-            connector->cursorIndex = prevCursorIndex;
+            if (connector->currentCursorPlane)
+                connector->cursorIndex = prevCursorIndex;
             SRMError("Failed to set crtc mode on device %s connector %d (atomic).",
                     connector->device->name,
                     connector->id);
@@ -1068,7 +1084,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                                         req,
                                         DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK,
                                         connector, 0);
-            if (ret)
+            if (ret && connector->currentCursorPlane)
                 connector->cursorIndex = prevCursorIndex;
             else
                 connector->atomicChanges = 0;
@@ -1109,7 +1125,7 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
                                                 connector, 0);
                 drmModeAtomicFree(req);
 
-                if (ret)
+                if (ret && connector->currentCursorPlane)
                     connector->cursorIndex = prevCursorIndex;
                 else
                     connector->atomicChanges = 0;
@@ -1318,26 +1334,11 @@ void srmRenderModeCommonSyncState(SRMConnector *connector)
     if (!connector->currentCrtc)
         return;
 
-    if (connector->device->clientCapAtomic)
+    if (connector->cursor[0].bo)
     {
-        if (connector->propIDs.content_type)
-            connector->atomicChanges |= SRM_ATOMIC_CHANGE_CONTENT_TYPE;
-
-        if (connector->cursor[0].bo)
+        if (connector->currentCursorPlane)
             connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION | SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
-
-        if (connector->gamma)
-            connector->atomicChanges |= SRM_ATOMIC_CHANGE_GAMMA_LUT;
-    }
-    else
-    {
-        if (connector->propIDs.content_type)
-            drmModeConnectorSetProperty(connector->device->fd,
-                                        connector->id,
-                                        connector->propIDs.content_type,
-                                        connector->contentType);
-
-        if (connector->cursor[0].bo)
+        else
         {
             if (connector->cursorVisible)
                 drmModeSetCursor(connector->device->fd,
@@ -1357,6 +1358,31 @@ void srmRenderModeCommonSyncState(SRMConnector *connector)
                               connector->cursorX,
                               connector->cursorY);
         }
+    }
+    else
+    {
+        drmModeSetCursor(connector->device->fd,
+                         connector->currentCrtc->id,
+                         0,
+                         0,
+                         0);
+    }
+
+    if (connector->device->clientCapAtomic)
+    {
+        if (connector->propIDs.content_type)
+            connector->atomicChanges |= SRM_ATOMIC_CHANGE_CONTENT_TYPE;
+
+        if (connector->gamma)
+            connector->atomicChanges |= SRM_ATOMIC_CHANGE_GAMMA_LUT;
+    }
+    else
+    {
+        if (connector->propIDs.content_type)
+            drmModeConnectorSetProperty(connector->device->fd,
+                                        connector->id,
+                                        connector->propIDs.content_type,
+                                        connector->contentType);
 
         /* This is always != NULL if gammaSize > 0 */
         if (connector->gamma)

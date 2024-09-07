@@ -392,7 +392,7 @@ SRMPlane *srmConnectorGetCurrentPrimaryPlane(SRMConnector *connector);
  * This function returns the currently used @ref SRMPlane associated with the cursor display plane for the given @ref SRMConnector.
  *
  * @param connector Pointer to the @ref SRMConnector for which to retrieve the current cursor plane.
- * @return The currently used @ref SRMPlane for the cursor display.
+ * @return The currently used @ref SRMPlane for the cursor display or NULL if not assigned.
  */
 SRMPlane *srmConnectorGetCurrentCursorPlane(SRMConnector *connector);
 

@@ -36,12 +36,33 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
     core->interfaceUserData = userData;
     core->isSuspended = 0;
 
+    // Default env values
+    setenv("SRM_FORCE_LEGACY_API",              "0", 0);
+    setenv("SRM_FORCE_LEGACY_CURSOR",           "1", 0);
+    setenv("SRM_FORCE_GL_ALLOCATION",           "0", 0);
+    setenv("SRM_RENDER_MODE_ITSELF_FB_COUNT",   "2", 0);
+    setenv("SRM_RENDER_MODE_PRIME_FB_COUNT",    "2", 0);
+    setenv("SRM_RENDER_MODE_DUMB_FB_COUNT",     "2", 0);
+    setenv("SRM_RENDER_MODE_CPU_FB_COUNT",      "2", 0);
+    setenv("SRM_ENABLE_WRITEBACK_CONNECTORS",   "0", 0);
+    setenv("SRM_DISABLE_CUSTOM_SCANOUT",        "0", 0);
+    setenv("SRM_DISABLE_CURSOR",                "0", 0);
+    setenv("SRM_NVIDIA_CURSOR",                 "1", 0);
+
     const char *env = getenv("SRM_DISABLE_CUSTOM_SCANOUT");
-
     core->customBufferScanoutIsDisabled = env && atoi(env) == 1;
-
     SRMDebug("[core] Custom scanout enabled: %s.",
         core->customBufferScanoutIsDisabled ? "NO" : "YES");
+
+    env = getenv("SRM_DISABLE_CURSOR");
+    core->disableCursorPlanes = env && atoi(env) == 1;
+    SRMDebug("[core] Cursor enabled: %s.",
+             core->disableCursorPlanes ? "NO" : "YES");
+
+    env = getenv("SRM_FORCE_LEGACY_CURSOR");
+    core->forceLegacyCursor = env && atoi(env) == 1;
+    SRMDebug("[core] Force legacy cursor: %s.",
+             core->forceLegacyCursor ? "YES" : "NO");
 
     // REF -
     if (!srmCoreUpdateEGLExtensions(core))

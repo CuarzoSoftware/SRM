@@ -59,7 +59,10 @@ struct SRMCoreStruct
     pthread_cond_t deallocatorCond;
     pthread_mutex_t deallocatorMutex;
 
+    // Env options
     UInt8 customBufferScanoutIsDisabled;
+    UInt8 forceLegacyCursor;
+    UInt8 disableCursorPlanes;
 };
 
 UInt8 srmCoreInitDeallocator(SRMCore *core);

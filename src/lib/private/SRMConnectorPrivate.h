@@ -81,8 +81,8 @@ struct SRMConnectorStruct
 
     Int32 cursorIndex;
     Int32 cursorX, cursorY;
-    UInt8 cursorVisible;
     UInt32 atomicChanges;
+    UInt8 cursorVisible;
 
     // Interface for OpenGL events
     SRMConnectorInterface *interface;

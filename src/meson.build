@@ -60,12 +60,12 @@ include_paths = ['./lib', conf_file_inc]
 # ------------ DEPENDENCIES ------------
 
 pkg              = import('pkgconfig')
-gl_dep           = dependency('gl')
+gl_dep           = dependency('gl', version: '>= 1.2')
 egl_dep          = dependency('egl', version: '>= 1.5')
-glesv2_dep       = dependency('glesv2')
-udev_dep         = dependency('libudev')
-drm_dep          = dependency('libdrm')
-gbm_dep          = dependency('gbm')
+glesv2_dep       = dependency('glesv2', version: '>= 3.2')
+udev_dep         = dependency('libudev', version: '>= 249')
+drm_dep          = dependency('libdrm', version: '>= 2.4.113')
+gbm_dep          = dependency('gbm', version: '>= 23.2.1')
 display_info_dep = dependency('libdisplay-info')
 pthread_dep      = c.find_library('pthread')
 
@@ -109,8 +109,8 @@ if get_option('build_examples') or get_option('build_tests')
 endif
 
 if get_option('build_examples')
-    libinput_dep = dependency('libinput')
-    libseat_dep = dependency('libseat')
+    libinput_dep = dependency('libinput', version: '>= 1.20.0')
+    libseat_dep = dependency('libseat', version: '>= 0.6.4')
     m_dep = c.find_library('m')
 
     subdir('examples/srm-basic')

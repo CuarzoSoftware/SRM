@@ -13,18 +13,19 @@ Pre-built binaries are provided for the following distributions. Please be aware
 
 SRM depends on the following libraries:
 
-* [hwinfo](https://github.com/vcrhonek/hwdata)
-* [libdisplay-info](https://gitlab.freedesktop.org/emersion/libdisplay-info)
-* libudev
-* libdrm
-* libgbm
-* libEGL >= 1.5
-* libGLESv2
+* libudev >= 249
+* libdrm >= 2.4.113
+* gbm >= 23.2.1
+* egl >= 1.5
+* gl >= 1.2
+* glesv2 >= 3.2
+* hwinfo
+* libdisplay-info
 
 The **srm-multi-session** example also require:
 
-* libseat
-* libinput
+* libseat >= 0.6.4
+* libinput >= 1.20.0
 
 ### Debian (Ubuntu, Linux Mint, etc)
 
@@ -33,12 +34,6 @@ To build SRM from a Debian based distribution please install the following packa
 ```bash
 $ sudo apt install build-essential meson libseat-dev libinput-dev libudev-dev libdrm-dev libgbm-dev libegl1-mesa-dev libgles2-mesa-dev hwinfo libdisplay-info-dev
 ```
-
-If the [hwinfo](https://github.com/vcrhonek/hwdata) or [libdisplay-info](https://gitlab.freedesktop.org/emersion/libdisplay-info) packages are not available in your distribution, please download and install them manually in the specified order:
-
-1. [hwinfo](https://packages.ubuntu.com/focal/hwdata)
-2. [libdisplay-info0](https://packages.ubuntu.com/lunar/libdisplay-info0)
-3. [libdisplay-info-dev](https://packages.ubuntu.com/lunar/libdisplay-info-dev)
 
 Next, execute the following commands:
 

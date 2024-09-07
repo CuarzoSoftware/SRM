@@ -47,7 +47,7 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
     setenv("SRM_ENABLE_WRITEBACK_CONNECTORS",   "0", 0);
     setenv("SRM_DISABLE_CUSTOM_SCANOUT",        "0", 0);
     setenv("SRM_DISABLE_CURSOR",                "0", 0);
-    setenv("SRM_NVIDIA_CURSOR",                 "1", 0);
+    setenv("SRM_NVIDIA_CURSOR",                 "0", 0);
 
     const char *env = getenv("SRM_DISABLE_CUSTOM_SCANOUT");
     core->customBufferScanoutIsDisabled = env && atoi(env) == 1;

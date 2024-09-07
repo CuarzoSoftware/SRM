@@ -1,3 +1,23 @@
+SRM (0.7.2-1)
+
+  # New Environment Variables
+
+  * SRM_FORCE_LEGACY_CURSOR: Allows forcing the use of legacy DRM cursor IOCTLs
+  * SRM_DISABLE_CURSOR: Allows disabling cursor planes for all drivers.
+  * SRM_ENABLE_WRITEBACK_CONNECTORS: Allows toggling the writeback DRM client capability.
+
+  # Internal Changes
+
+  * Legacy cursor IOCTLs are now used by default, even when using the atomic API, unless SRM_FORCE_LEGACY_CURSOR is set to 0. This is because legacy IOCTLs are asynchronous and provide a much smoother experience.
+  * Cursor planes are now disabled by default for NVIDIA proprietary drivers unless SRM_NVIDIA_CURSOR is set to 1. This is because updating cursors occasionally causes screen stuttering.
+
+  # Dependencies
+
+  * Specify the minimum required version of dependencies.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sat, 07 Sep 2024 16:51:58 -0400
+
+
 SRM (0.7.1-1)
 
   # Bug Fixes

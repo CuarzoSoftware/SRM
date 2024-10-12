@@ -91,8 +91,21 @@ void *srmBufferMapFD(Int32 fd, size_t len, UInt32 *caps)
 struct gbm_bo *srmBufferCreateLinearBO(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format)
 {
     UInt64 mod = DRM_FORMAT_MOD_LINEAR;
+    struct gbm_bo *bo = NULL;
 
-    struct gbm_bo *bo = gbm_bo_create_with_modifiers(
+    bo = gbm_bo_create_with_modifiers2(
+        dev, width, height, format, &mod, 1, GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_SCANOUT);
+
+    if (bo)
+        return bo;
+
+    bo = gbm_bo_create_with_modifiers2(
+        dev, width, height, format, &mod, 1, GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
+
+    if (bo)
+        return bo;
+
+    bo = gbm_bo_create_with_modifiers(
         dev, width, height, format, &mod, 1);
 
     if (bo)
@@ -112,4 +125,30 @@ SRMBuffer *srmBufferGetRef(SRMBuffer *buffer)
     buffer->refCount++;
     pthread_mutex_unlock(&buffer->mutex);
     return buffer;
+}
+
+struct gbm_surface *srmBufferCreateGBMSurface(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags)
+{
+    struct gbm_surface *surface = NULL;
+
+    if (modifier == DRM_FORMAT_MOD_INVALID)
+    {
+        return gbm_surface_create(dev, width, height, format, flags);
+    }
+    else if (modifier == DRM_FORMAT_MOD_LINEAR)
+    {
+        surface = gbm_surface_create(dev, width, height, format, flags | GBM_BO_USE_LINEAR);
+
+        if (surface) return surface;
+    }
+
+    surface = gbm_surface_create_with_modifiers2(
+        dev, width, height, format, &modifier, 1, flags);
+
+    if (surface) return surface;
+
+    surface = gbm_surface_create_with_modifiers(
+        dev, width, height, format, &modifier, 1);
+
+    return surface;
 }

@@ -154,14 +154,24 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
 
     UInt8 blankBuffer[64*64*4];
     memset(blankBuffer, 0, sizeof(blankBuffer));
+    UInt64 mod = DRM_FORMAT_MOD_LINEAR;
 
     for (int i = 0; i < 2; i++)
-    {
-        connector->cursor[i].bo = gbm_bo_create(connector->device->gbm,
-                                                      64,
-                                                      64,
-                                                      GBM_FORMAT_ARGB8888,
-                                                      GBM_BO_USE_CURSOR | GBM_BO_USE_WRITE);
+    {        
+        connector->cursor[i].bo = gbm_bo_create(
+            connector->device->gbm,
+            64, 64,
+            GBM_FORMAT_ARGB8888,
+            GBM_BO_USE_CURSOR | GBM_BO_USE_WRITE);
+
+        if (!connector->cursor[i].bo)
+            connector->cursor[i].bo = gbm_bo_create_with_modifiers2(
+                connector->device->gbm,
+                64, 64,
+                GBM_FORMAT_ARGB8888,
+                &mod,
+                1,
+                GBM_BO_USE_CURSOR | GBM_BO_USE_WRITE);
 
         if (!connector->cursor[i].bo)
             goto fail;
@@ -1435,13 +1445,12 @@ void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struc
 {
     if (connector->currentFormat.modifier != DRM_FORMAT_MOD_LINEAR)
     {
-        *surface = gbm_surface_create_with_modifiers2(
+        *surface = srmBufferCreateGBMSurface(
             connector->device->gbm,
             connector->currentMode->info.hdisplay,
             connector->currentMode->info.vdisplay,
             connector->currentFormat.format,
-            &connector->currentFormat.modifier,
-            1,
+            connector->currentFormat.modifier,
             GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
 
         if (*surface)
@@ -1450,10 +1459,11 @@ void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struc
         connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
     }
 
-    *surface = gbm_surface_create(
+    *surface = srmBufferCreateGBMSurface(
         connector->device->gbm,
         connector->currentMode->info.hdisplay,
         connector->currentMode->info.vdisplay,
         GBM_FORMAT_XRGB8888,
+        DRM_FORMAT_MOD_INVALID,
         GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
 }

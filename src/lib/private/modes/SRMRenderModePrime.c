@@ -151,12 +151,13 @@ static UInt8 createGBMSurfaces(SRMConnector *connector)
         return 0;
     }
 
-    data->rendererGBMSurface = gbm_surface_create(
+    data->rendererGBMSurface = srmBufferCreateGBMSurface(
         connector->device->rendererDevice->gbm,
         connector->currentMode->info.hdisplay,
         connector->currentMode->info.vdisplay,
         GBM_FORMAT_XRGB8888,
-        GBM_BO_USE_LINEAR | GBM_BO_USE_RENDERING);
+        DRM_FORMAT_MOD_LINEAR,
+        GBM_BO_USE_RENDERING);
 
     if (!data->rendererGBMSurface)
     {

@@ -619,20 +619,22 @@ void srmDeviceUninitializeEGLSharedContext(SRMDevice *device)
 
 UInt8 srmDeviceInitializeTestGBMSurface(SRMDevice *device)
 {
-    device->gbmSurfaceTest = gbm_surface_create(
+    device->gbmSurfaceTest = srmBufferCreateGBMSurface(
         device->gbm,
         64, 64,
         DRM_FORMAT_XRGB8888,
-        GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
+        DRM_FORMAT_MOD_LINEAR,
+        GBM_BO_USE_RENDERING);
 
     if (device->gbmSurfaceTest)
         return 1;
 
-    device->gbmSurfaceTest = gbm_surface_create(
+    device->gbmSurfaceTest = srmBufferCreateGBMSurface(
         device->gbm,
         64, 64,
         DRM_FORMAT_XRGB8888,
-        GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+        DRM_FORMAT_MOD_INVALID,
+        GBM_BO_USE_RENDERING);
 
     if (!device->gbmSurfaceTest)
     {

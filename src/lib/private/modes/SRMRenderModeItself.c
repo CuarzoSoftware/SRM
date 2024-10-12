@@ -32,6 +32,9 @@ struct RenderModeDataStruct
     UInt32 *connectorDRMFramebuffers;
     SRMBuffer **buffers;
 
+    GLuint *glRenderBuffers;
+    GLuint *glFrameBuffers;
+
     UInt32 buffersCount;
     UInt32 currentBufferIndex;
     EGLConfig connectorEGLConfig;
@@ -59,6 +62,7 @@ static UInt8 createData(SRMConnector *connector)
         return 0;
     }
 
+    connector->usingRenderBuffers = 0;
     connector->renderData = data;
     data->connectorEGLContext = EGL_NO_CONTEXT;
     data->connectorEGLSurface = EGL_NO_SURFACE;
@@ -74,6 +78,89 @@ static void destroyData(SRMConnector *connector)
         free(connector->renderData);
         connector->renderData = NULL;
     }
+}
+
+static UInt8 createRenderBuffers(SRMConnector *connector)
+{
+    if (!connector->device->eglFunctions.glEGLImageTargetRenderbufferStorageOES)
+        return 0;
+
+    RenderModeData *data = (RenderModeData*)connector->renderData;
+    char *env = getenv("SRM_RENDER_MODE_ITSELF_FB_COUNT");
+    data->buffersCount = 2;
+
+    if (env)
+    {
+        Int32 c = atoi(env);
+
+        if (c > 1 && c < 4)
+            data->buffersCount = c;
+    }
+
+    data->connectorBOs = calloc(data->buffersCount, sizeof(void*));
+    data->buffers = calloc(data->buffersCount, sizeof(void*));
+    data->glRenderBuffers = calloc(data->buffersCount, sizeof(GLuint));
+    data->glFrameBuffers = calloc(data->buffersCount, sizeof(GLuint));
+
+    for (UInt32 i = 0; i < data->buffersCount; i++)
+    {
+        srmRenderModeCommonCreateConnectorGBMBo(connector, &data->connectorBOs[i]);
+
+        if (!data->connectorBOs[i])
+        {
+            SRMError("RenderBuffers failed 1.");
+            goto fail;
+        }
+
+        data->buffers[i] = srmBufferCreateFromGBM(connector->device->core, data->connectorBOs[i]);
+
+        if (!data->buffers[i])
+        {
+            SRMError("RenderBuffers failed 2.");
+            goto fail;
+        }
+
+        EGLImage image = srmBufferGetEGLImage(connector->device, data->buffers[i]);
+
+        if (image == EGL_NO_IMAGE)
+        {
+            SRMError("RenderBuffers failed 3.");
+            goto fail;
+        }
+
+        glGenRenderbuffers(1, &data->glRenderBuffers[i]);
+        glBindRenderbuffer(GL_RENDERBUFFER, data->glRenderBuffers[i]);
+        connector->device->eglFunctions.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER, image);
+
+        glGenFramebuffers(1, &data->glFrameBuffers[i]);
+        glBindFramebuffer(GL_FRAMEBUFFER, data->glFrameBuffers[i]);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, data->glRenderBuffers[i]);
+        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+
+        if (status != GL_FRAMEBUFFER_COMPLETE)
+        {
+            SRMError("RenderBuffers failed 4.");
+            goto fail;
+        }
+    }
+
+    connector->usingRenderBuffers = 1;
+
+    return 1;
+
+fail:
+    SRMError("RenderBuffers failed.");
+    // TODO: destroy bos, fbs, etc
+    free(data->connectorBOs);
+    free(data->buffers);
+    free(data->glRenderBuffers);
+    free(data->glFrameBuffers);
+
+    data->connectorBOs = NULL;
+    data->buffers = NULL;
+    data->glRenderBuffers = NULL;
+    data->glFrameBuffers = NULL;
+    return 0;
 }
 
 static UInt8 createGBMSurfaces(SRMConnector *connector)
@@ -159,6 +246,11 @@ static UInt8 createEGLContext(SRMConnector *connector)
         eglQueryContext(connector->device->eglDisplay, data->connectorEGLContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &priority);
         SRMDebug("[%s] Using %s priority EGL context.", srmConnectorGetName(connector), priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
     }
+
+    eglMakeCurrent(connector->device->eglDisplay,
+                   EGL_NO_SURFACE,
+                   EGL_NO_SURFACE,
+                   data->connectorEGLContext);
 
     return 1;
 }
@@ -282,7 +374,9 @@ static void destroyEGLSurfaces(SRMConnector *connector)
 
 static UInt8 swapBuffers(SRMConnector *connector, EGLDisplay display, EGLSurface surface)
 {
-    SRM_UNUSED(connector);
+    if (connector->usingRenderBuffers)
+        return 0;
+
     return eglSwapBuffers(display, surface);
 }
 
@@ -430,14 +524,12 @@ static UInt8 render(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (connector->device->eglDisplay != eglGetCurrentDisplay() ||
-        data->connectorEGLSurface != eglGetCurrentSurface(EGL_READ) ||
-        data->connectorEGLSurface != eglGetCurrentSurface(EGL_DRAW) ||
-        data->connectorEGLContext != eglGetCurrentContext())
-        eglMakeCurrent(connector->device->eglDisplay,
-                       data->connectorEGLSurface,
-                       data->connectorEGLSurface,
-                       data->connectorEGLContext);
+    eglMakeCurrent(connector->device->eglDisplay,
+                   data->connectorEGLSurface,
+                   data->connectorEGLSurface,
+                   data->connectorEGLContext);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, connector->usingRenderBuffers ? data->glFrameBuffers[data->currentBufferIndex] : 0);
 
     connector->interface->paintGL(connector, connector->interfaceData);
 
@@ -453,15 +545,26 @@ static UInt8 flipPage(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    swapBuffers(connector, connector->device->eglDisplay, data->connectorEGLSurface);
-    gbm_surface_lock_front_buffer(data->connectorGBMSurface);
+    if (connector->usingRenderBuffers)
+    {
+        glFinish();
+        srmRenderModeCommonPageFlip(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
+        data->currentBufferIndex = nextBufferIndex(connector);
+        connector->interface->pageFlipped(connector, connector->interfaceData);
+    }
+    else
+    {
+        swapBuffers(connector, connector->device->eglDisplay, data->connectorEGLSurface);
+        gbm_surface_lock_front_buffer(data->connectorGBMSurface);
 
-    srmRenderModeCommonPageFlip(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
+        srmRenderModeCommonPageFlip(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
 
-    data->currentBufferIndex = nextBufferIndex(connector);
-    gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
+        data->currentBufferIndex = nextBufferIndex(connector);
+        gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
+    }
 
     connector->interface->pageFlipped(connector, connector->interfaceData);
+
     return 1;
 }
 
@@ -512,11 +615,14 @@ retry:
     if (!createEGLContext(connector))
         goto fail;
 
-    if (!createGBMSurfaces(connector))
-        goto fail;
+    if (!createRenderBuffers(connector))
+    {
+        if (!createGBMSurfaces(connector))
+            goto fail;
 
-    if (!createEGLSurfaces(connector))
-        goto fail;
+        if (!createEGLSurfaces(connector))
+            goto fail;
+    }
 
     if (!createDRMFramebuffers(connector))
         goto fail;
@@ -561,6 +667,16 @@ static UInt8 updateMode(SRMConnector *connector)
     }
 
     return 1;
+}
+
+static UInt32 getFramebufferID(SRMConnector *connector)
+{
+    RenderModeData *data = (RenderModeData*)connector->renderData;
+
+    if (connector->usingRenderBuffers)
+        return data->glFrameBuffers[data->currentBufferIndex];
+
+    return 0;
 }
 
 static UInt32 getCurrentBufferIndex(SRMConnector *connector)
@@ -612,6 +728,7 @@ void srmRenderModeItselfSetInterface(SRMConnector *connector)
     connector->renderInterface.render = &render;
     connector->renderInterface.flipPage = &flipPage;
     connector->renderInterface.updateMode = &updateMode;
+    connector->renderInterface.getFramebufferID = &getFramebufferID;
     connector->renderInterface.getCurrentBufferIndex = &getCurrentBufferIndex;
     connector->renderInterface.getBuffersCount = &getBuffersCount;
     connector->renderInterface.getBuffer = &getBuffer;

@@ -3,6 +3,7 @@
 
 #include <SRMTypes.h>
 #include <GLES2/gl2.h>
+#include <EGL/egl.h>
 #include <gbm.h>
 
 #ifdef __cplusplus
@@ -208,6 +209,9 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer);
  * @param buffer Pointer to the @ref SRMBuffer to be destroyed.
  */
 void srmBufferDestroy(SRMBuffer *buffer);
+
+// TODO: add doc
+EGLImage srmBufferGetEGLImage(SRMDevice *device, SRMBuffer *buffer);
 
 /**
  * @brief Retrieves an OpenGL texture ID associated with an @ref SRMBuffer for a specific device (GPU).

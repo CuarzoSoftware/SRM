@@ -1467,3 +1467,30 @@ void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struc
         DRM_FORMAT_MOD_INVALID,
         GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
 }
+
+void srmRenderModeCommonCreateConnectorGBMBo(SRMConnector *connector, struct gbm_bo **bo)
+{
+    if (connector->currentFormat.modifier != DRM_FORMAT_MOD_LINEAR)
+    {
+        *bo = srmBufferCreateGBMBo(
+            connector->device->gbm,
+            connector->currentMode->info.hdisplay,
+            connector->currentMode->info.vdisplay,
+            connector->currentFormat.format,
+            connector->currentFormat.modifier,
+            GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+
+        if (*bo)
+            return;
+
+        connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
+    }
+
+    *bo = srmBufferCreateGBMBo(
+        connector->device->gbm,
+        connector->currentMode->info.hdisplay,
+        connector->currentMode->info.vdisplay,
+        GBM_FORMAT_XRGB8888,
+        DRM_FORMAT_MOD_INVALID,
+        GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+}

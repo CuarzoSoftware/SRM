@@ -152,3 +152,29 @@ struct gbm_surface *srmBufferCreateGBMSurface(struct gbm_device *dev, UInt32 wid
 
     return surface;
 }
+
+struct gbm_bo *srmBufferCreateGBMBo(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags)
+{
+    struct gbm_bo *bo = NULL;
+
+    if (modifier == DRM_FORMAT_MOD_INVALID)
+    {
+        return gbm_bo_create(dev, width, height, format, flags);
+    }
+    else if (modifier == DRM_FORMAT_MOD_LINEAR)
+    {
+        bo = gbm_bo_create(dev, width, height, format, flags | GBM_BO_USE_LINEAR);
+
+        if (bo) return bo;
+    }
+
+    bo = gbm_bo_create_with_modifiers2(
+        dev, width, height, format, &modifier, 1, flags);
+
+    if (bo) return bo;
+
+    bo = gbm_bo_create_with_modifiers(
+        dev, width, height, format, &modifier, 1);
+
+    return bo;
+}

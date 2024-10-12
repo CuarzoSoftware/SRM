@@ -132,16 +132,20 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
     if (!srmDeviceUpdateEGLExtensions(device))
         goto fail;
 
+    // REF 5-1
+    if (!srmDeviceInitializeEGLSharedContext(device))
+        goto fail;
+
+    // REF -
+    if (!srmDeviceUpdateGLExtensions(device))
+        goto fail;
+
     // REF -
     if (!srmDeviceUpdateEGLFunctions(device))
         goto fail;
 
     // REF 6
     srmDeviceUpdateDMAFormats(device);
-
-    // REF 7
-    if (!srmDeviceInitializeEGLSharedContext(device))
-        goto fail;
 
     // REF 7-1
     if (!srmDeviceInitializeTestGBMSurface(device))
@@ -153,10 +157,6 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
 
     // REF 7-3
     if (!srmDeviceInitializeTestShader(device))
-        goto fail;
-
-    // REF -
-    if (!srmDeviceUpdateGLExtensions(device))
         goto fail;
 
     // REF 8
@@ -241,20 +241,20 @@ void srmDeviceDestroy(SRMDevice *device)
     // UNREF 8
     srmDeviceUninitEGLDeallocatorContext(device);
 
-    // REF 7-3
+    // UNREF 7-3
     srmDeviceUninitializeTestShader(device);
 
-    // REF 7-2
+    // UNREF 7-2
     srmDeviceUninitializeTestEGLSurface(device);
 
-    // REF 7-1
+    // UNREF 7-1
     srmDeviceUninitializeTestGBMSurface(device);
-
-    // UNREF 7
-    srmDeviceUninitializeEGLSharedContext(device);
 
     // UNREF 6
     srmDeviceDestroyDMAFormats(device);
+
+    // UNREF 5-1
+    srmDeviceUninitializeEGLSharedContext(device);
 
     // UNREF 5
     srmDeviceUninitializeEGL(device);
@@ -355,9 +355,8 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
     device->eglExtensions.EXT_image_dma_buf_import_modifiers = srmEGLHasExtension(extensions, "EGL_EXT_image_dma_buf_import_modifiers");
     device->eglExtensions.EXT_create_context_robustness = srmEGLHasExtension(extensions, "EGL_EXT_create_context_robustness");
     device->eglExtensions.KHR_image_pixmap = srmEGLHasExtension(extensions, "EGL_KHR_image_pixmap");
-
-    if (device->eglExtensions.KHR_image)
-        device->eglExtensions. KHR_gl_texture_2D_image = srmEGLHasExtension(extensions, "EGL_KHR_gl_texture_2D_image");
+    device->eglExtensions.KHR_gl_texture_2D_image = srmEGLHasExtension(extensions, "EGL_KHR_gl_texture_2D_image");
+    device->eglExtensions.KHR_gl_renderbuffer_image = srmEGLHasExtension(extensions, "EGL_KHR_gl_renderbuffer_image");
 
     const char *deviceExtensions = NULL, *driverName = NULL;
 
@@ -414,8 +413,24 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
     {
         device->eglFunctions.eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC) eglGetProcAddress("eglCreateImageKHR");
         device->eglFunctions.eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC) eglGetProcAddress("eglDestroyImageKHR");
-        device->eglFunctions.glEGLImageTargetTexture2DOES = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC) eglGetProcAddress("glEGLImageTargetTexture2DOES");
+
+        if (device->glExtensions.OES_EGL_image || device->glExtensions.OES_EGL_image_base)
+        {
+            if (device->eglExtensions.KHR_gl_texture_2D_image)
+                device->eglFunctions.glEGLImageTargetTexture2DOES = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC) eglGetProcAddress("glEGLImageTargetTexture2DOES");
+
+            if (device->eglExtensions.KHR_gl_renderbuffer_image)
+                device->eglFunctions.glEGLImageTargetRenderbufferStorageOES = (PFNGLEGLIMAGETARGETRENDERBUFFERSTORAGEOESPROC) eglGetProcAddress("glEGLImageTargetRenderbufferStorageOES");
+        }
     }
+
+    SRMDebug("[%s] Has glEGLImageTargetTexture2DOES: %s.",
+             device->name,
+             device->eglFunctions.glEGLImageTargetTexture2DOES == NULL ? "NO" : "YES");
+
+    SRMDebug("[%s] Has glEGLImageTargetRenderbufferStorageOES: %s.",
+             device->name,
+             device->eglFunctions.glEGLImageTargetRenderbufferStorageOES == NULL ? "NO" : "YES");
 
     if (device->eglExtensions.EXT_image_dma_buf_import_modifiers)
     {
@@ -796,6 +811,7 @@ UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device)
     device->glExtensions.EXT_texture_format_BGRA8888 = srmEGLHasExtension(exts, "GL_EXT_texture_format_BGRA8888");
     device->glExtensions.OES_EGL_image_external = srmEGLHasExtension(exts, "GL_OES_EGL_image_external");
     device->glExtensions.OES_EGL_image = srmEGLHasExtension(exts, "GL_OES_EGL_image");
+    device->glExtensions.OES_EGL_image_base = srmEGLHasExtension(exts, "GL_OES_EGL_image_base");
     return 1;
 }
 

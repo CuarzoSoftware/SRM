@@ -19,6 +19,7 @@ struct SRMConnectorRenderInterface
     UInt8(*render)(SRMConnector *connector);
     UInt8(*flipPage)(SRMConnector *connector);
     UInt8(*updateMode)(SRMConnector *connector);
+    UInt32(*getFramebufferID)(SRMConnector *connector);
     UInt32(*getCurrentBufferIndex)(SRMConnector *connector);
     UInt32(*getBuffersCount)(SRMConnector *connector);
     SRMBuffer*(*getBuffer)(SRMConnector *connector, UInt32 bufferIndex);
@@ -125,6 +126,7 @@ struct SRMConnectorStruct
     struct SRMConnectorRenderInterface renderInterface;
     void *renderData;
     UInt8 inPaintGL;
+    UInt8 usingRenderBuffers;
 
     // User scanout buffer (pending and current)
     SRMBuffer *userScanoutBufferRef[2];

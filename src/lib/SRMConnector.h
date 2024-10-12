@@ -497,6 +497,8 @@ UInt8 srmConnectorSuspend(SRMConnector *connector);
  */
 UInt8 srmConnectorResume(SRMConnector *connector);
 
+UInt32 srmConnectorGetFramebufferID(SRMConnector *connector);
+
 /**
  * @brief Returns the current framebuffer index.
  *

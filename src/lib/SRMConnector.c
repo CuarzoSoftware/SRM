@@ -952,3 +952,11 @@ releaseAndFail:
     srmConnectorReleaseUserScanoutBuffer(connector, 0);
     return 0;
 }
+
+UInt32 srmConnectorGetFramebufferID(SRMConnector *connector)
+{
+    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
+        return 0;
+
+    return connector->renderInterface.getFramebufferID(connector);
+}

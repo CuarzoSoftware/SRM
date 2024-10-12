@@ -827,3 +827,20 @@ GLenum srmBufferGetTextureTarget(SRMBuffer *buffer)
 {
     return buffer->target;
 }
+
+EGLImage srmBufferGetEGLImage(SRMDevice *device, SRMBuffer *buffer)
+{
+    if (!srmBufferGetTextureID(device, buffer))
+        return EGL_NO_IMAGE;
+
+    struct SRMBufferTexture *texture;
+    SRMListForeach(item, buffer->textures)
+    {
+        texture = srmListItemGetData(item);
+
+        if (texture->device == device)
+            return texture->image;
+    }
+
+    return EGL_NO_IMAGE;
+}

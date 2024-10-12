@@ -287,7 +287,10 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
                      NULL);
     }
 
-    glFlush();
+    if (buffer->allocator->driver == SRM_DEVICE_DRIVER_nvidia)
+        glFinish();
+    else
+        glFlush();
 
     if (buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
     {
@@ -489,6 +492,9 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     glTexParameteri(buffer->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(buffer->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+    if (buffer->allocator->driver == SRM_DEVICE_DRIVER_nvidia)
+        glFinish();
+
     srmListAppendData(buffer->textures, texture);
     pthread_mutex_unlock(&buffer->mutex);
     return texture->texture;
@@ -605,6 +611,10 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
 
         buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
         ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
+
+        if (buffer->allocator->driver == SRM_DEVICE_DRIVER_nvidia)
+            glFinish();
+
         pthread_mutex_unlock(&buffer->mutex);
         return 1;
     }
@@ -647,6 +657,10 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         }
 
         gbm_bo_unmap(buffer->bo, mapData);
+
+        if (buffer->allocator->driver == SRM_DEVICE_DRIVER_nvidia)
+            glFinish();
+
         pthread_mutex_unlock(&buffer->mutex);
         return 1;
     }
@@ -661,7 +675,12 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
                         buffer->glFormat, buffer->glType, pixels);
 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-        glFlush();
+
+        if (buffer->allocator->driver == SRM_DEVICE_DRIVER_nvidia)
+            glFinish();
+        else
+            glFlush();
+
         return 1;
     }
 

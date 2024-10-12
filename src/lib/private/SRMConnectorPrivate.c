@@ -495,6 +495,9 @@ void *srmConnectorRenderThread(void *conn)
                     connector->renderInterface.render(connector);
                     connector->inPaintGL = 0;
 
+                    if (connector->device->rendererDevice->driver == SRM_DEVICE_DRIVER_nvidia)
+                        glFinish();
+
                     /* Scanning out a custom user buffer (skip the render mode interface) */
                     if (connector->userScanoutBufferRef[0])
                     {

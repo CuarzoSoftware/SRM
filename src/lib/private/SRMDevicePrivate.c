@@ -106,6 +106,8 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
             device->driver = SRM_DEVICE_DRIVER_lima;
         else if (strcmp(version->name, "nvidia-drm") == 0)
             device->driver = SRM_DEVICE_DRIVER_nvidia;
+        else if (strcmp(version->name, "nvidia") == 0)
+            device->driver = SRM_DEVICE_DRIVER_nvidia;
 
         drmFreeVersion(version);
     }

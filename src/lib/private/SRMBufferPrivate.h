@@ -4,6 +4,7 @@
 #include <SRMFormat.h>
 #include <SRMBuffer.h>
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <pthread.h>
 #include <gbm.h>
@@ -44,8 +45,6 @@ typedef enum SRM_BUFFER_WRITE_MODE_ENUM
     SRM_BUFFER_WRITE_MODE_GLES
 } SRM_BUFFER_WRITE_MODE;
 
-
-
 struct SRMBufferStruct
 {
     // Common
@@ -54,6 +53,7 @@ struct SRMBufferStruct
     enum SRM_BUFFER_SRC src;
     SRM_BUFFER_WRITE_MODE writeMode;
     UInt32 refCount;
+    EGLSyncKHR eglSync;
 
     UInt32 width;
     UInt32 height;
@@ -101,6 +101,8 @@ void *srmBufferMapFD(Int32 fd, size_t len, UInt32 *caps);
 struct gbm_bo *srmBufferCreateLinearBO(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format);
 struct gbm_surface *srmBufferCreateGBMSurface(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags);
 struct gbm_bo *srmBufferCreateGBMBo(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags);
+UInt8 srmBufferUpdateSync(SRMBuffer *buffer);
+void srmBufferWaitSync(SRMBuffer *buffer);
 
 #ifdef __cplusplus
 }

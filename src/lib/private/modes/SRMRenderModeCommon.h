@@ -40,6 +40,7 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector);
 void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struct gbm_surface **surface);
 void srmRenderModeCommonCreateConnectorGBMBo(SRMConnector *connector, struct gbm_bo **bo);
 
+
 #ifdef __cplusplus
 }
 #endif

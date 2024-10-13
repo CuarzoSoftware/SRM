@@ -357,6 +357,7 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
     device->eglExtensions.KHR_image_pixmap = srmEGLHasExtension(extensions, "EGL_KHR_image_pixmap");
     device->eglExtensions.KHR_gl_texture_2D_image = srmEGLHasExtension(extensions, "EGL_KHR_gl_texture_2D_image");
     device->eglExtensions.KHR_gl_renderbuffer_image = srmEGLHasExtension(extensions, "EGL_KHR_gl_renderbuffer_image");
+    device->eglExtensions.KHR_fence_sync = srmEGLHasExtension(extensions, "EGL_KHR_fence_sync");
 
     const char *deviceExtensions = NULL, *driverName = NULL;
 
@@ -431,6 +432,18 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
     SRMDebug("[%s] Has glEGLImageTargetRenderbufferStorageOES: %s.",
              device->name,
              device->eglFunctions.glEGLImageTargetRenderbufferStorageOES == NULL ? "NO" : "YES");
+
+    const UInt8 hasEGLSync = device->glExtensions.OES_EGL_sync && device->eglExtensions.KHR_fence_sync;
+
+    if (hasEGLSync)
+    {
+        device->eglFunctions.eglCreateSyncKHR = (PFNEGLCREATESYNCKHRPROC)eglGetProcAddress("eglCreateSyncKHR");
+        device->eglFunctions.eglDestroySyncKHR = (PFNEGLDESTROYSYNCKHRPROC)eglGetProcAddress("eglDestroySyncKHR");
+        device->eglFunctions.eglClientWaitSyncKHR = (PFNEGLCLIENTWAITSYNCKHRPROC)eglGetProcAddress("eglClientWaitSyncKHR");
+        device->eglFunctions.eglGetSyncAttribKHR = (PFNEGLGETSYNCATTRIBKHRPROC)eglGetProcAddress("eglGetSyncAttribKHR");
+    }
+
+    SRMDebug("[%s] Has EGL Sync: %s.", device->name, hasEGLSync ? "YES" : "NO");
 
     if (device->eglExtensions.EXT_image_dma_buf_import_modifiers)
     {
@@ -802,7 +815,6 @@ void srmDeviceUninitializeTestShader(SRMDevice *device)
     }
 }
 
-
 UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device)
 {
     const char *exts = (const char*)glGetString(GL_EXTENSIONS);
@@ -812,6 +824,8 @@ UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device)
     device->glExtensions.OES_EGL_image_external = srmEGLHasExtension(exts, "GL_OES_EGL_image_external");
     device->glExtensions.OES_EGL_image = srmEGLHasExtension(exts, "GL_OES_EGL_image");
     device->glExtensions.OES_EGL_image_base = srmEGLHasExtension(exts, "GL_OES_EGL_image_base");
+    device->glExtensions.OES_surfaceless_context = srmEGLHasExtension(exts, "GL_OES_surfaceless_context");
+    device->glExtensions.OES_EGL_sync = srmEGLHasExtension(exts, "GL_OES_EGL_sync");
     return 1;
 }
 

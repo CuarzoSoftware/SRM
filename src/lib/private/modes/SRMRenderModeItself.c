@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <private/modes/SRMRenderModeItself.h>
 #include <private/modes/SRMRenderModeCommon.h>
 
@@ -82,11 +83,12 @@ static void destroyData(SRMConnector *connector)
 
 static UInt8 createRenderBuffers(SRMConnector *connector)
 {
-    if (!connector->device->eglFunctions.glEGLImageTargetRenderbufferStorageOES)
-        return 0;
-
     RenderModeData *data = (RenderModeData*)connector->renderData;
     char *env = getenv("SRM_RENDER_MODE_ITSELF_FB_COUNT");
+
+    if (!connector->device->eglFunctions.glEGLImageTargetRenderbufferStorageOES)
+        goto fail;
+
     data->buffersCount = 2;
 
     if (env)
@@ -555,11 +557,13 @@ static UInt8 flipPage(SRMConnector *connector)
     else
     {
         swapBuffers(connector, connector->device->eglDisplay, data->connectorEGLSurface);
-        gbm_surface_lock_front_buffer(data->connectorGBMSurface);
+        struct gbm_bo *bo = gbm_surface_lock_front_buffer(data->connectorGBMSurface);
 
         srmRenderModeCommonPageFlip(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
 
         data->currentBufferIndex = nextBufferIndex(connector);
+
+        assert("This driver doesn't recycle gbm_surface bos." && bo == data->connectorBOs[data->currentBufferIndex]);
         gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
     }
 

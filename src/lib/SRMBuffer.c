@@ -287,11 +287,6 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
                      NULL);
     }
 
-    if (buffer->allocator->driver == SRM_DEVICE_DRIVER_nvidia)
-        glFinish();
-    else
-        glFlush();
-
     if (buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
     {
         /* This is used to later get a gbm bo if the buffer is used for scanout */
@@ -301,6 +296,9 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
                                         (EGLClientBuffer)(UInt64)texture->texture,
                                         NULL);
     }
+
+    if (!srmBufferUpdateSync(buffer))
+        glFinish();
 
     eglMakeCurrent(prevDisplay,
                    prevSurfDraw,
@@ -360,6 +358,7 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
     buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
                                         buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
 
+    srmBufferUpdateSync(buffer);
     pthread_mutex_unlock(&buffer->mutex);
     return buffer;
 
@@ -382,6 +381,8 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         SRMError("[%s] wl_drm buffers can only be accessed from allocator device.", device->name);
         return 0;
     }
+
+    srmBufferWaitSync(buffer);
 
     // Check if already created
     struct SRMBufferTexture *texture;
@@ -512,6 +513,8 @@ void srmBufferDestroy(SRMBuffer *buffer)
         return;
     }
 
+    srmBufferWaitSync(buffer);
+
     if (buffer->scanout.fb != 0)
     {
         drmModeRmFB(buffer->allocator->fd, buffer->scanout.fb);
@@ -611,10 +614,7 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
 
         buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
         ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
-
-        if (buffer->allocator->driver == SRM_DEVICE_DRIVER_nvidia)
-            glFinish();
-
+        srmBufferUpdateSync(buffer);
         pthread_mutex_unlock(&buffer->mutex);
         return 1;
     }
@@ -657,10 +657,7 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         }
 
         gbm_bo_unmap(buffer->bo, mapData);
-
-        if (buffer->allocator->driver == SRM_DEVICE_DRIVER_nvidia)
-            glFinish();
-
+        srmBufferUpdateSync(buffer);
         pthread_mutex_unlock(&buffer->mutex);
         return 1;
     }
@@ -676,10 +673,8 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
-        if (buffer->allocator->driver == SRM_DEVICE_DRIVER_nvidia)
+        if (!srmBufferUpdateSync(buffer))
             glFinish();
-        else
-            glFlush();
 
         return 1;
     }
@@ -789,6 +784,7 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo)
     }
 
 skipMap:
+    srmBufferUpdateSync(buffer);
     return buffer;
 }
 
@@ -799,6 +795,8 @@ SRMDevice *srmBufferGetAllocatorDevice(SRMBuffer *buffer)
 
 UInt8 srmBufferRead(SRMBuffer *buffer, Int32 srcX, Int32 srcY, Int32 srcW, Int32 srcH, Int32 dstX, Int32 dstY, Int32 dstStride, UInt8 *dstBuffer)
 {
+    srmBufferWaitSync(buffer);
+
     if (buffer->map && buffer->modifiers[0] == DRM_FORMAT_MOD_LINEAR)
     {
         pthread_mutex_lock(&buffer->mutex);

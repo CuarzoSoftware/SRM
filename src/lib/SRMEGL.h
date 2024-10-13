@@ -77,6 +77,7 @@ typedef struct SRMEGLDeviceExtensionsStruct
     UInt8 MESA_configless_context;
     UInt8 KHR_surfaceless_context;
     UInt8 IMG_context_priority;
+    UInt8 KHR_fence_sync;
 } SRMEGLDeviceExtensions;
 
 /**
@@ -90,6 +91,10 @@ typedef struct SRMEGLDeviceFunctionsStruct
     PFNEGLQUERYDMABUFMODIFIERSEXTPROC eglQueryDmaBufModifiersEXT;
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
     PFNGLEGLIMAGETARGETRENDERBUFFERSTORAGEOESPROC glEGLImageTargetRenderbufferStorageOES;
+    PFNEGLCREATESYNCKHRPROC eglCreateSyncKHR;
+    PFNEGLDESTROYSYNCKHRPROC eglDestroySyncKHR;
+    PFNEGLCLIENTWAITSYNCKHRPROC eglClientWaitSyncKHR;
+    PFNEGLGETSYNCATTRIBKHRPROC eglGetSyncAttribKHR;
 } SRMEGLDeviceFunctions;
 
 /**
@@ -102,6 +107,8 @@ typedef struct SRMGLDeviceExtensionsStruct
     UInt8 OES_EGL_image;
     UInt8 OES_EGL_image_base;
     UInt8 OES_EGL_image_external;
+    UInt8 OES_EGL_sync;
+    UInt8 OES_surfaceless_context;
 } SRMGLDeviceExtensions;
 
 /**

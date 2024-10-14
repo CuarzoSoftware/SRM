@@ -20,6 +20,9 @@ extern "C" {
  * @{
  */
 
+// TODO
+UInt8 srmDeviceSync(SRMDevice *device);
+
 /**
  * @brief Get the @ref SRMCore instance to which this device belongs.
  *

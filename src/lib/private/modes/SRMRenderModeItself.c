@@ -12,6 +12,7 @@
 #include <SRMList.h>
 #include <SRMLog.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 
 static const EGLint eglConfigAttribs[] =
@@ -110,7 +111,7 @@ static UInt8 createRenderBuffers(SRMConnector *connector)
 
         if (!data->connectorBOs[i])
         {
-            SRMError("RenderBuffers failed 1.");
+            printf("RenderBuffers failed 1\n");
             goto fail;
         }
 
@@ -118,7 +119,7 @@ static UInt8 createRenderBuffers(SRMConnector *connector)
 
         if (!data->buffers[i])
         {
-            SRMError("RenderBuffers failed 2.");
+            printf("RenderBuffers failed 2\n");
             goto fail;
         }
 
@@ -126,7 +127,7 @@ static UInt8 createRenderBuffers(SRMConnector *connector)
 
         if (image == EGL_NO_IMAGE)
         {
-            SRMError("RenderBuffers failed 3.");
+            printf("RenderBuffers failed 3\n");
             goto fail;
         }
 
@@ -141,17 +142,18 @@ static UInt8 createRenderBuffers(SRMConnector *connector)
 
         if (status != GL_FRAMEBUFFER_COMPLETE)
         {
-            SRMError("RenderBuffers failed 4.");
+            printf("RenderBuffers failed 4\n");
             goto fail;
         }
     }
 
+    printf("USING RENDERBUFFERS!\n");
     connector->usingRenderBuffers = 1;
 
     return 1;
 
 fail:
-    SRMError("RenderBuffers failed.");
+    printf("RenderBuffers failed\n");
     // TODO: destroy bos, fbs, etc
     free(data->connectorBOs);
     free(data->buffers);
@@ -561,9 +563,9 @@ static UInt8 flipPage(SRMConnector *connector)
 
         srmRenderModeCommonPageFlip(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
 
-        data->currentBufferIndex = nextBufferIndex(connector);
-
         assert("This driver doesn't recycle gbm_surface bos." && bo == data->connectorBOs[data->currentBufferIndex]);
+
+        data->currentBufferIndex = nextBufferIndex(connector);
         gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
     }
 

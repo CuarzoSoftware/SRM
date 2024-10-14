@@ -495,30 +495,8 @@ void *srmConnectorRenderThread(void *conn)
                     connector->renderInterface.render(connector);
                     connector->inPaintGL = 0;
 
-                    SRMDevice *dev = connector->device->rendererDevice;
-
-                    if (dev->eglFunctions.eglCreateSyncKHR)
-                    {
-                        // TODO
-                        EGLSyncKHR sync = dev->eglFunctions.eglCreateSyncKHR(dev->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
-
-                        if (sync == EGL_NO_SYNC_KHR)
-                        {
-                            SRMError("Failed to create EGL sync.");
-                            glFinish();
-                        }
-                        else
-                        {
-                            glFlush();
-
-                            EGLint res = dev->eglFunctions.eglClientWaitSyncKHR(dev->eglDisplay, sync, 0, EGL_FOREVER_KHR);
-
-                            if (res != EGL_CONDITION_SATISFIED_KHR)
-                                SRMError("EGL SYNC CONDITION NOT SATISFIED");
-
-                            dev->eglFunctions.eglDestroySyncKHR(dev->eglDisplay, sync);
-                        }
-                    }
+                    // TODO
+                    srmDeviceSync(connector->device->rendererDevice);
 
                     /* Scanning out a custom user buffer (skip the render mode interface) */
                     if (connector->userScanoutBufferRef[0])

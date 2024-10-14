@@ -175,3 +175,33 @@ const SRMGLDeviceExtensions *srmDeviceGetGLExtensions(SRMDevice *device)
 {
     return &device->glExtensions;
 }
+
+UInt8 srmDeviceSync(SRMDevice *device)
+{
+    if (!device->eglFunctions.eglCreateSyncKHR)
+        return 0;
+
+    // TODO
+    EGLSyncKHR sync = device->eglFunctions.eglCreateSyncKHR(device->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
+
+    if (sync == EGL_NO_SYNC_KHR)
+    {
+        SRMError("Failed to create EGL sync.");
+        glFinish();
+    }
+    else
+    {
+        glFlush();
+
+        EGLint res = device->eglFunctions.eglClientWaitSyncKHR(device->eglDisplay, sync, 0, EGL_FOREVER_KHR);
+        device->eglFunctions.eglDestroySyncKHR(device->eglDisplay, sync);
+
+        if (res != EGL_CONDITION_SATISFIED_KHR)
+        {
+            SRMError("EGL SYNC CONDITION NOT SATISFIED");
+            return 0;
+        }
+    }
+
+    return 1;
+}

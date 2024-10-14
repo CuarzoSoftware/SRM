@@ -329,6 +329,8 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
 
     srmConnectorInitGamma(connector);
 
+    srmDeviceSync(connector->device->core->allocatorDevice); // TODO
+
     if (pthread_create(&connector->renderThread, NULL, srmConnectorRenderThread, connector))
     {
         SRMError("Could not start render thread for device %s connector %d.", connector->device->name, connector->id);

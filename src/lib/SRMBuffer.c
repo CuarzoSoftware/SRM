@@ -382,8 +382,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         return 0;
     }
 
-    srmBufferWaitSync(buffer);
-
     // Check if already created
     struct SRMBufferTexture *texture;
     SRMListForeach(item, buffer->textures)
@@ -408,6 +406,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
                 break;
             }
 
+            srmBufferWaitSync(buffer);
             return texture->texture;
         }
     }
@@ -492,9 +491,6 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     glTexParameteri(buffer->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(buffer->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(buffer->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    if (buffer->allocator->driver == SRM_DEVICE_DRIVER_nvidia)
-        glFinish();
 
     srmListAppendData(buffer->textures, texture);
     pthread_mutex_unlock(&buffer->mutex);
@@ -719,9 +715,10 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo)
         return NULL;
     }
 
-    if (!allocDev->eglExtensions.KHR_image_pixmap)
+    if (!allocDev->eglExtensions.KHR_image_pixmap && !allocDev->eglExtensions.EXT_image_dma_buf_import_modifiers)
     {
-        SRMError("Can not create buffer from GBM bo. KHR_image_pixmap extension not available.");
+        SRMError("Can not create buffer from GBM bo. "
+                 "KHR_image_pixmap and EXT_image_dma_buf_import_modifiers extensions not available.");
         return NULL;
     }
 
@@ -753,7 +750,6 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo)
 
     if (buffer->fds[0] >= 0)
     {
-        // Map the DMA buffer into user space
         buffer->map = mmap(NULL, buffer->height * buffer->strides[0], PROT_READ | PROT_WRITE, MAP_SHARED, buffer->fds[0], 0);
 
         if (buffer->map == MAP_FAILED)

@@ -789,10 +789,7 @@ UInt8 srmDeviceInitializeTestShader(SRMDevice *device)
 
 void srmDeviceUninitializeTestShader(SRMDevice *device)
 {
-    eglMakeCurrent(device->eglDisplay,
-                   device->eglSurfaceTest,
-                   device->eglSurfaceTest,
-                   device->eglSharedContext);
+    eglMakeCurrent(device->eglDisplay,  EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
 
     if (device->programTest)
     {
@@ -1230,4 +1227,7 @@ void srmDeviceTestCPUAllocationMode(SRMDevice *device)
     SRMDebug("[%s] Using OpenGL CPU buffer allocation mode.", device->name);
 
     device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_GLES;
+
+    if (!srmDeviceTestCPUAllocation(device, 13, 17))
+        SRMWarning("[%s] All CPU buffer allocation tests failed.", device->name);
 }

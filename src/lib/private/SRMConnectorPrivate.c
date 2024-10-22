@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMConnectorModePrivate.h>
 #include <private/SRMDevicePrivate.h>
@@ -67,7 +68,7 @@ UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
 
     if (!connectorRes)
     {
-        SRMError("Could not get device %s connector %d resources.", connector->device->name, connector->id);
+        SRMError("[%s] Could not get connector %d resources.", connector->device->shortName, connector->id);
         return 0;
     }
 
@@ -84,7 +85,7 @@ UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
 
     if (!props)
     {
-        SRMError("Could not get device %s connector %d properties.", connector->device->name, connector->id);
+        SRMError("[%s] Could not get connector %d properties.", connector->device->shortName, connector->id);
         return 0;
     }
 
@@ -145,7 +146,7 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
 
     if (!connectorRes)
     {
-        SRMError("Could not get device %s connector %d resources.", connector->device->name, connector->id);
+        SRMError("[%s] Could not get connector %d resources.", connector->device->shortName, connector->id);
         return 0;
     }
 
@@ -170,7 +171,7 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
 
     if (!blob)
     {
-        SRMError("Error getting device %s EDID property blob for connector %d: %s", connector->device->name, connector->id, strerror(errno));
+        SRMError("[%s] Error getting EDID property blob for connector %d: %s", connector->device->shortName, connector->id, strerror(errno));
         drmModeFreeConnector(connectorRes);
         return 0;
     }
@@ -179,7 +180,7 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
 
     if (!info)
     {
-        SRMError("Failed to parse device %s EDID of connector %d: %s", connector->device->name, connector->id, strerror(errno));
+        SRMError("[%s] Failed to parse EDID of connector %d: %s", connector->device->shortName, connector->id, strerror(errno));
         drmModeFreePropertyBlob(blob);
         drmModeFreeConnector(connectorRes);
         return 0;
@@ -223,7 +224,7 @@ UInt8 srmConnectorUpdateEncoders(SRMConnector *connector)
 
     if (!connectorRes)
     {
-        SRMError("Could not get device %s connector %d resources.", connector->device->name, connector->id);
+        SRMError("[%s] [%s] Could not get connector resources.", connector->device->shortName, connector->name);
         return 0;
     }
 
@@ -261,7 +262,7 @@ UInt8 srmConnectorUpdateModes(SRMConnector *connector)
 
     if (!connectorRes)
     {
-        SRMError("Could not get device %s connector %d resources.", connector->device->name, connector->id);
+        SRMError("[%s] [%s] Could not get connector resources.", connector->device->shortName, connector->name);
         return 0;
     }
 
@@ -414,9 +415,9 @@ void *srmConnectorRenderThread(void *conn)
 
     if (pthread_mutex_init(&connector->repaintMutex, NULL))
     {
-        SRMError("Could not create render mutex for device %s connector %d.",
-                 connector->device->name,
-                 connector->id);
+        SRMError("[%s] [%s] Could not create render mutex.",
+                 connector->device->shortName,
+                 connector->name);
         goto finish;
     }
     else
@@ -424,9 +425,9 @@ void *srmConnectorRenderThread(void *conn)
 
     if (pthread_cond_init(&connector->repaintCond, NULL))
     {
-        SRMError("Could not create render cond for device %s connector %d.",
-                 connector->device->name,
-                 connector->id);
+        SRMError("[%s] [%s] Could not create render pthread_cond.",
+                 connector->device->shortName,
+                 connector->name);
         goto finish;
     }
     else
@@ -444,9 +445,9 @@ void *srmConnectorRenderThread(void *conn)
 
     SRM_RENDER_MODE renderMode = srmDeviceGetRenderMode(connector->device);
 
-    SRMDebug("[%s] Connector %d render mode = %s.",
-             connector->device->name,
-             connector->id,
+    SRMDebug("[%s] [%s] Rendering Mode: %s.",
+             connector->device->shortName,
+             connector->name,
              srmGetRenderModeString(renderMode));
 
     if (renderMode == SRM_RENDER_MODE_ITSELF)
@@ -459,17 +460,25 @@ void *srmConnectorRenderThread(void *conn)
         srmRenderModeCPUSetInterface(connector);
     else
     {
-        SRMError("[%s] Invalid render mode for connector %d.",
-                 connector->device->name,
-                 connector->id);
-        goto finish;
+        assert(0 && "Invalid render mode for connector.");
+    }
+
+    SRMListForeach(devIt, connector->device->core->devices)
+    {
+        SRMDevice *dev = srmListItemGetData(devIt);
+
+        if (dev == connector->device->rendererDevice)
+            continue;
+
+        if (!srmDeviceCreateSharedContextForThread(dev))
+            goto finish;
     }
 
     if (!connector->renderInterface.initialize(connector))
     {
-        SRMError("[%s] Render mode interface initialize() failed for connector %d.",
-                 connector->device->name,
-                 connector->id);
+        SRMError("[%s] [%s] Render mode interface initialize() failed.",
+                 connector->device->shortName,
+                 connector->name);
         goto finish;
     }
 
@@ -494,9 +503,6 @@ void *srmConnectorRenderThread(void *conn)
                     connector->inPaintGL = 1;
                     connector->renderInterface.render(connector);
                     connector->inPaintGL = 0;
-
-                    // TODO
-                    srmDeviceSync(connector->device->rendererDevice);
 
                     /* Scanning out a custom user buffer (skip the render mode interface) */
                     if (connector->userScanoutBufferRef[0])
@@ -550,7 +556,7 @@ void *srmConnectorRenderThread(void *conn)
             connector->renderInterface.pause(connector);
             pthread_mutex_unlock(&connector->stateMutex);
             usleep(1000);
-            SRMDebug("[%s] Connector %d paused.", connector->device->rendererDevice->name, connector->id);
+            SRMDebug("[%s] [%s] Paused.", connector->device->shortName, connector->name);
             continue;
         }
         else if (connector->state == SRM_CONNECTOR_STATE_RESUMING)
@@ -559,7 +565,7 @@ void *srmConnectorRenderThread(void *conn)
             connector->renderInterface.resume(connector);
             pthread_mutex_unlock(&connector->stateMutex);
             usleep(1000);
-            SRMDebug("[%s] Connector %d resumed.", connector->device->rendererDevice->name, connector->id);
+            SRMDebug("[%s] [%s] Resumed.", connector->device->shortName, connector->name);
             continue;
         }
 
@@ -567,6 +573,17 @@ void *srmConnectorRenderThread(void *conn)
     }
 
     finish:
+
+    SRMListForeach(devIt, connector->device->core->devices)
+    {
+        SRMDevice *dev = srmListItemGetData(devIt);
+
+        if (dev == connector->device->rendererDevice)
+            continue;
+
+        srmDeviceDestroyThreadSharedContext(dev);
+    }
+
     connector->renderInitResult = -1;
     return NULL;
 }
@@ -689,9 +706,9 @@ void srmConnectorInitGamma(SRMConnector *connector)
 
     if (gammaSize > 0)
     {
-        SRMDebug("[%s] Connector (%d) gamma size = %d.",
-                 connector->device->name,
-                 connector->id,
+        SRMDebug("[%s] [%s] Gamma Size: %d.",
+                 connector->device->shortName,
+                 connector->name,
                  (UInt32)gammaSize);
 
         connector->gamma = malloc(gammaSize * sizeof(*connector->gamma));
@@ -733,16 +750,17 @@ void srmConnectorInitGamma(SRMConnector *connector)
                                     g,
                                     b))
             {
-                SRMError("Failed to set gamma for connector %d using legacy API drmModeCrtcSetGamma().",
-                         connector->id);
+                SRMError("[%s] [%s] Failed to set gamma using legacy API drmModeCrtcSetGamma().",
+                         connector->device->shortName,
+                         connector->name);
             }
         }
     }
     else
     {
-        SRMDebug("[%s] Connector (%d) does not support gamma correction.",
-                 connector->device->name,
-                 connector->id);
+        SRMDebug("[%s] [%s] Does not support gamma correction.",
+                 connector->device->shortName,
+                 connector->name);
     }
 }
 

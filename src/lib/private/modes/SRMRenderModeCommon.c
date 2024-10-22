@@ -9,6 +9,7 @@
 
 #include <SRMCore.h>
 #include <SRMLog.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <xf86drmMode.h>
@@ -221,7 +222,7 @@ UInt8 srmRenderModeCommonCreateCursor(SRMConnector *connector)
         }
     }
 
-    SRMError("Failed to setup hw cursor for connector %d.", connector->id);
+    SRMError("[%s] [%s] Failed to create HW cursor.", connector->device->shortName, connector->name);
     return 0;
 }
 
@@ -392,7 +393,7 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
             &connector->gammaBlobId))
         {
             connector->gammaBlobId = 0;
-            SRMError("Failed to create gamma lut blob for connector %d.", connector->id);
+            SRMError("[%s] [%s] Failed to create gamma lut blob.", connector->device->shortName, connector->name);
 	    }
         else
         {
@@ -414,6 +415,11 @@ void srmRenderModeCommitAtomicChanges(SRMConnector *connector, drmModeAtomicReqP
                                      connector->propIDs.content_type,
                                      connector->contentType);
     }
+
+    drmModeAtomicAddProperty(req,
+                             connector->currentPrimaryPlane->id,
+                             connector->currentPrimaryPlane->propIDs.IN_FENCE_FD,
+                             connector->fenceFD);
 }
 
 void srmRenderModeCommonDestroyCursor(SRMConnector *connector)
@@ -497,9 +503,9 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
 
             if (ret)
             {
-                SRMError("Failed unset mode on device %s connector %d. Error: %d. (Atomic)",
-                         connector->device->name,
-                         connector->id, ret);
+                SRMError("[%s] [%s] Failed unset mode. DRM Error: %d. (atomic)",
+                         connector->device->shortName,
+                         connector->name, ret);
             }
 
             // Set mode
@@ -602,9 +608,9 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
             {
                 if (connector->currentCursorPlane)
                     connector->cursorIndex = prevCursorIndex;
-                SRMError("Failed set mode with same size on device %s connector %d. Error: %d. (atomic)",
-                         connector->device->name,
-                         connector->id, ret);
+                SRMError("[%s] [%s] Failed set mode with same size. DRM Error: %d. (atomic)",
+                         connector->device->shortName,
+                         connector->name, ret);
             }
             else
                 connector->atomicChanges = 0;
@@ -639,9 +645,9 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
                                &connector->currentMode->info);
             if (ret)
             {
-                SRMError("Failed unset mode on device %s connector %d. Error: %d. (legacy)",
-                         connector->device->name,
-                         connector->id, ret);
+                SRMError("[%s] [%s] Failed unset mode. DRM Error: %d. (legacy)",
+                         connector->device->shortName,
+                         connector->name, ret);
                 goto retry;
             }
         }
@@ -660,9 +666,9 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
 
             if (ret)
             {
-                SRMError("Failed unset mode on device %s connector %d. Error: %d. (atomic)",
-                         connector->device->name,
-                         connector->id, ret);
+                SRMError("[%s] [%s] Failed unset mode. DRM Error: %d. (atomic)",
+                         connector->device->shortName,
+                         connector->name, ret);
             }
         }
         else
@@ -682,9 +688,9 @@ Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb)
 
             if (ret)
             {
-                SRMError("Failed unset mode on device %s connector %d. Error: %d. (legacy)",
-                         connector->device->name,
-                         connector->id, ret);
+                SRMError("[%s] [%s] Failed unset mode. DRM Error: %d. (legacy)",
+                         connector->device->shortName,
+                         connector->name, ret);
             }
         }
 
@@ -705,9 +711,9 @@ void srmRenderModeCommonUninitialize(SRMConnector *connector)
 
         if (ret)
         {
-            SRMError("Failed uninitialize device %s connector %d. Error: %d. (atomic)",
-                     connector->device->name,
-                     connector->id, ret);
+            SRMError("[%s] [%s] Failed to reset CRTC. DRM Error: %d. (atomic)",
+                     connector->device->shortName,
+                     connector->name, ret);
         }
     }
     else
@@ -723,9 +729,9 @@ void srmRenderModeCommonUninitialize(SRMConnector *connector)
 
         if (ret)
         {
-            SRMError("Failed uninitialize device %s connector %d. Error: %d. (legacy)",
-                     connector->device->name,
-                     connector->id, ret);
+            SRMError("[%s] [%s] Failed to reset CRTC. DRM Error: %d. (legacy)",
+                     connector->device->shortName,
+                     connector->name, ret);
         }
     }
 }
@@ -740,9 +746,9 @@ void srmRenderModeCommonPauseRendering(SRMConnector *connector)
 
         if (ret)
         {
-            SRMWarning("Failed to reset CRTC device %s connector %d. Error: %d (not DRM master). (atomic)",
-                     connector->device->name,
-                     connector->id, ret);
+            SRMWarning("[%s] [%s] Failed to reset CRTC. DRM Error: %d (not DRM master). (atomic)",
+                     connector->device->shortName,
+                     connector->name, ret);
         }
     }
     else
@@ -758,9 +764,9 @@ void srmRenderModeCommonPauseRendering(SRMConnector *connector)
 
         if (ret)
         {
-            SRMError("Failed to reset CRTC device %s connector %d. Error: %d (not DRM master). (legacy)",
-                     connector->device->name,
-                     connector->id, ret);
+            SRMError("[%s] [%s] Failed to reset CRTC. DRM Error: %d (not DRM master). (legacy)",
+                     connector->device->shortName,
+                     connector->name, ret);
         }
     }
 }
@@ -877,9 +883,9 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
         {
             if (connector->currentCursorPlane)
                 connector->cursorIndex = prevCursorIndex;
-            SRMError("Failed to resume crtc mode on device %s connector %d.",
-                     connector->device->name,
-                     connector->id);
+            SRMError("[%s] [%s] Failed to restore CRTC mode. DRM Error: %d.",
+                     connector->device->shortName,
+                     connector->name, ret);
         }
         else
             connector->atomicChanges = 0;
@@ -897,9 +903,9 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
 
         if (ret)
         {
-            SRMError("Failed to resume crtc mode on device %s connector %d.",
-                     connector->device->name,
-                     connector->id);
+            SRMError("[%s] [%s] Failed to restore CRTC mode. DRM Error: %d.",
+                     connector->device->shortName,
+                     connector->name, ret);
         }
     }
 }
@@ -1014,9 +1020,9 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
         {
             if (connector->currentCursorPlane)
                 connector->cursorIndex = prevCursorIndex;
-            SRMError("Failed to set crtc mode on device %s connector %d (atomic).",
-                    connector->device->name,
-                    connector->id);
+            SRMError("[%s] [%s] Failed to set CRTC mode (atomic). DRM Error: %d.",
+                    connector->device->shortName,
+                    connector->name, ret);
         }
         else
         {
@@ -1039,9 +1045,9 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
 
     if (ret)
     {
-        SRMError("Failed to set crtc mode on device %s connector %d.",
-                    connector->device->name,
-                    connector->id);
+        SRMError("[%s] [%s] Failed to set CRTC mode. DRM Error: %d.",
+                    connector->device->shortName,
+                    connector->name, ret);
         return 0;
     }
 
@@ -1181,9 +1187,9 @@ void srmRenderModeCommonPageFlip(SRMConnector *connector, UInt32 fb)
     if (ret)
     {
         connector->pendingPageFlip = 0;
-        SRMError("Failed to page flip on device %s connector %d. Error: %d.",
-                 connector->device->name,
-                 connector->id, ret);
+        SRMError("[%s] [%s] Failed to page flip. DRM Error: %d.",
+                 connector->device->shortName,
+                 connector->name, ret);
 
         if (customScanoutBuffer && ret == -22)
         {
@@ -1406,8 +1412,8 @@ void srmRenderModeCommonSyncState(SRMConnector *connector)
                                     table + gammaSize,
                                     table + gammaSize + gammaSize))
             {
-                SRMError("Failed to set gamma for connector %d using legacy API drmModeCrtcSetGamma().",
-                         connector->id);
+                SRMError("[%s] [%s] Failed to set gamma using legacy API drmModeCrtcSetGamma().",
+                         connector->device->shortName, connector->name);
             }
         }
     }
@@ -1430,9 +1436,9 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
             && fmt->modifier != DRM_FORMAT_MOD_INVALID
             && srmFormatIsInList(srmDeviceGetDMATextureFormats(connector->device), fmt->format, fmt->modifier))
         {
-            SRMDebug("[%s] Connector %d using format: %s - %s.",
-                connector->device->name,
-                connector->id,
+            SRMDebug("[%s] [%s] Using format: %s - %s.",
+                connector->device->shortName,
+                connector->name,
                 drmGetFormatName(fmt->format),
                 drmGetFormatModifierName(fmt->modifier));
             connector->currentFormat.modifier = fmt->modifier;
@@ -1493,4 +1499,79 @@ void srmRenderModeCommonCreateConnectorGBMBo(SRMConnector *connector, struct gbm
         GBM_FORMAT_XRGB8888,
         DRM_FORMAT_MOD_INVALID,
         GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+}
+
+Int32 srmRenderModeCommonCalculateBuffering(SRMConnector *connector, const char *modeName)
+{
+    char envName[48];
+    sprintf(envName, "SRM_RENDER_MODE_%s_FB_COUNT", modeName);
+    char *env = getenv(envName);
+    Int32 buffering = 2;
+
+    if (env)
+    {
+        Int32 c = atoi(env);
+
+        if (c > 1 && c <= SRM_MAX_BUFFERING)
+            buffering = c;
+    }
+
+    SRMDebug("[%s] [%s] [%s MODE] Buffering: %d.",
+        connector->device->shortName, connector->name, modeName, buffering);
+
+    return buffering;
+}
+
+void srmRenderModeCommonCreateSync(SRMConnector *connector)
+{
+    SRMEGLDeviceFunctions *f = &connector->device->eglFunctions;
+
+    if (!connector->device->clientCapAtomic || !f->eglDupNativeFenceFDANDROID)
+        goto fallback;
+
+    if (connector->fenceFD != -1)
+    {
+        close(connector->fenceFD);
+        connector->fenceFD = -1;
+    }
+
+    static const EGLint attribs[] =
+    {
+        EGL_SYNC_NATIVE_FENCE_FD_ANDROID, EGL_NO_NATIVE_FENCE_FD_ANDROID,
+        EGL_NONE,
+    };
+
+    EGLSyncKHR fence = f->eglCreateSyncKHR(connector->device->eglDisplay, EGL_SYNC_NATIVE_FENCE_ANDROID, attribs);
+
+    if (fence == EGL_NO_SYNC_KHR)
+        goto fallback;
+
+    glFlush();
+    connector->fenceFD = f->eglDupNativeFenceFDANDROID(connector->device->eglDisplay, fence);
+    f->eglDestroySyncKHR(connector->device->eglDisplay, fence);
+
+    if (connector->fenceFD != -1)
+        return;
+
+fallback:
+    glFinish();
+}
+
+struct gbm_bo *srmRenderModeCommonSurfaceLockFrontBufferSafe(struct gbm_surface *surface)
+{
+    struct gbm_bo *bo = gbm_surface_lock_front_buffer(surface);
+
+    if (bo)
+        gbm_bo_set_user_data(bo, (void*)-1, NULL);
+
+    return bo;
+}
+
+void srmRenderModeCommonSurfaceReleaseBufferSafe(struct gbm_surface *surface, struct gbm_bo *bo)
+{
+    if (gbm_bo_get_user_data(bo) == NULL)
+        return;
+
+    gbm_bo_set_user_data(bo, NULL, NULL);
+    gbm_surface_release_buffer(surface, bo);
 }

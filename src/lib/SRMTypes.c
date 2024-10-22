@@ -92,3 +92,21 @@ const char *srmGetConnectorContentTypeString(SRM_CONNECTOR_CONTENT_TYPE contentT
     default:                                    return "unknown";
     }
 }
+
+static EGLDisplay savedDisplay = EGL_NO_DISPLAY;
+static EGLSurface savedSurfaceDraw = EGL_NO_SURFACE;
+static EGLSurface savedSurfaceRead = EGL_NO_SURFACE;
+static EGLContext savedContext = EGL_NO_CONTEXT;
+
+void srmSaveContext()
+{
+    savedDisplay = eglGetCurrentDisplay();
+    savedSurfaceDraw = eglGetCurrentSurface(EGL_DRAW);
+    savedSurfaceRead = eglGetCurrentSurface(EGL_READ);
+    savedContext = eglGetCurrentContext();
+}
+
+void srmRestoreContext()
+{
+    eglMakeCurrent(savedDisplay, savedSurfaceDraw, savedSurfaceRead, savedContext);
+}

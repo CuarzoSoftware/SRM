@@ -37,7 +37,7 @@ UInt8 srmCrtcUpdateProperties(SRMCrtc *crtc)
 
     if (!crtcRes)
     {
-        SRMError("Unable to get device %s crtc %d resources.", crtc->device->name, crtc->id);
+        SRMError("[%s] Unable to get CRTC %d resources.", crtc->device->shortName, crtc->id);
         return 0;
     }
 
@@ -48,7 +48,7 @@ UInt8 srmCrtcUpdateProperties(SRMCrtc *crtc)
 
     if (!props)
     {
-        SRMError("Unable to get device %s crtc %d properties.", crtc->device->name, crtc->id);
+        SRMError("[%s] Unable to get CRCT %d properties.", crtc->device->shortName, crtc->id);
         return 0;
     }
 
@@ -60,7 +60,7 @@ UInt8 srmCrtcUpdateProperties(SRMCrtc *crtc)
 
         if (!prop)
         {
-            SRMWarning("Could not get property %d of device %s crtc %d.", props->props[i], crtc->device->name, crtc->id);
+            SRMWarning("[%s] Could not get property %d of crtc %d.", crtc->device->shortName, props->props[i], crtc->id);
             continue;
         }
 

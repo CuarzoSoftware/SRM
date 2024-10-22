@@ -185,6 +185,7 @@ static void destroyEGLContext(SRMConnector *connector)
 
     if (data->rendererEGLContext != EGL_NO_CONTEXT)
     {
+        eglMakeCurrent(connector->device->rendererDevice->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         eglDestroyContext(connector->device->rendererDevice->eglDisplay, data->rendererEGLContext);
         data->rendererEGLContext = EGL_NO_CONTEXT;
     }

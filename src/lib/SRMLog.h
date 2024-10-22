@@ -45,6 +45,9 @@ void SRMLogInit();
  */
 Int32 SRMLogGetLevel();
 
+// TODO: add doc
+Int32 SRMLogEGLGetLevel();
+
 /**
  * @brief Print a general message independent of the **SRM_DEBUG** value.
  *

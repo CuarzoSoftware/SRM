@@ -53,7 +53,7 @@ UInt8 srmPlaneUpdateProperties(SRMPlane *plane)
 
     if (!props)
     {
-        SRMError("Unable to get device %s plane %d properties.", plane->device->name, plane->id);
+        SRMError("[%s] Failed to get plane %d properties.", plane->device->shortName, plane->id);
         return 0;
     }
 
@@ -66,7 +66,7 @@ UInt8 srmPlaneUpdateProperties(SRMPlane *plane)
 
         if (!prop)
         {
-            SRMWarning("Could not get device %s property %d of plane %d.", plane->device->name, props->props[i], plane->id);
+            SRMWarning("[%s] Failed to get property %d of plane %d.", plane->device->shortName, props->props[i], plane->id);
             continue;
         }
 
@@ -74,6 +74,8 @@ UInt8 srmPlaneUpdateProperties(SRMPlane *plane)
             plane->propIDs.FB_ID = prop->prop_id;
         else if (strcmp(prop->name, "FB_DAMAGE_CLIPS") == 0)
             plane->propIDs.FB_DAMAGE_CLIPS = prop->prop_id;
+        else if (strcmp(prop->name, "IN_FENCE_FD") == 0)
+            plane->propIDs.IN_FENCE_FD = prop->prop_id;
         else if (strcmp(prop->name, "IN_FORMATS") == 0)
         {
             plane->propIDs.IN_FORMATS = prop->prop_id;
@@ -112,7 +114,7 @@ UInt8 srmPlaneUpdateProperties(SRMPlane *plane)
 
     if (plane->type == 10)
     {
-        SRMError("Could not get device %s plane %d type.", plane->device->name, plane->id);
+        SRMError("[%s] Failed to get plane %d type.", plane->device->shortName, plane->id);
         return 0;
     }
 
@@ -125,7 +127,7 @@ UInt8 srmPlaneUpdateCrtcs(SRMPlane *plane)
 
     if (!planeRes)
     {
-        SRMError("Failed to get device %s crtcs for plane %d.", plane->device->name, plane->id);
+        SRMError("[%s] Failed to get CRTCs for plane %d.", plane->device->shortName, plane->id);
         return 0;
     }
 
@@ -204,7 +206,7 @@ UInt8 srmPlaneUpdateFormats(SRMPlane *plane)
 
     if (!planeResource)
     {
-        SRMError("Failed to get device %s plane %d formats.", plane->device->name, plane->id);
+        SRMError("[%s] Failed to get plane %d formats.", plane->device->shortName, plane->id);
         return 0;
     }
 

@@ -1,8 +1,10 @@
+#include <private/SRMConnectorPrivate.h>
 #include <private/SRMDevicePrivate.h>
 #include <private/SRMCorePrivate.h>
 #include <SRMList.h>
 #include <SRMLog.h>
 #include <fcntl.h>
+#include <assert.h>
 
 const char *srmDeviceGetName(SRMDevice *device)
 {
@@ -176,32 +178,44 @@ const SRMGLDeviceExtensions *srmDeviceGetGLExtensions(SRMDevice *device)
     return &device->glExtensions;
 }
 
-UInt8 srmDeviceSync(SRMDevice *device)
+void srmDeviceMakeCurrent(SRMDevice *device)
 {
-    if (!device->eglFunctions.eglCreateSyncKHR)
-        return 0;
+    pthread_t t = pthread_self();
 
-    // TODO
-    EGLSyncKHR sync = device->eglFunctions.eglCreateSyncKHR(device->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
-
-    if (sync == EGL_NO_SYNC_KHR)
+    if (t == device->core->mainThread)
     {
-        SRMError("Failed to create EGL sync.");
-        glFinish();
+        eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
+        return;
     }
-    else
+
+    SRMListForeach(ctxIt, device->contexts)
     {
-        glFlush();
+        SRMDeviceThreadContext *ctx = srmListItemGetData(ctxIt);
 
-        EGLint res = device->eglFunctions.eglClientWaitSyncKHR(device->eglDisplay, sync, 0, EGL_FOREVER_KHR);
-        device->eglFunctions.eglDestroySyncKHR(device->eglDisplay, sync);
-
-        if (res != EGL_CONDITION_SATISFIED_KHR)
+        if (ctx->thread == t)
         {
-            SRMError("EGL SYNC CONDITION NOT SATISFIED");
-            return 0;
+            eglMakeCurrent(device->eglDisplay,
+                           EGL_NO_SURFACE, EGL_NO_SURFACE,
+                           ctx->context);
+            return;
         }
     }
 
-    return 1;
+    SRMListForeach(connIt, device->connectors)
+    {
+        SRMConnector *conn = srmListItemGetData(connIt);
+
+        if (srmConnectorGetState(conn) == SRM_CONNECTOR_STATE_UNINITIALIZED)
+            continue;
+
+        if (conn->renderThread == t)
+        {
+            eglMakeCurrent(device->eglDisplay,
+                           EGL_NO_SURFACE, EGL_NO_SURFACE,
+                           conn->renderInterface.getEGLContext(conn));
+            return;
+        }
+    }
+
+    assert(0 && "No EGL context found. This is not an SRM thread.");
 }

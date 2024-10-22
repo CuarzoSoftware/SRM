@@ -15,33 +15,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define MODE_NAME "ITSELF"
+
 static const EGLint eglConfigAttribs[] =
 {
     EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
     EGL_RED_SIZE, 8,
     EGL_GREEN_SIZE, 8,
     EGL_BLUE_SIZE, 8,
     EGL_ALPHA_SIZE, 0,
-    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
     EGL_DEPTH_SIZE, 0,
     EGL_NONE
 };
 
 struct RenderModeDataStruct
 {
-    struct gbm_surface *connectorGBMSurface;
-    struct gbm_bo **connectorBOs;
-    UInt32 *connectorDRMFramebuffers;
-    SRMBuffer **buffers;
-
-    GLuint *glRenderBuffers;
-    GLuint *glFrameBuffers;
-
+    struct gbm_surface *gbmSurface;
+    struct gbm_bo *gbmBOs[SRM_MAX_BUFFERING];
+    UInt32 drmFBs[SRM_MAX_BUFFERING];
+    SRMBuffer *srmBOs[SRM_MAX_BUFFERING];
+    GLuint glRBs[SRM_MAX_BUFFERING];
+    GLuint glFBs[SRM_MAX_BUFFERING];
     UInt32 buffersCount;
     UInt32 currentBufferIndex;
-    EGLConfig connectorEGLConfig;
-    EGLContext connectorEGLContext;
-    EGLSurface connectorEGLSurface;
+    EGLConfig eglConfig;
+    EGLContext eglContext;
+    EGLSurface eglSurface;
 };
 
 typedef struct RenderModeDataStruct RenderModeData;
@@ -49,26 +49,21 @@ typedef struct RenderModeDataStruct RenderModeData;
 static UInt8 createData(SRMConnector *connector)
 {
     if (connector->renderData)
-    {
-        // Already setup
-        return 1;
-    }
+        return 1; // Already setup
 
     RenderModeData *data = calloc(1, sizeof(RenderModeData));
 
     if (!data)
     {
-        SRMError("Could not allocate data for device %s connector %d render mode (ITSELF MODE).",
-                 connector->device->name,
-                 connector->id);
+        SRMError("[%s] [%s] [%s MODE] Could not allocate render mode data.",
+                 connector->device->shortName, connector->name, MODE_NAME);
         return 0;
     }
 
     connector->usingRenderBuffers = 0;
     connector->renderData = data;
-    data->connectorEGLContext = EGL_NO_CONTEXT;
-    data->connectorEGLSurface = EGL_NO_SURFACE;
-
+    data->eglContext = EGL_NO_CONTEXT;
+    data->eglSurface = EGL_NO_SURFACE;
     srmRenderModeCommonSearchNonLinearModifier(connector);
     return 1;
 }
@@ -82,88 +77,101 @@ static void destroyData(SRMConnector *connector)
     }
 }
 
+static void destroyRenderBuffers(SRMConnector *connector)
+{
+    RenderModeData *data = (RenderModeData*)connector->renderData;
+
+    for (UInt32 i = 0; i < data->buffersCount; i++)
+    {
+        if (data->glFBs[i] != 0)
+        {
+            glDeleteFramebuffers(1, &data->glFBs[i]);
+            data->glFBs[i] = 0;
+        }
+
+        if (data->glRBs[i] != 0)
+        {
+            glDeleteRenderbuffers(1, &data->glRBs[i]);
+            data->glRBs[i] = 0;
+        }
+
+        if (data->srmBOs[i])
+        {
+            srmBufferDestroy(data->srmBOs[i]);
+            data->srmBOs[i] = NULL;
+        }
+
+        if (data->gbmBOs[i])
+        {
+            gbm_bo_destroy(data->gbmBOs[i]);
+            data->gbmBOs[i] = NULL;
+        }
+    }
+}
+
 static UInt8 createRenderBuffers(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
-    char *env = getenv("SRM_RENDER_MODE_ITSELF_FB_COUNT");
 
     if (!connector->device->eglFunctions.glEGLImageTargetRenderbufferStorageOES)
         goto fail;
 
-    data->buffersCount = 2;
-
-    if (env)
-    {
-        Int32 c = atoi(env);
-
-        if (c > 1 && c < 4)
-            data->buffersCount = c;
-    }
-
-    data->connectorBOs = calloc(data->buffersCount, sizeof(void*));
-    data->buffers = calloc(data->buffersCount, sizeof(void*));
-    data->glRenderBuffers = calloc(data->buffersCount, sizeof(GLuint));
-    data->glFrameBuffers = calloc(data->buffersCount, sizeof(GLuint));
+    data->buffersCount = srmRenderModeCommonCalculateBuffering(connector, MODE_NAME);
 
     for (UInt32 i = 0; i < data->buffersCount; i++)
     {
-        srmRenderModeCommonCreateConnectorGBMBo(connector, &data->connectorBOs[i]);
+        srmRenderModeCommonCreateConnectorGBMBo(connector, &data->gbmBOs[i]);
 
-        if (!data->connectorBOs[i])
+        if (!data->gbmBOs[i])
         {
-            printf("RenderBuffers failed 1\n");
+            SRMError("[%s] [%s] [%s MODE] Failed to create gbm_bo for render buffer %d.",
+                connector->device->shortName, connector->name, MODE_NAME, i);
             goto fail;
         }
 
-        data->buffers[i] = srmBufferCreateFromGBM(connector->device->core, data->connectorBOs[i]);
+        data->srmBOs[i] = srmBufferCreateFromGBM(connector->device->core, data->gbmBOs[i]);
 
-        if (!data->buffers[i])
+        if (!data->srmBOs[i])
         {
-            printf("RenderBuffers failed 2\n");
+            SRMError("[%s] [%s] [%s MODE] Failed to create SRMBuffer for render buffer %d.",
+                connector->device->shortName, connector->name, MODE_NAME, i);
             goto fail;
         }
 
-        EGLImage image = srmBufferGetEGLImage(connector->device, data->buffers[i]);
+        EGLImage image = srmBufferGetEGLImage(connector->device, data->srmBOs[i]);
 
         if (image == EGL_NO_IMAGE)
         {
-            printf("RenderBuffers failed 3\n");
+            SRMError("[%s] [%s] [%s MODE] Failed to get EGLImage for render buffer %d.",
+                connector->device->shortName, connector->name, MODE_NAME, i);
             goto fail;
         }
 
-        glGenRenderbuffers(1, &data->glRenderBuffers[i]);
-        glBindRenderbuffer(GL_RENDERBUFFER, data->glRenderBuffers[i]);
+        glGenRenderbuffers(1, &data->glRBs[i]);
+        glBindRenderbuffer(GL_RENDERBUFFER, data->glRBs[i]);
         connector->device->eglFunctions.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER, image);
 
-        glGenFramebuffers(1, &data->glFrameBuffers[i]);
-        glBindFramebuffer(GL_FRAMEBUFFER, data->glFrameBuffers[i]);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, data->glRenderBuffers[i]);
+        glGenFramebuffers(1, &data->glFBs[i]);
+        glBindFramebuffer(GL_FRAMEBUFFER, data->glFBs[i]);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, data->glRBs[i]);
         GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 
         if (status != GL_FRAMEBUFFER_COMPLETE)
         {
-            printf("RenderBuffers failed 4\n");
+            SRMError("[%s] [%s] [%s MODE] Failed to create GL fb for render buffer %d.",
+                connector->device->shortName, connector->name, MODE_NAME, i);
             goto fail;
         }
     }
 
-    printf("USING RENDERBUFFERS!\n");
-    connector->usingRenderBuffers = 1;
+    SRMDebug("[%s] [%s] [%s MODE] Using GL render buffers instead of EGLSurface.",
+        connector->device->shortName, connector->name, MODE_NAME);
 
+    connector->usingRenderBuffers = 1;
     return 1;
 
 fail:
-    printf("RenderBuffers failed\n");
-    // TODO: destroy bos, fbs, etc
-    free(data->connectorBOs);
-    free(data->buffers);
-    free(data->glRenderBuffers);
-    free(data->glFrameBuffers);
-
-    data->connectorBOs = NULL;
-    data->buffers = NULL;
-    data->glRenderBuffers = NULL;
-    data->glFrameBuffers = NULL;
+    destroyRenderBuffers(connector);
     return 0;
 }
 
@@ -171,18 +179,15 @@ static UInt8 createGBMSurfaces(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorGBMSurface)
-    {
-        // Already created
-        return 1;
-    }
+    if (data->gbmSurface)
+        return 1; // Already created
 
-    srmRenderModeCommonCreateConnectorGBMSurface(connector, &data->connectorGBMSurface);
+    srmRenderModeCommonCreateConnectorGBMSurface(connector, &data->gbmSurface);
 
-    if (!data->connectorGBMSurface)
+    if (!data->gbmSurface)
     {
-        SRMError("Failed to create GBM surface for device %s connector %d (ITSELF MODE).",
-                 connector->device->name, connector->id);
+        SRMError("[%s] [%s] [%s MODE] Failed to create gbm_surface.",
+            connector->device->shortName, connector->name, MODE_NAME);
         return 0;
     }
 
@@ -193,10 +198,10 @@ static void destroyGBMSurfaces(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorGBMSurface)
+    if (data->gbmSurface)
     {
-        gbm_surface_destroy(data->connectorGBMSurface);
-        data->connectorGBMSurface = NULL;
+        gbm_surface_destroy(data->gbmSurface);
+        data->gbmSurface = NULL;
     }
 }
 
@@ -205,13 +210,12 @@ static UInt8 getEGLConfiguration(SRMConnector *connector)
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
     if (!srmRenderModeCommonChooseEGLConfiguration(connector->device->eglDisplay,
-                                eglConfigAttribs,
-                                connector->currentFormat.format,
-                                &data->connectorEGLConfig))
+        eglConfigAttribs,
+        connector->currentFormat.format,
+        &data->eglConfig))
     {
-        SRMError("Failed to choose EGL configuration for device %s connector %d (ITSELF MODE).",
-                 connector->device->name,
-                 connector->id);
+        SRMError("[%s] [%s] [%s MODE] Failed to choose EGL configuration.",
+            connector->device->shortName, connector->name, MODE_NAME);
         return 0;
     }
 
@@ -222,39 +226,38 @@ static UInt8 createEGLContext(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorEGLContext != EGL_NO_CONTEXT)
-    {
-        // Already created
-        return 1;
-    }
+    if (data->eglContext != EGL_NO_CONTEXT)
+        return 1; // Already created
 
     if (connector->device->rendererDevice->eglExtensions.IMG_context_priority)
         connector->device->rendererDevice->eglSharedContextAttribs[3] = EGL_CONTEXT_PRIORITY_HIGH_IMG;
 
-    data->connectorEGLContext = eglCreateContext(connector->device->eglDisplay,
-                                                 data->connectorEGLConfig,
-                                                 connector->device->eglSharedContext,
-                                                 connector->device->eglSharedContextAttribs);
+    data->eglContext = eglCreateContext(
+        connector->device->eglDisplay,
+        data->eglConfig,
+        connector->device->eglSharedContext,
+        connector->device->eglSharedContextAttribs);
 
-    if (data->connectorEGLContext == EGL_NO_CONTEXT)
+    if (data->eglContext == EGL_NO_CONTEXT)
     {
-        SRMError("Failed to create EGL context for device %s connector %d (ITSELF MODE).",
-                 connector->device->name,
-                 connector->id);
+        SRMError("[%s] [%s] [%s MODE] Failed to create EGL context.",
+            connector->device->shortName, connector->name, MODE_NAME);
         return 0;
     }
 
-    if (connector->device->eglExtensions.IMG_context_priority)
-    {
-        EGLint priority = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
-        eglQueryContext(connector->device->eglDisplay, data->connectorEGLContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &priority);
-        SRMDebug("[%s] Using %s priority EGL context.", srmConnectorGetName(connector), priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
-    }
+    EGLint priority = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
 
-    eglMakeCurrent(connector->device->eglDisplay,
-                   EGL_NO_SURFACE,
-                   EGL_NO_SURFACE,
-                   data->connectorEGLContext);
+    if (connector->device->eglExtensions.IMG_context_priority)
+        eglQueryContext(connector->device->eglDisplay, data->eglContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &priority);
+
+    SRMDebug("[%s] [%s] [%s MODE] Using EGL context priority: %s.",
+             connector->device->shortName, connector->name, MODE_NAME, srmEGLGetContextPriorityString(priority));
+
+    eglMakeCurrent(
+        connector->device->eglDisplay,
+        EGL_NO_SURFACE,
+        EGL_NO_SURFACE,
+        data->eglContext);
 
     return 1;
 }
@@ -263,10 +266,11 @@ static void destroyEGLContext(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorEGLContext != EGL_NO_CONTEXT)
+    if (data->eglContext != EGL_NO_CONTEXT)
     {
-        eglDestroyContext(connector->device->eglDisplay, data->connectorEGLContext);
-        data->connectorEGLContext = EGL_NO_CONTEXT;
+        eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        eglDestroyContext(connector->device->eglDisplay, data->eglContext);
+        data->eglContext = EGL_NO_CONTEXT;
     }
 }
 
@@ -274,75 +278,60 @@ static UInt8 createEGLSurfaces(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorEGLSurface != EGL_NO_SURFACE)
-    {
-        // Already created
-        return 1;
-    }
+    if (data->eglSurface != EGL_NO_SURFACE)
+        return 1; // Already created
 
-    data->connectorEGLSurface = eglCreateWindowSurface(connector->device->eglDisplay,
-                                                       data->connectorEGLConfig,
-                                                       (EGLNativeWindowType)data->connectorGBMSurface,
-                                                       NULL);
+    data->eglSurface = eglCreateWindowSurface(
+        connector->device->eglDisplay,
+        data->eglConfig,
+        (EGLNativeWindowType)data->gbmSurface,
+        NULL);
 
-    if (data->connectorEGLSurface == EGL_NO_SURFACE)
+    if (data->eglSurface == EGL_NO_SURFACE)
     {
-        SRMError("Failed to create EGL surface for device %s connector %d (ITSELF MODE).",
-                 connector->device->name,
-                 connector->id);
+        SRMError("[%s] [%s] [%s MODE] Failed to create EGL surface.",
+            connector->device->shortName, connector->name, MODE_NAME);
         return 0;
     }
 
-    eglMakeCurrent(connector->device->eglDisplay,
-                   data->connectorEGLSurface,
-                   data->connectorEGLSurface,
-                   data->connectorEGLContext);
+    eglMakeCurrent(
+        connector->device->eglDisplay,
+        data->eglSurface,
+        data->eglSurface,
+        data->eglContext);
 
     SRMList *bos = srmListCreate();
 
     struct gbm_bo *bo = NULL;
 
-    char *env = getenv("SRM_RENDER_MODE_ITSELF_FB_COUNT");
-
-    UInt32 fbCount = 2;
-
-    if (env)
-    {
-        Int32 c = atoi(env);
-
-        if (c > 1 && c < 4)
-            fbCount = c;
-    }
+    UInt32 fbCount = srmRenderModeCommonCalculateBuffering(connector, MODE_NAME);
 
     do
     {
-        eglSwapBuffers(connector->device->rendererDevice->eglDisplay,
-                       data->connectorEGLSurface);
-
-        bo = gbm_surface_lock_front_buffer(data->connectorGBMSurface);
+        eglSwapBuffers(connector->device->rendererDevice->eglDisplay, data->eglSurface);
+        bo = srmRenderModeCommonSurfaceLockFrontBufferSafe(data->gbmSurface);
 
         if (bo)
             srmListAppendData(bos, bo);
     }
-    while (srmListGetLength(bos) < fbCount && gbm_surface_has_free_buffers(data->connectorGBMSurface) > 0 && bo);
+    while (srmListGetLength(bos) < fbCount && gbm_surface_has_free_buffers(data->gbmSurface) > 0 && bo);
 
     data->buffersCount = srmListGetLength(bos);
 
     if (data->buffersCount == 0)
     {
         srmListDestroy(bos);
-        SRMError("Failed to get BOs from gbm_surface for connector %d device %s.", connector->id, connector->device->name);
+        SRMError("[%s] [%s] [%s MODE] Failed to get gbm_bo from gbm_surface.",
+            connector->device->shortName, connector->name, MODE_NAME);
         return 0;
     }
-
-    data->connectorBOs = calloc(data->buffersCount, sizeof(struct gbm_bo*));
 
     UInt32 i = 0;
     SRMListForeach(boIt, bos)
     {
         struct gbm_bo *b = srmListItemGetData(boIt);
-        gbm_surface_release_buffer(data->connectorGBMSurface, b);
-        data->connectorBOs[i] = b;
+        srmRenderModeCommonSurfaceReleaseBufferSafe(data->gbmSurface, b);
+        data->gbmBOs[i] = b;
         i++;
     }
 
@@ -354,25 +343,19 @@ static void destroyEGLSurfaces(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorBOs)
+    for (UInt32 i = 0; i < data->buffersCount; i++)
     {
-        for (UInt32 i = 0; i < data->buffersCount; i++)
+        if (data->gbmBOs[i])
         {
-            if (data->connectorBOs[i])
-            {
-                gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[i]);
-                data->connectorBOs[i] = NULL;
-            }
+            srmRenderModeCommonSurfaceReleaseBufferSafe(data->gbmSurface, data->gbmBOs[i]);
+            data->gbmBOs[i] = NULL;
         }
-
-        free(data->connectorBOs);
-        data->connectorBOs = NULL;
     }
 
-    if (data->connectorEGLSurface != EGL_NO_SURFACE)
+    if (data->eglSurface != EGL_NO_SURFACE)
     {
-        eglDestroySurface(connector->device->eglDisplay, data->connectorEGLSurface);
-        data->connectorEGLSurface = EGL_NO_SURFACE;
+        eglDestroySurface(connector->device->eglDisplay, data->eglSurface);
+        data->eglSurface = EGL_NO_SURFACE;
     }
 }
 
@@ -388,86 +371,79 @@ static UInt8 createDRMFramebuffers(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorDRMFramebuffers)
-    {
-        // Already created
-        return 1;
-    }
+    if (data->drmFBs[0] != 0)
+        return 1; // Already created
 
     Int32 ret;
-    data->connectorDRMFramebuffers = calloc(data->buffersCount, sizeof(UInt32));
-
-    if (!data->buffers)
-        data->buffers = calloc(data->buffersCount, sizeof(SRMBuffer*));
 
     for (UInt32 i = 0; i < data->buffersCount; i++)
     {
         if (connector->currentFormat.modifier != DRM_FORMAT_MOD_LINEAR)
         {
             UInt32 boHandles[4] = { 0 };
-            boHandles[0] = gbm_bo_get_handle_for_plane(data->connectorBOs[i], 0).u32;
+            boHandles[0] = gbm_bo_get_handle_for_plane(data->gbmBOs[i], 0).u32;
 
             UInt32 pitches[4] = { 0 };
-            pitches[0] = gbm_bo_get_stride_for_plane(data->connectorBOs[i], 0);
+            pitches[0] = gbm_bo_get_stride_for_plane(data->gbmBOs[i], 0);
 
             UInt32 offsets[4] = { 0 };
-            offsets[0] = gbm_bo_get_offset(data->connectorBOs[i], 0);
+            offsets[0] = gbm_bo_get_offset(data->gbmBOs[i], 0);
 
             UInt64 mods[4] = { 0 };
             mods[0] = connector->currentFormat.modifier;
 
-            ret = drmModeAddFB2WithModifiers(connector->device->fd,
-                               connector->currentMode->info.hdisplay,
-                               connector->currentMode->info.vdisplay,
-                               connector->currentFormat.format,
-                               boHandles,
-                               pitches,
-                               offsets,
-                               mods,
-                               &data->connectorDRMFramebuffers[i],
-                               DRM_MODE_FB_MODIFIERS);
+            ret = drmModeAddFB2WithModifiers(
+                connector->device->fd,
+                connector->currentMode->info.hdisplay,
+                connector->currentMode->info.vdisplay,
+                connector->currentFormat.format,
+                boHandles,
+                pitches,
+                offsets,
+                mods,
+                &data->drmFBs[i],
+                DRM_MODE_FB_MODIFIERS);
 
             if (ret == 0)
                 goto skipLegacy;
         }
 
-        ret = drmModeAddFB(connector->device->fd,
-                           connector->currentMode->info.hdisplay,
-                           connector->currentMode->info.vdisplay,
-                           24,
-                           gbm_bo_get_bpp(data->connectorBOs[i]),
-                           gbm_bo_get_stride(data->connectorBOs[i]),
-                           gbm_bo_get_handle(data->connectorBOs[i]).u32,
-                           &data->connectorDRMFramebuffers[i]);
+        ret = drmModeAddFB(
+            connector->device->fd,
+            connector->currentMode->info.hdisplay,
+            connector->currentMode->info.vdisplay,
+            24,
+            gbm_bo_get_bpp(data->gbmBOs[i]),
+            gbm_bo_get_stride(data->gbmBOs[i]),
+            gbm_bo_get_handle(data->gbmBOs[i]).u32,
+            &data->drmFBs[i]);
 
         if (ret)
         {
-            SRMError("Failed o create DRM framebuffer %d for device %s connector %d (ITSELF MODE).",
-                     i,
-                     connector->device->name,
-                     connector->id);
+            SRMError("[%s] [%s] [%s MODE] Failed o create DRM framebuffer %d. DRM Error: %d.",
+                connector->device->shortName, connector->name, MODE_NAME, i, ret);
             return 0;
         }
 
         skipLegacy:
 
-        data->buffers[i] = srmBufferCreateFromGBM(connector->device->core, data->connectorBOs[i]);
+        // Already created when using renderbuffers
+        if (!connector->usingRenderBuffers)
+        {
+            data->srmBOs[i] = srmBufferCreateFromGBM(connector->device->core, data->gbmBOs[i]);
 
-        if (!data->buffers[i])
-        {
-            SRMWarning("Failed o create buffer %d from GBM bo for device %s connector %d (ITSELF MODE).",
-                       i,
-                       connector->device->name,
-                       connector->id);
-        }
-        else
-        {
-            if (srmBufferGetTextureID(connector->device, data->buffers[i]) == 0)
+            if (!data->srmBOs[i])
             {
-                SRMWarning("Failed o get texture ID from buffer %d on device %s connector %d (ITSELF MODE).",
-                           i,
-                           connector->device->name,
-                           connector->id);
+                SRMWarning("[%s] [%s] [%s MODE] Failed to create SRMBuffer %d from GBM bo.",
+                    connector->device->shortName, connector->name, MODE_NAME, i);
+            }
+            else
+            {
+                if (srmBufferGetTextureID(connector->device, data->srmBOs[i]) == 0)
+                {
+                    SRMWarning("[%s] [%s] [%s MODE] Failed o get texture ID from SRMBuffer %d.",
+                        connector->device->shortName, connector->name, MODE_NAME, i);
+                }
             }
         }
     }
@@ -481,37 +457,27 @@ static void destroyDRMFramebuffers(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
-    if (data->connectorDRMFramebuffers)
+    for (UInt32 i = 0; i < data->buffersCount; i++)
+    {
+        if (data->drmFBs[i] != 0)
+        {
+            drmModeRmFB(connector->device->fd, data->drmFBs[i]);
+            data->drmFBs[i] = 0;
+        }
+    }
+
+    if (!connector->usingRenderBuffers)
     {
         for (UInt32 i = 0; i < data->buffersCount; i++)
         {
-            if (data->connectorDRMFramebuffers[i] != 0)
+            if (data->srmBOs[i])
             {
-                drmModeRmFB(connector->device->fd, data->connectorDRMFramebuffers[i]);
-                data->connectorDRMFramebuffers[i] = 0;
+                srmBufferDestroy(data->srmBOs[i]);
+                data->srmBOs[i] = NULL;
             }
         }
-
-        free(data->connectorDRMFramebuffers);
-        data->connectorDRMFramebuffers = NULL;
     }
 
-    if (data->buffers)
-    {
-        for (UInt32 i = 0; i < data->buffersCount; i++)
-        {
-            if (data->buffers[i])
-            {
-                srmBufferDestroy(data->buffers[i]);
-                data->buffers[i] = NULL;
-            }
-        }
-
-        free(data->buffers);
-        data->buffers = NULL;
-    }
-
-    data->connectorDRMFramebuffers = NULL;
     data->currentBufferIndex = 0;
 }
 
@@ -527,21 +493,10 @@ static UInt32 nextBufferIndex(SRMConnector *connector)
 static UInt8 render(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
-
-    eglMakeCurrent(connector->device->eglDisplay,
-                   data->connectorEGLSurface,
-                   data->connectorEGLSurface,
-                   data->connectorEGLContext);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, connector->usingRenderBuffers ? data->glFrameBuffers[data->currentBufferIndex] : 0);
-
+    eglMakeCurrent(connector->device->eglDisplay, data->eglSurface, data->eglSurface, data->eglContext);
+    glBindFramebuffer(GL_FRAMEBUFFER, connector->usingRenderBuffers ? data->glFBs[data->currentBufferIndex] : 0);
     connector->interface->paintGL(connector, connector->interfaceData);
-
-    if (connector->currentVSync)
-        glFlush();
-    else
-        glFinish();
-
+    eglMakeCurrent(connector->device->eglDisplay, data->eglSurface, data->eglSurface, data->eglContext);
     return 1;
 }
 
@@ -549,24 +504,26 @@ static UInt8 flipPage(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
+    srmRenderModeCommonCreateSync(connector);
+
     if (connector->usingRenderBuffers)
     {
-        glFinish();
-        srmRenderModeCommonPageFlip(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
+        srmRenderModeCommonPageFlip(connector, data->drmFBs[data->currentBufferIndex]);
         data->currentBufferIndex = nextBufferIndex(connector);
         connector->interface->pageFlipped(connector, connector->interfaceData);
     }
     else
     {
-        swapBuffers(connector, connector->device->eglDisplay, data->connectorEGLSurface);
-        struct gbm_bo *bo = gbm_surface_lock_front_buffer(data->connectorGBMSurface);
+        swapBuffers(connector, connector->device->eglDisplay, data->eglSurface);
+        struct gbm_bo *bo = srmRenderModeCommonSurfaceLockFrontBufferSafe(data->gbmSurface);
 
-        srmRenderModeCommonPageFlip(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
+        srmRenderModeCommonPageFlip(connector, data->drmFBs[data->currentBufferIndex]);
 
-        assert("This driver doesn't recycle gbm_surface bos." && bo == data->connectorBOs[data->currentBufferIndex]);
+        // TODO
+        assert("This driver doesn't recycle gbm_surface bos." && bo == data->gbmBOs[data->currentBufferIndex]);
 
         data->currentBufferIndex = nextBufferIndex(connector);
-        gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[data->currentBufferIndex]);
+        srmRenderModeCommonSurfaceReleaseBufferSafe(data->gbmSurface, data->gbmBOs[data->currentBufferIndex]);
     }
 
     connector->interface->pageFlipped(connector, connector->interfaceData);
@@ -577,7 +534,7 @@ static UInt8 flipPage(SRMConnector *connector)
 static UInt8 initCrtc(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
-    return srmRenderModeCommonInitCrtc(connector, data->connectorDRMFramebuffers[nextBufferIndex(connector)]);
+    return srmRenderModeCommonInitCrtc(connector, data->drmFBs[nextBufferIndex(connector)]);
 }
 
 static void uninitialize(SRMConnector *connector)
@@ -586,14 +543,17 @@ static void uninitialize(SRMConnector *connector)
 
     if (data)
     {
-        eglMakeCurrent(connector->device->eglDisplay,
-                       EGL_NO_SURFACE,
-                       EGL_NO_SURFACE,
-                       data->connectorEGLContext);
+        eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->eglContext);
         srmRenderModeCommonUninitialize(connector);
         destroyDRMFramebuffers(connector);
-        destroyEGLSurfaces(connector);
-        destroyGBMSurfaces(connector);
+
+        if (connector->usingRenderBuffers)
+            destroyRenderBuffers(connector);
+        else
+        {
+            destroyEGLSurfaces(connector);
+            destroyGBMSurfaces(connector);
+        }
         destroyEGLContext(connector);
         destroyData(connector);
     }
@@ -606,9 +566,8 @@ static UInt8 initialize(SRMConnector *connector)
 retry:
     if (!eglBindAPI(EGL_OPENGL_ES_API))
     {
-        SRMError("Failed to bind GLES API for device %s connector %d (ITSELF MODE).",
-                 connector->device->name,
-                 connector->id);
+        SRMError("[%s] [%s] [%s MODE] Failed to bind GLES API.",
+            connector->device->shortName, connector->name, MODE_NAME);
         goto fail;
     }
 
@@ -643,16 +602,14 @@ fail:
 
     if (connector->allowModifiers)
     {
-        SRMError("Failed to initialize device %s connector %d with explicit modifiers, falling back to implicit modifiers (ITSELF MODE).",
-                 connector->device->name,
-                 connector->id);
+        SRMError("[%s] [%s] [%s MODE] Failed to initialize with explicit modifiers, falling back to implicit modifiers.",
+            connector->device->shortName, connector->name, MODE_NAME);
         connector->allowModifiers = 0;
         goto retry;
     }
 
-    SRMError("Failed to initialize render mode ITSELF for device %s connector %d.",
-             connector->device->name,
-             connector->id);
+    SRMError("[%s] [%s] [%s MODE] Failed to initialize.",
+        connector->device->shortName, connector->name, MODE_NAME);
 
     return 0;
 }
@@ -662,12 +619,18 @@ static UInt8 updateMode(SRMConnector *connector)
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
     // If ret = 1 then new mode dimensions != prev mode dimensions
-    if (srmRenderModeCommonUpdateMode(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]))
+    if (srmRenderModeCommonUpdateMode(connector, data->drmFBs[data->currentBufferIndex]))
     {
         eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, connector->device->eglSharedContext);
         destroyDRMFramebuffers(connector);
-        destroyEGLSurfaces(connector);
-        destroyGBMSurfaces(connector);
+
+        if (connector->usingRenderBuffers)
+            destroyRenderBuffers(connector);
+        else
+        {
+            destroyEGLSurfaces(connector);
+            destroyGBMSurfaces(connector);
+        }
         connector->currentMode = connector->targetMode;
         return initialize(connector);
     }
@@ -680,7 +643,7 @@ static UInt32 getFramebufferID(SRMConnector *connector)
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
     if (connector->usingRenderBuffers)
-        return data->glFrameBuffers[data->currentBufferIndex];
+        return data->glFBs[data->currentBufferIndex];
 
     return 0;
 }
@@ -704,7 +667,7 @@ static SRMBuffer *getBuffer(SRMConnector *connector, UInt32 bufferIndex)
     if (bufferIndex >= data->buffersCount)
         return NULL;
 
-    return data->buffers[bufferIndex];
+    return data->srmBOs[bufferIndex];
 }
 
 static void pauseRendering(SRMConnector *connector)
@@ -717,15 +680,15 @@ static void resumeRendering(SRMConnector *connector)
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
     for (UInt32 i = 0; i < data->buffersCount; i++)
-        gbm_surface_release_buffer(data->connectorGBMSurface, data->connectorBOs[i]);
+        srmRenderModeCommonSurfaceReleaseBufferSafe(data->gbmSurface, data->gbmBOs[i]);
 
-    srmRenderModeCommonResumeRendering(connector, data->connectorDRMFramebuffers[data->currentBufferIndex]);
+    srmRenderModeCommonResumeRendering(connector, data->drmFBs[data->currentBufferIndex]);
 }
 
 static EGLContext getEGLContext(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
-    return data->connectorEGLContext;
+    return data->eglContext;
 }
 
 void srmRenderModeItselfSetInterface(SRMConnector *connector)

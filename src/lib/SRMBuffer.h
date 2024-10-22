@@ -134,8 +134,8 @@ typedef struct SRMBufferDMADataStruct
  *
  * This function creates an @ref SRMBuffer object using the provided 
  * [Generic Buffer Management (GBM)](https://en.wikipedia.org/wiki/Mesa_(computer_graphics)#Generic_Buffer_Management) buffer object.
- * 
- * @warning The `gbm_bo` must remain valid during the buffer lifetime. It is not destroyed when 
+ *
+ * @warning The `struct gbm_bo` must remain valid during the buffer lifetime. It is not destroyed when
  *          the buffer is destroyed and must be destroyed manually.
  *
  * @note Depending on the backing storage of the bo, the buffer may not be shareable across all devices.

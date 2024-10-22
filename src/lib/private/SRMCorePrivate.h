@@ -11,22 +11,6 @@
 extern "C" {
 #endif
 
-enum SRM_DEALLOCATOR_MSG
-{
-    SRM_DEALLOCATOR_MSG_CREATE_CONTEXT,
-    SRM_DEALLOCATOR_MSG_DESTROY_CONTEXT,
-    SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
-    SRM_DEALLOCATOR_MSG_STOP_THREAD
-};
-
-struct SRMDeallocatorThreadMessage
-{
-    enum SRM_DEALLOCATOR_MSG msg;
-    SRMDevice *device;
-    GLuint textureID;
-    EGLImage image;
-};
-
 struct SRMCoreStruct
 {
     SRMVersion version;
@@ -52,26 +36,13 @@ struct SRMCoreStruct
     SRMEGLCoreExtensions eglExtensions;
     SRMEGLCoreFunctions eglFunctions;
 
-    pthread_t deallocatorThread;
-    SRMList *deallocatorMessages;
-    Int8 deallocatorState;
-    UInt8 deallocatorRunning;
-    pthread_cond_t deallocatorCond;
-    pthread_mutex_t deallocatorMutex;
+    pthread_t mainThread;
 
     // Env options
     UInt8 customBufferScanoutIsDisabled;
     UInt8 forceLegacyCursor;
     UInt8 disableCursorPlanes;
 };
-
-UInt8 srmCoreInitDeallocator(SRMCore *core);
-void srmCoreUnitDeallocator(SRMCore *core);
-void srmCoreSendDeallocatorMessage(SRMCore *core,
-                                   enum SRM_DEALLOCATOR_MSG msg,
-                                   SRMDevice *device,
-                                   GLuint textureID,
-                                   EGLImage image);
 
 UInt8 srmCoreUpdateEGLExtensions(SRMCore *core);
 UInt8 srmCoreUpdateEGLFunctions(SRMCore *core);

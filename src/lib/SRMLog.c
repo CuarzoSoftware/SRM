@@ -15,20 +15,28 @@
 #define BRELN "\n"
 
 static int level = 0;
+static int eglLevel = 0;
 
 void SRMLogInit()
 {
     char *env = getenv("SRM_DEBUG");
 
-    if(env)
+    if (env)
         level = atoi(env);
     else
         level = 0;
+
+    char *eglEnv = getenv("SRM_EGL_DEBUG");
+
+    if (eglEnv)
+        eglLevel = atoi(eglEnv);
+    else
+        eglLevel = 0;
 }
 
 void SRMFatal(const char *format, ...)
 {
-    if(level >= 1)
+    if (level >= 1)
     {
         printf("%sSRM fatal:%s ", KRED, KNRM);
         va_list args;
@@ -41,7 +49,7 @@ void SRMFatal(const char *format, ...)
 
 void SRMError(const char *format, ...)
 {
-    if(level >= 2)
+    if (level >= 2)
     {
         printf("%sSRM error:%s ", KRED, KNRM);
         va_list args;
@@ -54,7 +62,7 @@ void SRMError(const char *format, ...)
 
 void SRMWarning(const char *format, ...)
 {
-    if(level >= 3)
+    if (level >= 3)
     {
         printf("%sSRM warning:%s ", KYEL, KNRM);
         va_list args;
@@ -67,7 +75,7 @@ void SRMWarning(const char *format, ...)
 
 void SRMDebug(const char *format, ...)
 {
-    if(level >= 4)
+    if (level >= 4)
     {
         printf("%sSRM debug:%s ", KGRN, KNRM);
         va_list args;
@@ -90,4 +98,9 @@ void SRMLog(const char *format, ...)
 Int32 SRMLogGetLevel()
 {
     return level;
+}
+
+Int32 SRMLogEGLGetLevel()
+{
+    return eglLevel;
 }

@@ -1,11 +1,11 @@
 #ifndef SRMCONNECTORPRIVATE_H
 #define SRMCONNECTORPRIVATE_H
 
+#include <EGL/egl.h>
 #include <SRMConnector.h>
 #include <SRMFormat.h>
 #include <GLES2/gl2.h>
 #include <gbm.h>
-#include <EGL/egl.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
@@ -95,6 +95,9 @@ struct SRMConnectorStruct
     drmEventContext drmEventCtx;
     UInt8 pendingPageFlip;
     UInt8 firstPageFlip;
+
+    // Sync
+    Int32 fenceFD;
 
     UInt8 hasRepaintCond;
     pthread_cond_t repaintCond;

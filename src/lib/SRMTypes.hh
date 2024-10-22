@@ -41,6 +41,8 @@ extern "C" {
  */
 #define SRM_UNUSED(var) (void)var
 
+#define SRM_MAX_BUFFERING 3
+
 /**
  * @typedef Int8
  * @brief Alias for a signed 8-bit integer (int8_t).
@@ -394,6 +396,10 @@ typedef enum SRM_CONNECTOR_CONTENT_TYPE_ENUM
  * @return A pointer to the string representation of the content type hint.
  */
 const char *srmGetConnectorContentTypeString(SRM_CONNECTOR_CONTENT_TYPE contentType);
+
+// TODO: add doc
+void srmSaveContext();
+void srmRestoreContext();
 
 /**
  * @}

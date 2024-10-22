@@ -34,7 +34,6 @@ struct SRMBufferTexture
     SRMDevice *device;
     EGLImage image;
     GLuint texture;
-    UInt8 updated;
 };
 
 typedef enum SRM_BUFFER_WRITE_MODE_ENUM
@@ -53,7 +52,6 @@ struct SRMBufferStruct
     enum SRM_BUFFER_SRC src;
     SRM_BUFFER_WRITE_MODE writeMode;
     UInt32 refCount;
-    EGLSyncKHR eglSync;
 
     UInt32 width;
     UInt32 height;
@@ -101,8 +99,6 @@ void *srmBufferMapFD(Int32 fd, size_t len, UInt32 *caps);
 struct gbm_bo *srmBufferCreateLinearBO(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format);
 struct gbm_surface *srmBufferCreateGBMSurface(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags);
 struct gbm_bo *srmBufferCreateGBMBo(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags);
-UInt8 srmBufferUpdateSync(SRMBuffer *buffer);
-void srmBufferWaitSync(SRMBuffer *buffer);
 
 #ifdef __cplusplus
 }

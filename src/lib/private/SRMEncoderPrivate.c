@@ -37,7 +37,7 @@ UInt8 srmEncoderUpdateCrtcs(SRMEncoder *encoder)
 
     if (!encoderRes)
     {
-        SRMError("SRM Error: Failed to get device %s crtcs for encoder %d.", encoder->device->name, encoder->id);
+        SRMError("[%s] Failed to get CRTCs for encoder %d.", encoder->device->shortName, encoder->id);
         return 0;
     }
 

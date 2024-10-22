@@ -64,3 +64,18 @@ UInt8 srmEGLHasExtension(const char *extensions, const char *extension)
 
     return 0;
 }
+
+const char *srmEGLGetContextPriorityString(EGLint priority)
+{
+    switch (priority)
+    {
+    case EGL_CONTEXT_PRIORITY_HIGH_IMG:
+        return "HIGH";
+    case EGL_CONTEXT_PRIORITY_MEDIUM_IMG:
+        return "MEDIUM";
+    case EGL_CONTEXT_PRIORITY_LOW_IMG:
+        return "LOW";
+    default:
+        return "UNKNOWN";
+    }
+}

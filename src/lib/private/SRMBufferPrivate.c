@@ -7,12 +7,14 @@
 #include <SRMLog.h>
 
 #include <fcntl.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <xf86drm.h>
 
 SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator)
 {
@@ -20,7 +22,6 @@ SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator)
     pthread_mutex_init(&buffer->mutex, NULL);
     buffer->core = core;
     buffer->refCount = 1;
-    buffer->eglSync = EGL_NO_SYNC_KHR;
 
     for (int i = 0; i < SRM_MAX_PLANES; i++)
         buffer->fds[i] = -1;
@@ -179,38 +180,4 @@ struct gbm_bo *srmBufferCreateGBMBo(struct gbm_device *dev, UInt32 width, UInt32
         dev, width, height, format, &modifier, 1);
 
     return bo;
-}
-
-UInt8 srmBufferUpdateSync(SRMBuffer *buffer)
-{
-    SRMDevice *dev = buffer->allocator;
-
-    if (!dev || !dev->eglFunctions.eglCreateSyncKHR)
-        return 0;
-
-    if (buffer->eglSync != EGL_NO_SYNC_KHR)
-        assert(dev->eglFunctions.eglDestroySyncKHR(dev->eglDisplay, buffer->eglSync) == EGL_TRUE);
-
-    buffer->eglSync = dev->eglFunctions.eglCreateSyncKHR(dev->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
-
-    if (buffer->eglSync == EGL_NO_SYNC_KHR)
-    {
-        SRMError("[%s] Failed to create EGL Sync for SRMBuffer.", dev->name);
-        return 0;
-    }
-
-    glFlush();
-    return 1;
-}
-
-void srmBufferWaitSync(SRMBuffer *buffer)
-{
-    SRMDevice *dev = buffer->allocator;
-
-    if (!dev || !dev->eglFunctions.eglClientWaitSyncKHR || buffer->eglSync == EGL_NO_SYNC_KHR)
-        return;
-
-    dev->eglFunctions.eglClientWaitSyncKHR(dev->eglDisplay, buffer->eglSync, 0, EGL_FOREVER_KHR);
-    assert(dev->eglFunctions.eglDestroySyncKHR(dev->eglDisplay, buffer->eglSync) == EGL_TRUE);
-    buffer->eglSync = EGL_NO_SYNC_KHR;
 }

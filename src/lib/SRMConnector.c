@@ -295,9 +295,9 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
     if (!srmConnectorGetBestConfiguration(connector, &bestEncoder, &bestCrtc, &bestPrimaryPlane, &bestCursorPlane))
     {
         // Fails to get a valid encoder, crtc or primary plane
-        SRMWarning("Could not get a Encoder, Crtc and Primary Plane trio for device %s connector %d.",
-                   connector->device->name,
-                   connector->id);
+        SRMWarning("[%s] [%s] Could not get a Encoder, Crtc and Primary Plane trio.",
+                   connector->device->shortName,
+                   connector->name);
         return 0;
     }
 
@@ -320,7 +320,7 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
     else
         connector->currentCursorPlane = NULL;
 
-
+    connector->fenceFD = -1;
     connector->interfaceData = userData;
     connector->interface = interface;
 
@@ -329,11 +329,9 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
 
     srmConnectorInitGamma(connector);
 
-    srmDeviceSync(connector->device->core->allocatorDevice); // TODO
-
     if (pthread_create(&connector->renderThread, NULL, srmConnectorRenderThread, connector))
     {
-        SRMError("Could not start render thread for device %s connector %d.", connector->device->name, connector->id);
+        SRMError("[%s] [%s] Could not start rendering thread.", connector->device->shortName, connector->name);
         goto fail;
     }
 
@@ -345,12 +343,7 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
 
     connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
 
-    SRMDebug("[%s] Connector (%d) %s, %s, %s initialized.",
-             connector->device->name,
-             connector->id,
-             connector->name,
-             connector->model,
-             connector->manufacturer);
+    SRMDebug("[%s] [%s] initialized.", connector->device->shortName, connector->name);
 
     return 1;
 
@@ -405,12 +398,8 @@ void srmConnectorUninitialize(SRMConnector *connector)
 
     srmConnectorRenderThreadCleanUp(connector);
 
-    SRMDebug("[%s] Connector (%d) %s, %s, %s uninitialized.",
-             connector->device->name,
-             connector->id,
-             connector->name,
-             connector->model,
-             connector->manufacturer);
+    SRMDebug("[%s] [%s] uninitialized.",
+             connector->device->shortName, connector->name);
 }
 
 UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)
@@ -744,8 +733,8 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
     if (buffer == connector->userScanoutBufferRef[0])
     {
-        SRMDebug("[%s][%s] Custom scanout buffer succesfully set.",
-                 connector->device->name,
+        SRMDebug("[%s] [%s] Custom scanout buffer succesfully set.",
+                 connector->device->shortName,
                  connector->name);
         return 1;
     }
@@ -754,16 +743,16 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
     if (!buffer)
     {
-        SRMDebug("[%s][%s] Custom scanout buffer succesfully unset.",
-                 connector->device->name,
+        SRMDebug("[%s] [%s] Custom scanout buffer succesfully unset.",
+                 connector->device->shortName,
                  connector->name);
         return 0;
     }
 
     if (connector->device != buffer->allocator)
     {
-        SRMError("[%s][%s] Failed to set custom scanout buffer. The buffer allocator must match the connector's device.",
-                 connector->device->name,
+        SRMError("[%s] [%s] Failed to set custom scanout buffer. The buffer allocator must match the connector's device.",
+                 connector->device->shortName,
                  connector->name);
         return 0;
     }
@@ -772,16 +761,16 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
     if (srmConnectorModeGetWidth(mode) != srmBufferGetWidth(buffer) || srmConnectorModeGetHeight(mode) != srmBufferGetHeight(buffer))
     {
-        SRMError("[%s][%s] Failed to set custom scanout buffer. The buffer dimensions must match the connector's mode size.",
-                 connector->device->name,
+        SRMError("[%s] [%s] Failed to set custom scanout buffer. The buffer dimensions must match the connector's mode size.",
+                 connector->device->shortName,
                  connector->name);
         return 0;
     }
 
     if (srmBufferGetTextureID(connector->device, buffer) == 0)
     {
-        SRMError("[%s][%s] Failed to set custom scanout buffer. The buffer is not supported by the connector's device.",
-                 connector->device->name,
+        SRMError("[%s] [%s] Failed to set custom scanout buffer. The buffer is not supported by the connector's device.",
+                 connector->device->shortName,
                  connector->name);
         return 0;
     }
@@ -793,8 +782,8 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier)
             || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier))
         {
-            SRMError("[%s][%s] Failed to set custom scanout buffer. Format not supported by the primary plane.",
-                     connector->device->name,
+            SRMError("[%s] [%s] Failed to set custom scanout buffer. Format not supported by the primary plane.",
+                     connector->device->shortName,
                      connector->name);
             return 0;
         }
@@ -835,8 +824,8 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
     if (!bo)
     {
-        SRMError("[%s][%s] Failed to set custom scanout buffer. Could not get a GBM bo.",
-                 connector->device->name,
+        SRMError("[%s] [%s] Failed to set custom scanout buffer. Could not get a GBM bo.",
+                 connector->device->shortName,
                  connector->name);
         return 0;
     }
@@ -859,8 +848,8 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         UInt32 oldFmt = buffer->scanout.fmt.format;
         buffer->scanout.fmt.format = srmFormatGetAlphaSubstitute(buffer->scanout.fmt.format);
 
-        SRMError("[%s][%s] Failed to set custom scanout buffer. Format %s not supported by primary plane. Trying alpha substitute format %s",
-                 connector->device->name,
+        SRMError("[%s] [%s] Failed to set custom scanout buffer. Format %s not supported by primary plane. Trying alpha substitute format %s",
+                 connector->device->shortName,
                  connector->name,
                  drmGetFormatName(oldFmt),
                  drmGetFormatName(buffer->scanout.fmt.format));
@@ -868,8 +857,8 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier)
             || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier))
         {
-            SRMError("[%s][%s] Failed to set custom scanout buffer. Unsupported format/modifier: %s - %s.",
-                     connector->device->name,
+            SRMError("[%s] [%s] Failed to set custom scanout buffer. Unsupported format/modifier: %s - %s.",
+                     connector->device->shortName,
                      connector->name,
                      drmGetFormatName(buffer->scanout.fmt.format),
                      drmGetFormatModifierName(buffer->scanout.fmt.modifier));
@@ -896,14 +885,14 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
     if (ret)
     {
-        SRMError("[%s][%s] Failed to set custom scanout buffer using drmModeAddFB2WithModifiers(), trying drmModeAddFB2().",
-                 connector->device->name,
+        SRMError("[%s] [%s] Failed to set custom scanout buffer using drmModeAddFB2WithModifiers(), trying drmModeAddFB2().",
+                 connector->device->shortName,
                  connector->name);
 
         if (buffer->scanout.fmt.modifier != DRM_FORMAT_MOD_INVALID && buffer->scanout.fmt.modifier != DRM_FORMAT_MOD_LINEAR)
         {
-            SRMError("[%s][%s] Failed to set custom scanout buffer. drmModeAddFB2() and drmModeAddFB() do not support explicit modifiers.",
-                     connector->device->name,
+            SRMError("[%s] [%s] Failed to set custom scanout buffer. drmModeAddFB2() and drmModeAddFB() do not support explicit modifiers.",
+                     connector->device->shortName,
                      connector->name);
             goto releaseAndFail;
         }
@@ -917,8 +906,8 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
     if (ret && planesCount == 1 && offsets[0] == 0)
     {
-        SRMError("[%s][%s] Failed to set custom scanout buffer using drmModeAddFB2(), trying drmModeAddFB().",
-                 connector->device->name,
+        SRMError("[%s] [%s] Failed to set custom scanout buffer using drmModeAddFB2(), trying drmModeAddFB().",
+                 connector->device->shortName,
                  connector->name);
 
         UInt32 depth, bpp;
@@ -926,8 +915,8 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
         if (depth == 0 || bpp == 0)
         {
-            SRMError("[%s][%s] Failed to set custom scanout buffer using drmModeAddFB(), could not get depth and bpp for format %s.",
-                     connector->device->name,
+            SRMError("[%s] [%s] Failed to set custom scanout buffer using drmModeAddFB(), could not get depth and bpp for format %s.",
+                     connector->device->shortName,
                      connector->name,
                      drmGetFormatName(buffer->scanout.fmt.format));
             goto releaseAndFail;
@@ -942,8 +931,8 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
     if (ret)
     {
-        SRMError("[%s][%s] Failed to set custom scanout buffer using drmModeAddFB().",
-                 connector->device->name,
+        SRMError("[%s] [%s] Failed to set custom scanout buffer using drmModeAddFB().",
+                 connector->device->shortName,
                  connector->name);
         goto releaseAndFail;
     }

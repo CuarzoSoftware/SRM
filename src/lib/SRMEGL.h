@@ -78,6 +78,7 @@ typedef struct SRMEGLDeviceExtensionsStruct
     UInt8 KHR_surfaceless_context;
     UInt8 IMG_context_priority;
     UInt8 KHR_fence_sync;
+    UInt8 ANDROID_native_fence_sync;
 } SRMEGLDeviceExtensions;
 
 /**
@@ -95,6 +96,7 @@ typedef struct SRMEGLDeviceFunctionsStruct
     PFNEGLDESTROYSYNCKHRPROC eglDestroySyncKHR;
     PFNEGLCLIENTWAITSYNCKHRPROC eglClientWaitSyncKHR;
     PFNEGLGETSYNCATTRIBKHRPROC eglGetSyncAttribKHR;
+    PFNEGLDUPNATIVEFENCEFDANDROIDPROC eglDupNativeFenceFDANDROID;
 } SRMEGLDeviceFunctions;
 
 /**
@@ -129,6 +131,11 @@ const char *srmEGLGetErrorString(EGLint error);
  * @return 1 if the extension is supported, 0 otherwise.
  */
 UInt8 srmEGLHasExtension(const char *extensions, const char *extension);
+
+/**
+ * @brief Get a human-readable string for an EGL context priority.
+ */
+const char *srmEGLGetContextPriorityString(EGLint priority);
 
 /**
  * @}

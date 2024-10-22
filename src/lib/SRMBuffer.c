@@ -231,25 +231,14 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     texture->device = buffer->allocator;
     texture->image = EGL_NO_IMAGE;
 
-    EGLDisplay prevDisplay = eglGetCurrentDisplay();
-    EGLSurface prevSurfDraw = eglGetCurrentSurface(EGL_DRAW);
-    EGLSurface prevSurfRead = eglGetCurrentSurface(EGL_READ);
-    EGLContext prevContext = eglGetCurrentContext();
-
-    eglMakeCurrent(buffer->allocator->eglDisplay,
-                   EGL_NO_SURFACE,
-                   EGL_NO_SURFACE,
-                   buffer->allocator->eglSharedContext);
-
+    srmSaveContext();
+    srmDeviceMakeCurrent(buffer->allocator);
     glGenTextures(1, &texture->texture);
 
     if (!texture->texture)
     {
         free(texture);
-        eglMakeCurrent(prevDisplay,
-                       prevSurfDraw,
-                       prevSurfRead,
-                       prevContext);
+        srmRestoreContext();
         goto fail;
     }
 
@@ -287,23 +276,19 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
                      NULL);
     }
 
+    glFlush();
+
     if (buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
     {
         /* This is used to later get a gbm bo if the buffer is used for scanout */
-        texture->image = eglCreateImage(buffer->allocator->eglDisplay,
-                                        buffer->allocator->eglSharedContext,
+        texture->image = eglCreateImage(eglGetCurrentDisplay(),
+                                        eglGetCurrentContext(),
                                         EGL_GL_TEXTURE_2D_KHR,
                                         (EGLClientBuffer)(UInt64)texture->texture,
                                         NULL);
     }
 
-    if (!srmBufferUpdateSync(buffer))
-        glFinish();
-
-    eglMakeCurrent(prevDisplay,
-                   prevSurfDraw,
-                   prevSurfRead,
-                   prevContext);
+    srmRestoreContext();
 
     /* TODO: Add read cap */
 
@@ -358,7 +343,6 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
     buffer->target = srmFormatIsInList(buffer->allocator->dmaRenderFormats,
                                         buffer->format, buffer->modifiers[0]) ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
 
-    srmBufferUpdateSync(buffer);
     pthread_mutex_unlock(&buffer->mutex);
     return buffer;
 
@@ -378,7 +362,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 
     if (buffer->src == SRM_BUFFER_SRC_WL_DRM && device != buffer->allocator)
     {
-        SRMError("[%s] wl_drm buffers can only be accessed from allocator device.", device->name);
+        SRMError("[%s] wl_drm buffers can only be accessed from allocator device.", device->shortName);
         return 0;
     }
 
@@ -389,37 +373,18 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         texture = srmListItemGetData(item);
 
         if (texture->device == device)
-        {
-            if (texture->updated)
-            {
-                /* TODO: Some GPUs do not require EGL image recreation when the DMA buf is updated. Check with glRead or
-                 * something like that if it needs it */
-
-                srmCoreSendDeallocatorMessage(device->core,
-                                              SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
-                                              device,
-                                              texture->texture,
-                                              texture->image);
-
-                free(texture);
-                srmListRemoveItem(buffer->textures, item);
-                break;
-            }
-
-            srmBufferWaitSync(buffer);
             return texture->texture;
-        }
     }
 
     if (buffer->target == GL_TEXTURE_2D && !device->glExtensions.OES_EGL_image)
     {
-        SRMError("[%s] Failed to get texture id from EGL image, OES_EGL_image extension not available.", device->name);
+        SRMError("[%s] Failed to get texture id from EGL image, OES_EGL_image extension not available.", device->shortName);
         return 0;
     }
 
     if (buffer->target == GL_TEXTURE_EXTERNAL_OES && !device->glExtensions.OES_EGL_image_external)
     {
-        SRMError("[%s] Failed to get texture id from EGL image, OES_EGL_image_external extension not available.", device->name);
+        SRMError("[%s] Failed to get texture id from EGL image, OES_EGL_image_external extension not available.", device->shortName);
         return 0;
     }
 
@@ -483,6 +448,8 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         return 0;
     }
 
+    srmSaveContext();
+    srmDeviceMakeCurrent(device);
     glGenTextures(1, &texture->texture);
     glBindTexture(buffer->target, texture->texture);
     device->eglFunctions.glEGLImageTargetTexture2DOES(buffer->target, texture->image);
@@ -492,6 +459,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     glTexParameteri(buffer->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(buffer->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+    srmRestoreContext();
     srmListAppendData(buffer->textures, texture);
     pthread_mutex_unlock(&buffer->mutex);
     return texture->texture;
@@ -509,8 +477,6 @@ void srmBufferDestroy(SRMBuffer *buffer)
         return;
     }
 
-    srmBufferWaitSync(buffer);
-
     if (buffer->scanout.fb != 0)
     {
         drmModeRmFB(buffer->allocator->fd, buffer->scanout.fb);
@@ -525,24 +491,26 @@ void srmBufferDestroy(SRMBuffer *buffer)
 
     if (buffer->textures)
     {
+        srmSaveContext();
+
         while (!srmListIsEmpty(buffer->textures))
         {
             struct SRMBufferTexture *texture = srmListPopBack(buffer->textures);
 
-            srmCoreSendDeallocatorMessage(buffer->core,
-                                          SRM_DEALLOCATOR_MSG_DESTROY_BUFFER,
-                                          texture->device,
-                                          texture->texture,
-                                          texture->image);
+            srmDeviceMakeCurrent(texture->device);
+
+            if (texture->texture != 0)
+                glDeleteTextures(1, &texture->texture);
+
+            if (texture->image != EGL_NO_IMAGE)
+                eglDestroyImage(texture->device->eglDisplay, texture->image);
 
             free(texture);
         }
 
         srmListDestroy(buffer->textures);
+        srmRestoreContext();
     }
-
-    while (!srmListIsEmpty(buffer->core->deallocatorMessages))
-        usleep(1000);
 
     for (UInt32 i = 0; i < buffer->planesCount; i++)
         if (buffer->fds[i] != -1)
@@ -610,7 +578,6 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
 
         buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
         ioctl(buffer->fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
-        srmBufferUpdateSync(buffer);
         pthread_mutex_unlock(&buffer->mutex);
         return 1;
     }
@@ -653,12 +620,14 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         }
 
         gbm_bo_unmap(buffer->bo, mapData);
-        srmBufferUpdateSync(buffer);
         pthread_mutex_unlock(&buffer->mutex);
         return 1;
     }
     else if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_GLES)
     {
+        srmSaveContext();
+        srmDeviceMakeCurrent(buffer->allocator);
+
         glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(buffer->allocator, buffer));
         glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / buffer->pixelSize);
         glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
@@ -668,10 +637,7 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
                         buffer->glFormat, buffer->glType, pixels);
 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-
-        if (!srmBufferUpdateSync(buffer))
-            glFinish();
-
+        srmRestoreContext();
         return 1;
     }
 
@@ -780,7 +746,6 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo)
     }
 
 skipMap:
-    srmBufferUpdateSync(buffer);
     return buffer;
 }
 
@@ -791,7 +756,7 @@ SRMDevice *srmBufferGetAllocatorDevice(SRMBuffer *buffer)
 
 UInt8 srmBufferRead(SRMBuffer *buffer, Int32 srcX, Int32 srcY, Int32 srcW, Int32 srcH, Int32 dstX, Int32 dstY, Int32 dstStride, UInt8 *dstBuffer)
 {
-    srmBufferWaitSync(buffer);
+    /* TODO: Check READ cap */
 
     if (buffer->map && buffer->modifiers[0] == DRM_FORMAT_MOD_LINEAR)
     {

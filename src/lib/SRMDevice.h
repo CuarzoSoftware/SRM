@@ -20,9 +20,6 @@ extern "C" {
  * @{
  */
 
-// TODO
-UInt8 srmDeviceSync(SRMDevice *device);
-
 /**
  * @brief Get the @ref SRMCore instance to which this device belongs.
  *
@@ -314,6 +311,9 @@ const SRMEGLDeviceFunctions *srmDeviceGetEGLFunctions(SRMDevice *device);
  * @return A pointer to the @ref SRMGLDeviceExtensions structure indicating the supported OpenGL extensions.
  */
 const SRMGLDeviceExtensions *srmDeviceGetGLExtensions(SRMDevice *device);
+
+// TODO: Makes current the EGL context associated with the calling thread
+void srmDeviceMakeCurrent(SRMDevice *device);
 
 /// @cond OMIT
 

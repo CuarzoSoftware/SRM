@@ -32,6 +32,7 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
              SRM_VERSION_PATCH,
              SRM_VERSION_BUILD);
 
+    core->mainThread = pthread_self();
     core->interface = interface;
     core->interfaceUserData = userData;
     core->isSuspended = 0;
@@ -90,10 +91,6 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
 
     // REF 7
     core->devices = srmListCreate();
-
-    // REF 8
-    if (!srmCoreInitDeallocator(core))
-        goto fail;
 
     // REF 7
     if (!srmCoreEnumerateDevices(core)) // Fails if no device found
@@ -177,9 +174,6 @@ void srmCoreDestroy(SRMCore *core)
     // UNREF 9
     if (core->monitor)
         udev_monitor_unref(core->monitor);
-
-    // UNREF 8
-    srmCoreUnitDeallocator(core);
 
     if (core->udevMonitorFd >= 0)
         close(core->udevMonitorFd);

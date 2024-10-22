@@ -39,7 +39,10 @@ void srmRenderModeCommonWaitPageFlip(SRMConnector *connector, Int32 iterLimit);
 void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector);
 void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struct gbm_surface **surface);
 void srmRenderModeCommonCreateConnectorGBMBo(SRMConnector *connector, struct gbm_bo **bo);
-
+Int32 srmRenderModeCommonCalculateBuffering(SRMConnector *connector, const char *modeName);
+void srmRenderModeCommonCreateSync(SRMConnector *connector);
+struct gbm_bo *srmRenderModeCommonSurfaceLockFrontBufferSafe(struct gbm_surface *surface);
+void srmRenderModeCommonSurfaceReleaseBufferSafe(struct gbm_surface *surface, struct gbm_bo *bo);
 
 #ifdef __cplusplus
 }

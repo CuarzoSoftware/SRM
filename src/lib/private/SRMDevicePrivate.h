@@ -21,6 +21,12 @@ typedef enum SRM_DEVICE_DRIVER_ENUM
     SRM_DEVICE_DRIVER_nvidia = 4
 } SRM_DEVICE_DRIVER;
 
+typedef struct SRMDeviceThreadContextStruct
+{
+    pthread_t thread;
+    EGLContext context;
+} SRMDeviceThreadContext;
+
 struct SRMDeviceStruct
 {
     SRMCore *core;
@@ -43,8 +49,6 @@ struct SRMDeviceStruct
 
     SRMListItem *coreLink;
 
-    char name[64];
-
     struct gbm_device *gbm;
     EGLDeviceEXT eglDevice;
     EGLDisplay eglDisplay;
@@ -59,7 +63,6 @@ struct SRMDeviceStruct
     GLuint programTest;
     GLuint textureUniformTest;
 
-    EGLContext eglDeallocatorContext;
     EGLint eglSharedContextAttribs[7];
     SRMEGLDeviceExtensions eglExtensions;
     SRMEGLDeviceFunctions eglFunctions;
@@ -85,12 +88,16 @@ struct SRMDeviceStruct
 
     clockid_t clock;
 
+    SRMList *contexts;
     SRMList *crtcs;
     SRMList *encoders;
     SRMList *planes;
     SRMList *connectors;
 
     UInt8 pendingUdevEvents;
+
+    char shortName[8];
+    char name[64];
 };
 
 SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA);
@@ -109,6 +116,8 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device);
 void srmDeviceDestroyDMAFormats(SRMDevice *device);
 
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device);
+UInt8 srmDeviceCreateSharedContextForThread(SRMDevice *device);
+void srmDeviceDestroyThreadSharedContext(SRMDevice *device);
 void srmDeviceUninitializeEGLSharedContext(SRMDevice *device);
 
 UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device);
@@ -121,9 +130,6 @@ void srmDeviceUninitializeTestEGLSurface(SRMDevice *device);
 
 UInt8 srmDeviceInitializeTestShader(SRMDevice *device);
 void srmDeviceUninitializeTestShader(SRMDevice *device);
-
-UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device);
-void srmDeviceUninitEGLDeallocatorContext(SRMDevice *device);
 
 UInt8 srmDeviceUpdateClientCaps(SRMDevice *device);
 UInt8 srmDeviceUpdateCaps(SRMDevice *device);

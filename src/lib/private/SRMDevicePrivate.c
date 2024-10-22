@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <private/SRMListenerPrivate.h>
 #include <private/SRMCorePrivate.h>
 #include <private/SRMDevicePrivate.h>
@@ -63,13 +64,20 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
 {
     if (srmDeviceInBlacklist(name))
     {
-        SRMWarning("[device] %s is blacklisted. Ignoring it.", name);
+        SRMWarning("Device %s is blacklisted. Ignoring it.", name);
         return NULL;
     }
 
     // REF 1
     SRMDevice *device = calloc(1, sizeof(SRMDevice));
     strncpy(device->name, name, sizeof(device->name) - 1);
+
+    size_t n = strlen(name) - 1;
+
+    while (name[n] != '/')
+        n--;
+
+    strncpy(device->shortName, &name[n + 1], sizeof(device->shortName) - 1);
     device->core = core;
     device->enabled = 1;
     device->isBootVGA = isBootVGA;
@@ -77,7 +85,7 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
     device->eglSurfaceTest = EGL_NO_SURFACE;
     device->fd = -1;
 
-    SRMDebug("[%s] Is boot VGA: %s.", device->name, device->isBootVGA ?  "YES" : "NO");
+    SRMDebug("[%s] Is boot VGA: %s.", device->shortName, device->isBootVGA ?  "YES" : "NO");
 
     // REF 2
     device->fd = core->interface->openRestricted(name,
@@ -86,17 +94,17 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
 
     if (device->fd < 0)
     {
-        SRMError("[device] Failed to open DRM device %s.", device->name);
+        SRMError("[%s] Failed to open DRM device.", device->shortName);
         goto fail;
     }
 
-    SRMDebug("[%s] Is master: %s.", device->name, drmIsMaster(device->fd) ?  "YES" : "NO");
+    SRMDebug("[%s] Is master: %s.", device->shortName, drmIsMaster(device->fd) ?  "YES" : "NO");
 
     drmVersion *version = drmGetVersion(device->fd);
 
     if (version)
     {
-        SRMDebug("[%s] DRM Driver: %s.", device->name, version->name);
+        SRMDebug("[%s] DRM Driver: %s.", device->shortName, version->name);
 
         if (strcmp(version->name, "i915") == 0)
             device->driver = SRM_DEVICE_DRIVER_i915;
@@ -115,7 +123,7 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
     // REF 3
     if (pthread_mutex_init(&device->pageFlipMutex, NULL))
     {
-        SRMError("Failed to create page flip mutex for device %s.", device->name);
+        SRMError("[%s] Failed to create page flip mutex.", device->shortName);
         goto fail;
     }
     device->pageFlipMutexInitialized = 1;
@@ -157,10 +165,6 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
 
     // REF 7-3
     if (!srmDeviceInitializeTestShader(device))
-        goto fail;
-
-    // REF 8
-    if (!srmDeviceInitEGLDeallocatorContext(device))
         goto fail;
 
     // REF -
@@ -238,9 +242,6 @@ void srmDeviceDestroy(SRMDevice *device)
         srmListDestroy(device->crtcs);
     }
 
-    // UNREF 8
-    srmDeviceUninitEGLDeallocatorContext(device);
-
     // UNREF 7-3
     srmDeviceUninitializeTestShader(device);
 
@@ -283,7 +284,7 @@ UInt8 srmDeviceInitializeGBM(SRMDevice *device)
 
     if (!device->gbm)
     {
-        SRMError("Failed to initialize GBM on device %s.", device->name);
+        SRMError("[%s] Failed to initialize GBM.", device->shortName);
         return 0;
     }
 
@@ -306,7 +307,7 @@ UInt8 srmDeviceInitializeEGL(SRMDevice *device)
 
     if (device->eglDisplay == EGL_NO_DISPLAY)
     {
-        SRMError("Failed to get EGL display for device %s.", device->name);
+        SRMError("[%s] Failed to get EGL display.", device->shortName);
         return 0;
     }
 
@@ -314,15 +315,15 @@ UInt8 srmDeviceInitializeEGL(SRMDevice *device)
 
     if (!eglInitialize(device->eglDisplay, &minor, &major))
     {
-        SRMError("Failed to initialize EGL display for device %s.", device->name);
+        SRMError("[%s] Failed to initialize EGL display.", device->shortName);
         device->eglDisplay = EGL_NO_DISPLAY;
         return 0;
     }
 
-    SRMDebug("[%s] EGL version: %d.%d.", device->name, minor, major);
+    SRMDebug("[%s] EGL version: %d.%d.", device->shortName, minor, major);
 
     const char *vendor = eglQueryString(device->eglDisplay, EGL_VENDOR);
-    SRMDebug("[%s] EGL vendor: %s.", device->name, vendor ? vendor : "Unknown");
+    SRMDebug("[%s] EGL vendor: %s.", device->shortName, vendor ? vendor : "Unknown");
 
     return 1;
 }
@@ -343,11 +344,12 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
 
     if (!extensions)
     {
-        SRMError("Failed to query EGL display extensions for device %s.", device->name);
+        SRMError("[%s] Failed to query EGL display extensions.", device->shortName);
         return 0;
     }
 
-    SRMDebug("[%s] EGL Extensions: %s.", device->name, extensions);
+    if (SRMLogEGLGetLevel() > 3)
+        SRMDebug("[%s] EGL Extensions: %s.", device->shortName, extensions);
 
     device->eglExtensions.KHR_image_base = srmEGLHasExtension(extensions, "EGL_KHR_image_base");
     device->eglExtensions.KHR_image = srmEGLHasExtension(extensions, "EGL_KHR_image");
@@ -358,6 +360,7 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
     device->eglExtensions.KHR_gl_texture_2D_image = srmEGLHasExtension(extensions, "EGL_KHR_gl_texture_2D_image");
     device->eglExtensions.KHR_gl_renderbuffer_image = srmEGLHasExtension(extensions, "EGL_KHR_gl_renderbuffer_image");
     device->eglExtensions.KHR_fence_sync = srmEGLHasExtension(extensions, "EGL_KHR_fence_sync");
+    device->eglExtensions.ANDROID_native_fence_sync = srmEGLHasExtension(extensions, "EGL_ANDROID_native_fence_sync");
 
     const char *deviceExtensions = NULL, *driverName = NULL;
 
@@ -367,7 +370,7 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
 
         if (!device->core->eglFunctions.eglQueryDisplayAttribEXT(device->eglDisplay, EGL_DEVICE_EXT, &deviceAttrib))
         {
-            SRMError("eglQueryDisplayAttribEXT(EGL_DEVICE_EXT) failed for device %s.", device->name);
+            SRMError("[%s] eglQueryDisplayAttribEXT(EGL_DEVICE_EXT) failed.", device->shortName);
             goto skipDeviceQuery;
         }
 
@@ -377,11 +380,12 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
 
         if (!deviceExtensions)
         {
-            SRMError("eglQueryDeviceStringEXT(EGL_EXTENSIONS) failed for device %s.", device->name);
+            SRMError("[%s] eglQueryDeviceStringEXT(EGL_EXTENSIONS) failed.", device->shortName);
             goto skipDeviceQuery;
         }
 
-        SRMDebug("[%s] EGL Device Extensions: %s.", device->name, deviceExtensions);
+        if (SRMLogEGLGetLevel() > 3)
+            SRMDebug("[%s] EGL Device Extensions: %s.", device->shortName, deviceExtensions);
 
         device->eglExtensions.MESA_device_software = srmEGLHasExtension(deviceExtensions, "EGL_MESA_device_software");
 
@@ -403,7 +407,19 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
     device->eglExtensions.KHR_surfaceless_context = srmEGLHasExtension(extensions, "EGL_KHR_surfaceless_context");
     device->eglExtensions.IMG_context_priority = srmEGLHasExtension(extensions, "EGL_IMG_context_priority");
 
-    SRMDebug("[%s] EGL driver name: %s.", device->name, driverName ? driverName : "Unknown");
+    SRMDebug("[%s] EGL driver name: %s.", device->shortName, driverName ? driverName : "Unknown");
+
+    if (!device->eglExtensions.KHR_no_config_context && !device->eglExtensions.MESA_configless_context)
+    {
+        SRMError("[%s] Required EGL extensions EGL_KHR_no_config_context and EGL_MESA_configless_context are not available.", device->shortName);
+        return 0;
+    }
+
+    if (!device->eglExtensions.KHR_surfaceless_context)
+    {
+        SRMError("[%s] Required EGL extension KHR_surfaceless_context is not available.", device->shortName);
+        return 0;
+    }
 
     return 1;
 }
@@ -426,14 +442,16 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
     }
 
     SRMDebug("[%s] Has glEGLImageTargetTexture2DOES: %s.",
-             device->name,
+             device->shortName,
              device->eglFunctions.glEGLImageTargetTexture2DOES == NULL ? "NO" : "YES");
 
     SRMDebug("[%s] Has glEGLImageTargetRenderbufferStorageOES: %s.",
-             device->name,
+             device->shortName,
              device->eglFunctions.glEGLImageTargetRenderbufferStorageOES == NULL ? "NO" : "YES");
 
-    const UInt8 hasEGLSync = device->glExtensions.OES_EGL_sync && device->eglExtensions.KHR_fence_sync;
+    const UInt8 hasEGLSync = device->glExtensions.OES_EGL_sync &&
+                             device->eglExtensions.KHR_fence_sync &&
+                             device->eglExtensions.ANDROID_native_fence_sync;
 
     if (hasEGLSync)
     {
@@ -441,9 +459,10 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
         device->eglFunctions.eglDestroySyncKHR = (PFNEGLDESTROYSYNCKHRPROC)eglGetProcAddress("eglDestroySyncKHR");
         device->eglFunctions.eglClientWaitSyncKHR = (PFNEGLCLIENTWAITSYNCKHRPROC)eglGetProcAddress("eglClientWaitSyncKHR");
         device->eglFunctions.eglGetSyncAttribKHR = (PFNEGLGETSYNCATTRIBKHRPROC)eglGetProcAddress("eglGetSyncAttribKHR");
+        device->eglFunctions.eglDupNativeFenceFDANDROID = (PFNEGLDUPNATIVEFENCEFDANDROIDPROC)eglGetProcAddress("eglDupNativeFenceFDANDROID");
     }
 
-    SRMDebug("[%s] Has EGL Sync: %s.", device->name, hasEGLSync ? "YES" : "NO");
+    SRMDebug("[%s] Has EGL Sync: %s.", device->shortName, hasEGLSync ? "YES" : "NO");
 
     if (device->eglExtensions.EXT_image_dma_buf_import_modifiers)
     {
@@ -464,7 +483,7 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
 
     if (!device->eglExtensions.EXT_image_dma_buf_import)
     {
-        SRMDebug("[%s] No EGL DMA formats (EXT_image_dma_buf_import not avaliable).", device->name);
+        SRMDebug("[%s] No EGL DMA formats (EXT_image_dma_buf_import not avaliable).", device->shortName);
         return 0;
     }
 
@@ -476,13 +495,13 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
     {
         if (!device->eglFunctions.eglQueryDmaBufFormatsEXT(device->eglDisplay, 0, NULL, &formatsCount))
         {
-            SRMError("[%s] Failed to query the number of EGL DMA formats.", device->name);
+            SRMError("[%s] Failed to query the number of EGL DMA formats.", device->shortName);
             return 0;
         }
 
         if (formatsCount <= 0)
         {
-            SRMError("[%s] No EGL DMA formats.", device->name);
+            SRMError("[%s] No EGL DMA formats.", device->shortName);
             return 0;
         }
 
@@ -490,14 +509,14 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
 
         if (!device->eglFunctions.eglQueryDmaBufFormatsEXT(device->eglDisplay, formatsCount, formats, &formatsCount))
         {
-            SRMError("[%s] Failed to query EGL DMA formats.", device->name);
+            SRMError("[%s] Failed to query EGL DMA formats.", device->shortName);
             free(formats);
             return 0;
         }
     }
     else
     {
-        SRMError("[%s] Failed to query EGL DMA formats.", device->name);
+        SRMError("[%s] Failed to query EGL DMA formats.", device->shortName);
         return 0;
     }
 
@@ -586,7 +605,7 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 {
     if (!eglBindAPI(EGL_OPENGL_ES_API))
     {
-        SRMError("Failed to bind GLES API for device %s.", device->name);
+        SRMError("[%s] Failed to bind GLES API.", device->shortName);
         return 0;
     }
 
@@ -596,7 +615,7 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
             DRM_FORMAT_XRGB8888,
             &device->eglConfigTest))
     {
-        SRMError("Failed to choose EGL configuration for device %s.", device->name);
+        SRMError("[%s] Failed to choose EGL configuration.", device->shortName);
         return 0;
     }
 
@@ -621,7 +640,7 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 
     if (device->eglSharedContext == EGL_NO_CONTEXT)
     {
-        SRMError("Failed to create shared EGL context for device %s.", device->name);
+        SRMError("[%s] Failed to create shared EGL context.", device->shortName);
         return 0;
     }
 
@@ -629,12 +648,74 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
     {
         EGLint priority = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
         eglQueryContext(device->eglDisplay, device->eglSharedContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &priority);
-        SRMDebug("[%s] Using %s priority EGL context.", device->name, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
+        SRMDebug("[%s] Using %s priority EGL context.", device->shortName, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
     }
 
     eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
 
+    device->contexts = srmListCreate();
     return 1;
+}
+
+UInt8 srmDeviceCreateSharedContextForThread(SRMDevice *device)
+{
+    assert(device->contexts != NULL);
+    pthread_t t = pthread_self();
+
+    if (t == device->core->mainThread) // Already created
+        return 1;
+
+    SRMListForeach(ctxIt, device->contexts)
+    {
+        SRMDeviceThreadContext *ctx = srmListItemGetData(ctxIt);
+
+        if (ctx->thread == t) // Already created
+            return 1;
+    }
+
+    if (!eglBindAPI(EGL_OPENGL_ES_API))
+    {
+        SRMError("[%s] srmDeviceCreateSharedContextForThread: Failed to bind GLES API.", device->shortName);
+        return 0;
+    }
+
+    SRMDeviceThreadContext *ctx = calloc(1, sizeof(SRMDeviceThreadContext));
+
+    ctx->thread = t;
+    ctx->context = eglCreateContext(device->eglDisplay, device->eglConfigTest, device->eglSharedContext, device->eglSharedContextAttribs);
+
+    if (ctx->context == EGL_NO_CONTEXT)
+    {
+        SRMError("[%s] srmDeviceCreateSharedContextForThread: Failed to create thread EGL context.", device->shortName);
+        free(ctx);
+        return 0;
+    }
+
+    srmListAppendData(device->contexts, ctx);
+    return 1;
+}
+
+void srmDeviceDestroyThreadSharedContext(SRMDevice *device)
+{
+    assert(device->contexts != NULL);
+    pthread_t t = pthread_self();
+
+    if (t == device->core->mainThread)
+        return;
+
+    SRMListForeach(ctxIt, device->contexts)
+    {
+        SRMDeviceThreadContext *ctx = srmListItemGetData(ctxIt);
+
+        if (ctx->thread == t)
+        {
+            eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+            eglDestroyContext(device->eglDisplay, ctx->context);
+            srmListRemoveItem(device->contexts, ctxIt);
+            free(ctx);
+            return;
+        }
+    }
 }
 
 void srmDeviceUninitializeEGLSharedContext(SRMDevice *device)
@@ -644,6 +725,13 @@ void srmDeviceUninitializeEGLSharedContext(SRMDevice *device)
         eglReleaseThread();
         eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         eglDestroyContext(device->eglDisplay, device->eglSharedContext);
+    }
+
+    if (device->contexts)
+    {
+        assert(srmListIsEmpty(device->contexts) && "There should not be remaining EGL contexts.");
+        srmListDestroy(device->contexts);
+        device->contexts = NULL;
     }
 }
 
@@ -668,7 +756,7 @@ UInt8 srmDeviceInitializeTestGBMSurface(SRMDevice *device)
 
     if (!device->gbmSurfaceTest)
     {
-        SRMError("Failed to create GBM surface for device %s.", device->name);
+        SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to create GBM surface.", device->shortName);
         return 0;
     }
 
@@ -692,7 +780,7 @@ UInt8 srmDeviceInitializeTestEGLSurface(SRMDevice *device)
 
     if (device->eglSurfaceTest == EGL_NO_SURFACE)
     {
-        SRMError("Failed to create EGL surface for device %s.", device->name);
+        SRMError("[%s] srmDeviceInitializeTestEGLSurface: Failed to create EGL surface.", device->shortName);
         return 0;
     }
 
@@ -815,7 +903,9 @@ void srmDeviceUninitializeTestShader(SRMDevice *device)
 UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device)
 {
     const char *exts = (const char*)glGetString(GL_EXTENSIONS);
-    SRMDebug("[%s] OpenGL Extensions: %s.", device->name, exts);
+
+    if (SRMLogEGLGetLevel() > 3)
+        SRMDebug("[%s] OpenGL Extensions: %s.", device->shortName, exts);
     device->glExtensions.EXT_read_format_bgra = srmEGLHasExtension(exts, "GL_EXT_read_format_bgra");
     device->glExtensions.EXT_texture_format_BGRA8888 = srmEGLHasExtension(exts, "GL_EXT_texture_format_BGRA8888");
     device->glExtensions.OES_EGL_image_external = srmEGLHasExtension(exts, "GL_OES_EGL_image_external");
@@ -894,7 +984,7 @@ UInt8 srmDeviceUpdateCrtcs(SRMDevice *device)
 
     if (!res)
     {
-        SRMError("Could not get device %s resources.", device->name);
+        SRMError("[%s] Could not get DRM resources.", device->shortName);
         return 0;
     }
 
@@ -912,7 +1002,7 @@ UInt8 srmDeviceUpdateCrtcs(SRMDevice *device)
 
     if (srmListIsEmpty(device->crtcs))
     {
-        SRMError("SRM Error: No crtc found for device %s.", device->name);
+        SRMError("[%s] No CRCT found.", device->shortName);
         return 0;
     }
 
@@ -925,7 +1015,7 @@ UInt8 srmDeviceUpdateEncoders(SRMDevice *device)
 
     if (!res)
     {
-        SRMError("Could not get device %s resources.", device->name);
+        SRMError("[%s] Could not get DRM resources.", device->shortName);
         return 0;
     }
 
@@ -943,7 +1033,7 @@ UInt8 srmDeviceUpdateEncoders(SRMDevice *device)
 
     if (srmListIsEmpty(device->encoders))
     {
-        SRMError("No encoder found for device %s.", device->name);
+        SRMError("[%s] No encoder found.", device->shortName);
         return 0;
     }
 
@@ -956,7 +1046,7 @@ UInt8 srmDeviceUpdatePlanes(SRMDevice *device)
 
     if (!planeRes)
     {
-        SRMError("Could not get device %s plane resources.", device->name);
+        SRMError("[%s] Could not get plane resources.", device->shortName);
         return 0;
     }
 
@@ -981,7 +1071,7 @@ UInt8 srmDeviceUpdateConnectors(SRMDevice *device)
 
     if (!res)
     {
-        SRMError("Could not get device %s resources.", device->name);
+        SRMError("[%s] Could not get DRM resources.", device->shortName);
         return 0;
     }
 
@@ -999,37 +1089,11 @@ UInt8 srmDeviceUpdateConnectors(SRMDevice *device)
 
     if (srmListIsEmpty(device->connectors))
     {
-        SRMError("No connector found for device %s.", device->name);
+        SRMError("[%s] No connector found.", device->shortName);
         return 0;
     }
 
     return 1;
-}
-
-UInt8 srmDeviceInitEGLDeallocatorContext(SRMDevice *device)
-{
-    srmCoreSendDeallocatorMessage(device->core, SRM_DEALLOCATOR_MSG_CREATE_CONTEXT, device, 0, EGL_NO_IMAGE);
-
-    while (device->core->deallocatorState == 0)
-        usleep(10);
-
-    if (device->core->deallocatorState == -1)
-    {
-        SRMError("[%s] Failed to create deallocator EGL context.", device->name);
-        return 0;
-    }
-    return 1;
-}
-
-void srmDeviceUninitEGLDeallocatorContext(SRMDevice *device)
-{
-    if (device->eglDeallocatorContext != EGL_NO_CONTEXT)
-    {
-        srmCoreSendDeallocatorMessage(device->core, SRM_DEALLOCATOR_MSG_DESTROY_CONTEXT, device, 0, EGL_NO_IMAGE);
-
-        while (device->core->deallocatorState == 0)
-            usleep(10);
-    }
 }
 
 UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
@@ -1037,7 +1101,7 @@ UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
     if (drmIsMaster(device->fd) != 1)
     {
         device->pendingUdevEvents = 1;
-        SRMWarning("[core] Can't handle connector hotplugging event. Device %s is not master.", device->name);
+        SRMWarning("[%s] Can not handle connector hotplugging event. Device is not master.", device->shortName);
         return 0;
     }
 
@@ -1051,7 +1115,7 @@ UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
 
         if (!connectorRes)
         {
-            SRMError("Failed to get device %s connector %d resources in hotplug event.", connector->device->name, connector->id);
+            SRMError("Failed to get device %s connector %d resources in hotplug event.", connector->device->shortName, connector->id);
             continue;
         }
 
@@ -1069,7 +1133,7 @@ UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
                 srmConnectorUpdateModes(connector);
 
                 SRMDebug("[%s] Connector (%d) %s, %s, %s plugged.",
-                         connector->device->name,
+                         connector->device->shortName,
                          connector->id,
                          connector->name,
                          connector->model,
@@ -1088,7 +1152,7 @@ UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
             else
             {
                 SRMDebug("[%s] Connector (%d) %s, %s, %s unplugged.",
-                         connector->device->name,
+                         connector->device->shortName,
                          connector->id,
                          connector->name,
                          connector->model,
@@ -1193,9 +1257,9 @@ fail:
         free(readPixels);
 
     if (ok)
-        SRMDebug("[%s] CPU buffer allocation test succeded %dx%d.", device->name, width, height);
+        SRMDebug("[%s] CPU buffer allocation test succeded %dx%d.", device->shortName, width, height);
     else
-        SRMError("[%s] CPU buffer allocation test failed %dx%d.", device->name, width, height);
+        SRMError("[%s] CPU buffer allocation test failed %dx%d.", device->shortName, width, height);
 
     return ok;
 }
@@ -1212,22 +1276,23 @@ void srmDeviceTestCPUAllocationMode(SRMDevice *device)
 
     device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_PRIME;
 
-    SRMDebug("[%s] Testing PRIME map CPU buffer allocation mode.", device->name);
+    SRMDebug("[%s] Testing PRIME map CPU buffer allocation mode.", device->shortName);
 
     if (srmDeviceTestCPUAllocation(device, 13, 17))
         return;
 
-    SRMDebug("[%s] Testing GBM bo map CPU buffer allocation mode.", device->name);
+    SRMDebug("[%s] Testing GBM bo map CPU buffer allocation mode.", device->shortName);
 
     device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_GBM;
 
     if (srmDeviceTestCPUAllocation(device, 13, 17))
         return;
 
-    SRMDebug("[%s] Using OpenGL CPU buffer allocation mode.", device->name);
+    SRMDebug("[%s] Using OpenGL CPU buffer allocation mode.", device->shortName);
 
     device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_GLES;
 
     if (!srmDeviceTestCPUAllocation(device, 13, 17))
-        SRMWarning("[%s] All CPU buffer allocation tests failed.", device->name);
+        SRMWarning("[%s] All CPU buffer allocation tests failed.", device->shortName);
 }
+

@@ -13,6 +13,7 @@ struct SRMPlanePropIDs
     FB_ID,
     FB_DAMAGE_CLIPS,
     IN_FORMATS,
+    IN_FENCE_FD,
     CRTC_ID,
     CRTC_X,
     CRTC_Y,

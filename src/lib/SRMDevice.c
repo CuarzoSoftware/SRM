@@ -217,7 +217,8 @@ void srmDeviceMakeCurrent(SRMDevice *device)
         }
     }
 
-    assert(0 && "No EGL context found. This is not an SRM thread.");
+    srmDeviceCreateSharedContextForThread(device);
+    srmDeviceMakeCurrent(device);
 }
 
 void srmDeviceSyncWait(SRMDevice *device)

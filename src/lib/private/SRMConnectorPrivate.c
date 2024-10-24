@@ -581,7 +581,7 @@ void *srmConnectorRenderThread(void *conn)
         if (dev == connector->device->rendererDevice)
             continue;
 
-        srmDeviceDestroyThreadSharedContext(dev);
+        srmDeviceDestroyThreadSharedContext(dev, pthread_self());
     }
 
     connector->renderInitResult = -1;

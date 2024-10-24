@@ -20,17 +20,6 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-static const EGLint eglConfigAttribs[] =
-{
-    EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-    EGL_RED_SIZE, 8,
-    EGL_GREEN_SIZE, 8,
-    EGL_BLUE_SIZE, 8,
-    EGL_ALPHA_SIZE, 0,
-    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-    EGL_NONE
-};
-
 static UInt8 srmDeviceInBlacklist(const char *deviceName)
 {
     char *blacklist = getenv("SRM_DEVICES_BLACKLIST");
@@ -85,7 +74,7 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
     device->eglSurfaceTest = EGL_NO_SURFACE;
     device->fd = -1;
 
-    SRMDebug("[%s] Is boot VGA: %s.", device->shortName, device->isBootVGA ?  "YES" : "NO");
+    SRMDebug("[%s] Is Boot VGA: %s.", device->shortName, device->isBootVGA ?  "YES" : "NO");
 
     // REF 2
     device->fd = core->interface->openRestricted(name,
@@ -98,7 +87,7 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
         goto fail;
     }
 
-    SRMDebug("[%s] Is master: %s.", device->shortName, drmIsMaster(device->fd) ?  "YES" : "NO");
+    SRMDebug("[%s] Is DRM Master: %s.", device->shortName, drmIsMaster(device->fd) ?  "YES" : "NO");
 
     drmVersion *version = drmGetVersion(device->fd);
 
@@ -320,10 +309,10 @@ UInt8 srmDeviceInitializeEGL(SRMDevice *device)
         return 0;
     }
 
-    SRMDebug("[%s] EGL version: %d.%d.", device->shortName, minor, major);
+    SRMDebug("[%s] EGL Version: %d.%d.", device->shortName, minor, major);
 
     const char *vendor = eglQueryString(device->eglDisplay, EGL_VENDOR);
-    SRMDebug("[%s] EGL vendor: %s.", device->shortName, vendor ? vendor : "Unknown");
+    SRMDebug("[%s] EGL Vendor: %s.", device->shortName, vendor ? vendor : "Unknown");
 
     return 1;
 }
@@ -407,7 +396,7 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
     device->eglExtensions.KHR_surfaceless_context = srmEGLHasExtension(extensions, "EGL_KHR_surfaceless_context");
     device->eglExtensions.IMG_context_priority = srmEGLHasExtension(extensions, "EGL_IMG_context_priority");
 
-    SRMDebug("[%s] EGL driver name: %s.", device->shortName, driverName ? driverName : "Unknown");
+    SRMDebug("[%s] EGL Driver: %s.", device->shortName, driverName ? driverName : "Unknown");
 
     if (!device->eglExtensions.KHR_no_config_context && !device->eglExtensions.MESA_configless_context)
     {
@@ -462,7 +451,7 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
         device->eglFunctions.eglDupNativeFenceFDANDROID = (PFNEGLDUPNATIVEFENCEFDANDROIDPROC)eglGetProcAddress("eglDupNativeFenceFDANDROID");
     }
 
-    SRMDebug("[%s] Has EGL Sync: %s.", device->shortName, hasEGLSync ? "YES" : "NO");
+    SRMDebug("[%s] Has EGL Android Fence Sync: %s.", device->shortName, hasEGLSync ? "YES" : "NO");
 
     if (device->eglExtensions.EXT_image_dma_buf_import_modifiers)
     {
@@ -611,7 +600,7 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
 
     if (!srmRenderModeCommonChooseEGLConfiguration(
             device->eglDisplay,
-            eglConfigAttribs,
+            commonEGLConfigAttribs,
             DRM_FORMAT_XRGB8888,
             &device->eglConfigTest))
     {
@@ -642,13 +631,6 @@ UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device)
     {
         SRMError("[%s] Failed to create shared EGL context.", device->shortName);
         return 0;
-    }
-
-    if (device->eglExtensions.IMG_context_priority)
-    {
-        EGLint priority = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
-        eglQueryContext(device->eglDisplay, device->eglSharedContext, EGL_CONTEXT_PRIORITY_LEVEL_IMG, &priority);
-        SRMDebug("[%s] Using %s priority EGL context.", device->shortName, priority == EGL_CONTEXT_PRIORITY_HIGH_IMG ? "high" : "medium");
     }
 
     eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
@@ -695,19 +677,18 @@ UInt8 srmDeviceCreateSharedContextForThread(SRMDevice *device)
     return 1;
 }
 
-void srmDeviceDestroyThreadSharedContext(SRMDevice *device)
+void srmDeviceDestroyThreadSharedContext(SRMDevice *device, pthread_t thread)
 {
-    assert(device->contexts != NULL);
-    pthread_t t = pthread_self();
-
-    if (t == device->core->mainThread)
+    if (thread == device->core->mainThread)
         return;
+
+    assert(device->contexts != NULL);
 
     SRMListForeach(ctxIt, device->contexts)
     {
         SRMDeviceThreadContext *ctx = srmListItemGetData(ctxIt);
 
-        if (ctx->thread == t)
+        if (ctx->thread == thread)
         {
             eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
             eglDestroyContext(device->eglDisplay, ctx->context);
@@ -729,7 +710,11 @@ void srmDeviceUninitializeEGLSharedContext(SRMDevice *device)
 
     if (device->contexts)
     {
-        assert(srmListIsEmpty(device->contexts) && "There should not be remaining EGL contexts.");
+        while (!srmListIsEmpty(device->contexts))
+        {
+            SRMDeviceThreadContext *ctx = srmListItemGetData(srmListGetFront(device->contexts));
+            srmDeviceDestroyThreadSharedContext(device, ctx->thread);
+        }
         srmListDestroy(device->contexts);
         device->contexts = NULL;
     }

@@ -219,3 +219,24 @@ void srmDeviceMakeCurrent(SRMDevice *device)
 
     assert(0 && "No EGL context found. This is not an SRM thread.");
 }
+
+void srmDeviceSyncWait(SRMDevice *device)
+{
+    if (device->eglFunctions.eglCreateSyncKHR && device->eglFunctions.eglClientWaitSyncKHR)
+    {
+        EGLSyncKHR sync = device->eglFunctions.eglCreateSyncKHR(device->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
+
+        if (sync == EGL_NO_SYNC_KHR)
+            goto fallback;
+
+        glFlush();
+        EGLint result = device->eglFunctions.eglClientWaitSyncKHR(device->eglDisplay, sync, 0, EGL_FOREVER_KHR);
+        device->eglFunctions.eglDestroySyncKHR(device->eglDisplay, sync);
+
+        if (result == EGL_CONDITION_SATISFIED_KHR)
+            return;
+    }
+
+fallback:
+    glFinish();
+}

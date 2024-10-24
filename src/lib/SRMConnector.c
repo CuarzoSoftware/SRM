@@ -343,7 +343,7 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
 
     connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
 
-    SRMDebug("[%s] [%s] initialized.", connector->device->shortName, connector->name);
+    SRMDebug("[%s] [%s] Initialized.", connector->device->shortName, connector->name);
 
     return 1;
 
@@ -398,8 +398,7 @@ void srmConnectorUninitialize(SRMConnector *connector)
 
     srmConnectorRenderThreadCleanUp(connector);
 
-    SRMDebug("[%s] [%s] uninitialized.",
-             connector->device->shortName, connector->name);
+    SRMDebug("[%s] [%s] Uninitialized.", connector->device->shortName, connector->name);
 }
 
 UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)

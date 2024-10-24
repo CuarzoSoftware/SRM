@@ -314,6 +314,7 @@ const SRMGLDeviceExtensions *srmDeviceGetGLExtensions(SRMDevice *device);
 
 // TODO: Makes current the EGL context associated with the calling thread
 void srmDeviceMakeCurrent(SRMDevice *device);
+void srmDeviceSyncWait(SRMDevice *device);
 
 /// @cond OMIT
 

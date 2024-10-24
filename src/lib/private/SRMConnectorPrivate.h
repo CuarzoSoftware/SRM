@@ -129,7 +129,6 @@ struct SRMConnectorStruct
     struct SRMConnectorRenderInterface renderInterface;
     void *renderData;
     UInt8 inPaintGL;
-    UInt8 usingRenderBuffers;
 
     // User scanout buffer (pending and current)
     SRMBuffer *userScanoutBufferRef[2];

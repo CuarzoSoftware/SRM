@@ -52,17 +52,17 @@ SRMCore *srmCoreCreate(SRMInterface *interface, void *userData)
 
     const char *env = getenv("SRM_DISABLE_CUSTOM_SCANOUT");
     core->customBufferScanoutIsDisabled = env && atoi(env) == 1;
-    SRMDebug("[core] Custom scanout enabled: %s.",
+    SRMDebug("[core] Custom Scanout Enabled: %s.",
         core->customBufferScanoutIsDisabled ? "NO" : "YES");
 
     env = getenv("SRM_DISABLE_CURSOR");
     core->disableCursorPlanes = env && atoi(env) == 1;
-    SRMDebug("[core] Cursor enabled: %s.",
+    SRMDebug("[core] Cursor Planes Enabled: %s.",
              core->disableCursorPlanes ? "NO" : "YES");
 
     env = getenv("SRM_FORCE_LEGACY_CURSOR");
     core->forceLegacyCursor = env && atoi(env) == 1;
-    SRMDebug("[core] Force legacy cursor: %s.",
+    SRMDebug("[core] Force Legacy Cursor IOCTLs: %s.",
              core->forceLegacyCursor ? "YES" : "NO");
 
     // REF -

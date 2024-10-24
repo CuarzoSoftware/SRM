@@ -2,6 +2,7 @@
 #define SRMRENDERMODECOMMON_H
 
 #include <EGL/egl.h>
+#include <GLES2/gl2.h>
 #include <xf86drmMode.h>
 #include <SRMTypes.h>
 #include <gbm.h>
@@ -9,6 +10,19 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct RenderModeCommonDataStruct
+{
+    UInt32 drmFBs[SRM_MAX_BUFFERING];
+    struct gbm_bo *rendererBOs[SRM_MAX_BUFFERING];
+    SRMBuffer *rendererBOWrappers[SRM_MAX_BUFFERING];
+    GLuint rendererRBs[SRM_MAX_BUFFERING];
+    GLuint rendererFBs[SRM_MAX_BUFFERING];
+    UInt32 currentBufferIndex;
+    UInt32 buffersCount;
+    EGLConfig rendererConfig;
+    EGLContext rendererContext;
+} RenderModeCommonData;
 
 enum SRM_ATOMIC_CHANGE
 {

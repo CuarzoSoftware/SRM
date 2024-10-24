@@ -117,7 +117,7 @@ void srmDeviceDestroyDMAFormats(SRMDevice *device);
 
 UInt8 srmDeviceInitializeEGLSharedContext(SRMDevice *device);
 UInt8 srmDeviceCreateSharedContextForThread(SRMDevice *device);
-void srmDeviceDestroyThreadSharedContext(SRMDevice *device);
+void srmDeviceDestroyThreadSharedContext(SRMDevice *device, pthread_t thread);
 void srmDeviceUninitializeEGLSharedContext(SRMDevice *device);
 
 UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device);

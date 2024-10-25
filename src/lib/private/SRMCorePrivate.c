@@ -250,7 +250,7 @@ UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
     if (!renderer->gbmTestBo || gbm_bo_get_modifier(renderer->gbmTestBo) != DRM_FORMAT_MOD_LINEAR)
         return 0;
 
-    UInt32 size = 8;
+    UInt32 size = 64;
 
     SRMBufferDMAData dma;
     dma.format = gbm_bo_get_format(renderer->gbmTestBo);
@@ -357,7 +357,7 @@ void srmCoreAssignRenderingModes(SRMCore *core)
         if (dev == dev->rendererDevice)
         {
             dev->renderMode = SRM_RENDER_MODE_ITSELF;
-            //continue;
+            continue;
         }
 
         if (dev->capPrimeImport && dev->rendererDevice->capPrimeExport && srmCoreCheckPRIME(dev, dev->rendererDevice))

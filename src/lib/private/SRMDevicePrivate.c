@@ -734,7 +734,7 @@ UInt8 srmDeviceInitializeTestGBM(SRMDevice *device)
     if (!device->gbmTestBo)
     {
         SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to create gbm_bo.", device->shortName);
-        goto fail;
+        goto fallback;
     }
 
     it = srmListAppendData(device->core->devices, device);
@@ -744,7 +744,7 @@ UInt8 srmDeviceInitializeTestGBM(SRMDevice *device)
     if (!device->testBuffer)
     {
         SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to create SRMBuffer.", device->shortName);
-        goto fail;
+        goto fallback;
     }
 
     image = srmBufferGetEGLImage(device, device->testBuffer);
@@ -752,7 +752,7 @@ UInt8 srmDeviceInitializeTestGBM(SRMDevice *device)
     if (image == EGL_NO_IMAGE)
     {
         SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to get EGLImage from SRMBuffer.", device->shortName);
-        goto fail;
+        goto fallback;
     }
 
     eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
@@ -762,7 +762,7 @@ UInt8 srmDeviceInitializeTestGBM(SRMDevice *device)
     if (device->testRB == 0)
     {
         SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to generate GL renderbuffer.", device->shortName);
-        goto fail;
+        goto fallback;
     }
 
     glBindRenderbuffer(GL_RENDERBUFFER, device->testRB);
@@ -772,7 +772,7 @@ UInt8 srmDeviceInitializeTestGBM(SRMDevice *device)
     if (device->testFB == 0)
     {
         SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to generate GL framebuffer.", device->shortName);
-        goto fail;
+        goto fallback;
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, device->testFB);
@@ -782,7 +782,36 @@ UInt8 srmDeviceInitializeTestGBM(SRMDevice *device)
     if (status != GL_FRAMEBUFFER_COMPLETE)
     {
         SRMError("[%s] srmDeviceInitializeTestGBMSurface: Incomplete GL framebuffer.", device->shortName);
+        goto fallback;
+    }
+
+    return 1;
+
+fallback:
+
+    SRMWarning("[%s] srmDeviceInitializeTestGBMSurface: Fallback to GL texture.", device->shortName);
+    srmDeviceUninitializeTestGBM(device);
+    glGenFramebuffers(1, &device->testFB);
+    glBindFramebuffer(GL_FRAMEBUFFER, device->testFB);
+
+    if (device->testFB == 0)
+    {
+        SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to generate GL framebuffer.", device->shortName);
         goto fail;
+    }
+
+    glGenTextures(1, &device->testTex);
+    glBindTexture(GL_TEXTURE_2D, device->testTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 64, 64, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, device->testTex, 0);
+    glFinish();
+
+    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+
+    if (status != GL_FRAMEBUFFER_COMPLETE)
+    {
+        SRMError("[%s] srmDeviceInitializeTestGBMSurface: Incomplete GL framebuffer.", device->shortName);
+        return 0;
     }
 
     return 1;
@@ -805,6 +834,12 @@ void srmDeviceUninitializeTestGBM(SRMDevice *device)
     {
         glDeleteRenderbuffers(1, &device->testRB);
         device->testRB = 0;
+    }
+
+    if (device->testTex)
+    {
+        glDeleteTextures(1, &device->testTex);
+        device->testTex = 0;
     }
 
     if (device->testBuffer)

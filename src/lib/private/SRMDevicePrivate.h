@@ -56,7 +56,7 @@ struct SRMDeviceStruct
 
     struct gbm_bo *gbmTestBo;
     SRMBuffer *testBuffer;
-    GLuint testRB, testFB;
+    GLuint testRB, testFB, testTex;
     EGLConfig eglConfigTest;
     GLuint vertexShaderTest;
     GLuint fragmentShaderTest;

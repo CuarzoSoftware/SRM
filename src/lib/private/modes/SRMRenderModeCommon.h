@@ -55,6 +55,7 @@ void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struc
 void srmRenderModeCommonCreateConnectorGBMBo(SRMConnector *connector, struct gbm_bo **bo);
 Int32 srmRenderModeCommonCalculateBuffering(SRMConnector *connector, const char *modeName);
 void srmRenderModeCommonCreateSync(SRMConnector *connector);
+void srmRenderModeCommonDestroySync(SRMConnector *connector);
 struct gbm_bo *srmRenderModeCommonSurfaceLockFrontBufferSafe(struct gbm_surface *surface);
 void srmRenderModeCommonSurfaceReleaseBufferSafe(struct gbm_surface *surface, struct gbm_bo *bo);
 

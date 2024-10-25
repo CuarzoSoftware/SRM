@@ -71,7 +71,6 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
     device->enabled = 1;
     device->isBootVGA = isBootVGA;
     device->eglDevice = EGL_NO_DEVICE_EXT;
-    device->eglSurfaceTest = EGL_NO_SURFACE;
     device->fd = -1;
 
     SRMDebug("[%s] Is Boot VGA: %s.", device->shortName, device->isBootVGA ?  "YES" : "NO");
@@ -117,6 +116,14 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
     }
     device->pageFlipMutexInitialized = 1;
 
+    // REF -
+    if (!srmDeviceUpdateClientCaps(device))
+        goto fail;
+
+    // REF -
+    if (!srmDeviceUpdateCaps(device))
+        goto fail;
+
     // REF 4
     if (!srmDeviceInitializeGBM(device))
         goto fail;
@@ -145,23 +152,11 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
     srmDeviceUpdateDMAFormats(device);
 
     // REF 7-1
-    if (!srmDeviceInitializeTestGBMSurface(device))
-        goto fail;
-
-    // REF 7-2
-    if(!srmDeviceInitializeTestEGLSurface(device))
+    if (!srmDeviceInitializeTestGBM(device))
         goto fail;
 
     // REF 7-3
     if (!srmDeviceInitializeTestShader(device))
-        goto fail;
-
-    // REF -
-    if (!srmDeviceUpdateClientCaps(device))
-        goto fail;
-
-    // REF -
-    if (!srmDeviceUpdateCaps(device))
         goto fail;
 
     // REF 9
@@ -234,11 +229,8 @@ void srmDeviceDestroy(SRMDevice *device)
     // UNREF 7-3
     srmDeviceUninitializeTestShader(device);
 
-    // UNREF 7-2
-    srmDeviceUninitializeTestEGLSurface(device);
-
     // UNREF 7-1
-    srmDeviceUninitializeTestGBMSurface(device);
+    srmDeviceUninitializeTestGBM(device);
 
     // UNREF 6
     srmDeviceDestroyDMAFormats(device);
@@ -457,6 +449,12 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
     {
         device->eglFunctions.eglQueryDmaBufFormatsEXT = (PFNEGLQUERYDMABUFFORMATSEXTPROC) eglGetProcAddress("eglQueryDmaBufFormatsEXT");
         device->eglFunctions.eglQueryDmaBufModifiersEXT = (PFNEGLQUERYDMABUFMODIFIERSEXTPROC) eglGetProcAddress("eglQueryDmaBufModifiersEXT");
+    }
+
+    if (!device->eglFunctions.glEGLImageTargetRenderbufferStorageOES)
+    {
+        SRMError("[%s] Required EGL extension KHR_gl_renderbuffer_image is not available.", device->shortName);
+        return 0;
     }
 
     return 1;
@@ -720,85 +718,105 @@ void srmDeviceUninitializeEGLSharedContext(SRMDevice *device)
     }
 }
 
-UInt8 srmDeviceInitializeTestGBMSurface(SRMDevice *device)
+UInt8 srmDeviceInitializeTestGBM(SRMDevice *device)
 {
-    device->gbmSurfaceTest = srmBufferCreateGBMSurface(
+    SRMListItem *it;
+    EGLImage image;
+    GLenum status;
+
+    device->gbmTestBo = srmBufferCreateGBMBo(
         device->gbm,
         64, 64,
         DRM_FORMAT_XRGB8888,
         DRM_FORMAT_MOD_LINEAR,
         GBM_BO_USE_RENDERING);
 
-    if (device->gbmSurfaceTest)
-        return 1;
-
-    device->gbmSurfaceTest = srmBufferCreateGBMSurface(
-        device->gbm,
-        64, 64,
-        DRM_FORMAT_XRGB8888,
-        DRM_FORMAT_MOD_INVALID,
-        GBM_BO_USE_RENDERING);
-
-    if (!device->gbmSurfaceTest)
+    if (!device->gbmTestBo)
     {
-        SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to create GBM surface.", device->shortName);
-        return 0;
+        SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to create gbm_bo.", device->shortName);
+        goto fail;
+    }
+
+    it = srmListAppendData(device->core->devices, device);
+    device->testBuffer = srmBufferCreateFromGBM(device->core, device->gbmTestBo);
+    srmListRemoveItem(device->core->devices, it);
+
+    if (!device->testBuffer)
+    {
+        SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to create SRMBuffer.", device->shortName);
+        goto fail;
+    }
+
+    image = srmBufferGetEGLImage(device, device->testBuffer);
+
+    if (image == EGL_NO_IMAGE)
+    {
+        SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to get EGLImage from SRMBuffer.", device->shortName);
+        goto fail;
+    }
+
+    eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
+
+    glGenRenderbuffers(1, &device->testRB);
+
+    if (device->testRB == 0)
+    {
+        SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to generate GL renderbuffer.", device->shortName);
+        goto fail;
+    }
+
+    glBindRenderbuffer(GL_RENDERBUFFER, device->testRB);
+    device->eglFunctions.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER, image);
+    glGenFramebuffers(1, &device->testFB);
+
+    if (device->testFB == 0)
+    {
+        SRMError("[%s] srmDeviceInitializeTestGBMSurface: Failed to generate GL framebuffer.", device->shortName);
+        goto fail;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, device->testFB);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, device->testRB);
+    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+
+    if (status != GL_FRAMEBUFFER_COMPLETE)
+    {
+        SRMError("[%s] srmDeviceInitializeTestGBMSurface: Incomplete GL framebuffer.", device->shortName);
+        goto fail;
     }
 
     return 1;
+
+fail:
+    return 0;
 }
 
-void srmDeviceUninitializeTestGBMSurface(SRMDevice *device)
+void srmDeviceUninitializeTestGBM(SRMDevice *device)
 {
-    if (device->gbmSurfaceTest)
-        gbm_surface_destroy(device->gbmSurfaceTest);
-}
+    eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
 
-
-UInt8 srmDeviceInitializeTestEGLSurface(SRMDevice *device)
-{
-    device->eglSurfaceTest = eglCreateWindowSurface(
-        device->eglDisplay,
-        device->eglConfigTest,
-        (EGLNativeWindowType)device->gbmSurfaceTest,
-        NULL);
-
-    if (device->eglSurfaceTest == EGL_NO_SURFACE)
+    if (device->testFB)
     {
-        SRMError("[%s] srmDeviceInitializeTestEGLSurface: Failed to create EGL surface.", device->shortName);
-        return 0;
+        glDeleteFramebuffers(1, &device->testFB);
+        device->testFB = 0;
     }
 
-    eglMakeCurrent(device->eglDisplay,
-                   device->eglSurfaceTest,
-                   device->eglSurfaceTest,
-                   device->eglSharedContext);
-
-    eglSwapBuffers(device->eglDisplay,
-                   device->eglSurfaceTest);
-
-    device->gbmSurfaceTestBo = gbm_surface_lock_front_buffer(device->gbmSurfaceTest);
-    return 1;
-}
-
-void srmDeviceUninitializeTestEGLSurface(SRMDevice *device)
-{
-    if (device->gbmSurfaceTestBo)
+    if (device->testRB)
     {
-        gbm_surface_release_buffer(device->gbmSurfaceTest, device->gbmSurfaceTestBo);
-        device->gbmSurfaceTestBo = NULL;
+        glDeleteRenderbuffers(1, &device->testRB);
+        device->testRB = 0;
     }
 
-    if (device->gbmSurfaceTest)
+    if (device->testBuffer)
     {
-        gbm_surface_destroy(device->gbmSurfaceTest);
-        device->gbmSurfaceTest = NULL;
+        srmBufferDestroy(device->testBuffer);
+        device->testBuffer = NULL;
     }
 
-    if (device->eglSurfaceTest != EGL_NO_SURFACE)
+    if (device->gbmTestBo)
     {
-        eglDestroySurface(device->eglDisplay, device->eglSurfaceTest);
-        device->eglSurfaceTest = EGL_NO_SURFACE;
+        gbm_bo_destroy(device->gbmTestBo);
+        device->gbmTestBo = NULL;
     }
 }
 
@@ -815,10 +833,7 @@ UInt8 srmDeviceInitializeTestShader(SRMDevice *device)
    const char *vertexShaderSource = "attribute vec4 position; varying vec2 v_texcoord; void main() { gl_Position = vec4(position.xy, 0.0, 1.0); v_texcoord = position.zw; }";
    const char *fragmentShaderSource = "precision mediump float; uniform sampler2D tex; varying vec2 v_texcoord; void main() { gl_FragColor = texture2D(tex, v_texcoord); }";
 
-   eglMakeCurrent(device->eglDisplay,
-                  device->eglSurfaceTest,
-                  device->eglSurfaceTest,
-                  device->eglSharedContext);
+   eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
 
    GLint success = 0;
    GLchar infoLog[256];
@@ -1166,7 +1181,7 @@ UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
     return 1;
 }
 
-static UInt8 srmDeviceTestCPUAllocation(SRMDevice *device, UInt32 width, UInt32 height)
+static UInt8 srmDeviceTestCPUAllocation(const char *modeName, SRMDevice *device, UInt32 width, UInt32 height)
 {
     UInt8 *pixels = NULL;
     UInt8 *readPixels = NULL;
@@ -1190,11 +1205,6 @@ static UInt8 srmDeviceTestCPUAllocation(SRMDevice *device, UInt32 width, UInt32 
         }
     }
 
-    eglMakeCurrent(device->eglDisplay,
-                   device->eglSurfaceTest,
-                   device->eglSurfaceTest,
-                   device->eglSharedContext);
-
     buffer = srmBufferCreateFromCPU(device->core, device, width, height, stride, pixels, DRM_FORMAT_ARGB8888);
 
     if (!buffer)
@@ -1205,8 +1215,9 @@ static UInt8 srmDeviceTestCPUAllocation(SRMDevice *device, UInt32 width, UInt32 
     if (textureId == 0)
         goto fail;
 
+    eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
     glUseProgram(device->programTest);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, device->testFB);
     glDisable(GL_BLEND);
     glEnable(GL_SCISSOR_TEST);
     glDisable(GL_DEPTH_BUFFER_BIT);
@@ -1242,9 +1253,9 @@ fail:
         free(readPixels);
 
     if (ok)
-        SRMDebug("[%s] CPU buffer allocation test succeded %dx%d.", device->shortName, width, height);
+        SRMDebug("[%s] %s CPU buffer allocation test succeded %dx%d.", device->shortName, modeName, width, height);
     else
-        SRMError("[%s] CPU buffer allocation test failed %dx%d.", device->shortName, width, height);
+        SRMError("[%s] %s CPU buffer allocation test failed %dx%d.", device->shortName, modeName, width, height);
 
     return ok;
 }
@@ -1263,21 +1274,21 @@ void srmDeviceTestCPUAllocationMode(SRMDevice *device)
 
     SRMDebug("[%s] Testing PRIME map CPU buffer allocation mode.", device->shortName);
 
-    if (srmDeviceTestCPUAllocation(device, 13, 17))
+    if (srmDeviceTestCPUAllocation("PRIME mmap", device, 13, 17))
         return;
 
     SRMDebug("[%s] Testing GBM bo map CPU buffer allocation mode.", device->shortName);
 
     device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_GBM;
 
-    if (srmDeviceTestCPUAllocation(device, 13, 17))
+    if (srmDeviceTestCPUAllocation("GBM mmap", device, 13, 17))
         return;
 
     SRMDebug("[%s] Using OpenGL CPU buffer allocation mode.", device->shortName);
 
     device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_GLES;
 
-    if (!srmDeviceTestCPUAllocation(device, 13, 17))
+    if (!srmDeviceTestCPUAllocation("GL", device, 13, 17))
         SRMWarning("[%s] All CPU buffer allocation tests failed.", device->shortName);
 }
 

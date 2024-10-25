@@ -1524,16 +1524,12 @@ Int32 srmRenderModeCommonCalculateBuffering(SRMConnector *connector, const char 
 
 void srmRenderModeCommonCreateSync(SRMConnector *connector)
 {
+    srmRenderModeCommonDestroySync(connector);
+
     SRMEGLDeviceFunctions *f = &connector->device->eglFunctions;
 
     if (!connector->device->clientCapAtomic || !f->eglDupNativeFenceFDANDROID)
         goto fallback;
-
-    if (connector->fenceFD != -1)
-    {
-        close(connector->fenceFD);
-        connector->fenceFD = -1;
-    }
 
     static const EGLint attribs[] =
     {
@@ -1574,4 +1570,18 @@ void srmRenderModeCommonSurfaceReleaseBufferSafe(struct gbm_surface *surface, st
 
     gbm_bo_set_user_data(bo, NULL, NULL);
     gbm_surface_release_buffer(surface, bo);
+}
+
+void srmRenderModeCommonDestroySync(SRMConnector *connector)
+{
+    SRMEGLDeviceFunctions *f = &connector->device->eglFunctions;
+
+    if (!connector->device->clientCapAtomic || !f->eglDupNativeFenceFDANDROID)
+        return;
+
+    if (connector->fenceFD != -1)
+    {
+        close(connector->fenceFD);
+        connector->fenceFD = -1;
+    }
 }

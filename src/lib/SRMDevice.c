@@ -4,7 +4,6 @@
 #include <SRMList.h>
 #include <SRMLog.h>
 #include <fcntl.h>
-#include <assert.h>
 
 const char *srmDeviceGetName(SRMDevice *device)
 {

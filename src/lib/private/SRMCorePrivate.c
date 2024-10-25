@@ -247,20 +247,18 @@ void srmCoreAssignRendererDevices(SRMCore *core)
 
 UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
 {
-    if (gbm_bo_get_modifier(renderer->gbmSurfaceTestBo) != DRM_FORMAT_MOD_LINEAR)
+    if (gbm_bo_get_modifier(renderer->gbmTestBo) != DRM_FORMAT_MOD_LINEAR)
         return 0;
 
     SRMBufferDMAData dma;
-    dma.format = gbm_bo_get_format(renderer->gbmSurfaceTestBo);
+    dma.format = gbm_bo_get_format(renderer->gbmTestBo);
     dma.width = 64;
     dma.height = 64;
     dma.num_fds = 1;
-    dma.modifiers[0] = gbm_bo_get_modifier(renderer->gbmSurfaceTestBo);
-    dma.fds[0] = gbm_bo_get_fd(renderer->gbmSurfaceTestBo);
-    dma.strides[0] = gbm_bo_get_stride_for_plane(renderer->gbmSurfaceTestBo, 0);
-    dma.offsets[0] = gbm_bo_get_offset(renderer->gbmSurfaceTestBo, 0);
-
-    gbm_surface_release_buffer(renderer->gbmSurfaceTest, renderer->gbmSurfaceTestBo);
+    dma.modifiers[0] = gbm_bo_get_modifier(renderer->gbmTestBo);
+    dma.fds[0] = gbm_bo_get_fd(renderer->gbmTestBo);
+    dma.strides[0] = gbm_bo_get_stride_for_plane(renderer->gbmTestBo, 0);
+    dma.offsets[0] = gbm_bo_get_offset(renderer->gbmTestBo, 0);
 
     SRMBuffer *primeBuffer = srmBufferCreateFromDMA(
         target->core,
@@ -274,16 +272,9 @@ UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
     UInt8 *targetPixels = malloc(64 * stride);
     UInt8 *rendererPixels = malloc(64 * stride);
 
-    eglMakeCurrent(
-        renderer->eglDisplay,
-        renderer->eglSurfaceTest,
-        renderer->eglSurfaceTest,
-        renderer->eglSharedContext);
+    eglMakeCurrent(renderer->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, renderer->eglSharedContext);
 
-    eglSwapBuffers(renderer->eglDisplay, renderer->eglSurfaceTest);
-    gbm_surface_lock_front_buffer(renderer->gbmSurfaceTest);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, renderer->testFB);
 
     glScissor(0, 0, 32, 32);
     glViewport(0, 0, 32, 32);
@@ -308,11 +299,7 @@ UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
     glFinish();
     glReadPixels(0, 0, 64, 64, GL_RGBA, GL_UNSIGNED_BYTE, rendererPixels);
 
-    eglMakeCurrent(
-        target->eglDisplay,
-        target->eglSurfaceTest,
-        target->eglSurfaceTest,
-        target->eglSharedContext);
+    eglMakeCurrent(target->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, target->eglSharedContext);
 
     GLuint textureId = srmBufferGetTextureID(target, primeBuffer);
 
@@ -325,7 +312,7 @@ UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
     }
 
     glUseProgram(target->programTest);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, target->testFB);
     glDisable(GL_BLEND);
     glEnable(GL_SCISSOR_TEST);
     glDisable(GL_DEPTH_BUFFER_BIT);

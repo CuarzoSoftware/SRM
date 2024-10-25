@@ -276,7 +276,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
                      NULL);
     }
 
-    glFlush();
+    srmDeviceSyncWait(buffer->allocator);
 
     if (buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
     {
@@ -458,6 +458,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
     glTexParameteri(buffer->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(buffer->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(buffer->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    srmDeviceSyncWait(buffer->allocator);
 
     srmRestoreContext();
     srmListAppendData(buffer->textures, texture);
@@ -637,6 +638,7 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
                         buffer->glFormat, buffer->glType, pixels);
 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        srmDeviceSyncWait(buffer->allocator);
         srmRestoreContext();
         return 1;
     }

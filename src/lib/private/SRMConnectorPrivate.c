@@ -507,6 +507,7 @@ void *srmConnectorRenderThread(void *conn)
                     /* Scanning out a custom user buffer (skip the render mode interface) */
                     if (connector->userScanoutBufferRef[0])
                     {
+                        srmRenderModeCommonDestroySync(connector);
                         srmRenderModeCommonPageFlip(connector, connector->userScanoutBufferRef[0]->scanout.fb);
                         connector->interface->pageFlipped(connector, connector->interfaceData);
                     }
@@ -573,6 +574,8 @@ void *srmConnectorRenderThread(void *conn)
     }
 
     finish:
+
+    srmRenderModeCommonDestroySync(connector);
 
     SRMListForeach(devIt, connector->device->core->devices)
     {

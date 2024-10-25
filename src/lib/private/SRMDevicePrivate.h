@@ -54,10 +54,10 @@ struct SRMDeviceStruct
     EGLDisplay eglDisplay;
     EGLContext eglSharedContext;
 
-    struct gbm_surface *gbmSurfaceTest;
-    struct gbm_bo *gbmSurfaceTestBo;
+    struct gbm_bo *gbmTestBo;
+    SRMBuffer *testBuffer;
+    GLuint testRB, testFB;
     EGLConfig eglConfigTest;
-    EGLSurface eglSurfaceTest;
     GLuint vertexShaderTest;
     GLuint fragmentShaderTest;
     GLuint programTest;
@@ -122,11 +122,8 @@ void srmDeviceUninitializeEGLSharedContext(SRMDevice *device);
 
 UInt8 srmDeviceUpdateGLExtensions(SRMDevice *device);
 
-UInt8 srmDeviceInitializeTestGBMSurface(SRMDevice *device);
-void srmDeviceUninitializeTestGBMSurface(SRMDevice *device);
-
-UInt8 srmDeviceInitializeTestEGLSurface(SRMDevice *device);
-void srmDeviceUninitializeTestEGLSurface(SRMDevice *device);
+UInt8 srmDeviceInitializeTestGBM(SRMDevice *device);
+void srmDeviceUninitializeTestGBM(SRMDevice *device);
 
 UInt8 srmDeviceInitializeTestShader(SRMDevice *device);
 void srmDeviceUninitializeTestShader(SRMDevice *device);

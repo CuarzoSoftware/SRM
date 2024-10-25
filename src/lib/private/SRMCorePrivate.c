@@ -247,13 +247,15 @@ void srmCoreAssignRendererDevices(SRMCore *core)
 
 UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
 {
-    if (gbm_bo_get_modifier(renderer->gbmTestBo) != DRM_FORMAT_MOD_LINEAR)
+    if (!renderer->gbmTestBo || gbm_bo_get_modifier(renderer->gbmTestBo) != DRM_FORMAT_MOD_LINEAR)
         return 0;
+
+    UInt32 size = 8;
 
     SRMBufferDMAData dma;
     dma.format = gbm_bo_get_format(renderer->gbmTestBo);
-    dma.width = 64;
-    dma.height = 64;
+    dma.width = size;
+    dma.height = size;
     dma.num_fds = 1;
     dma.modifiers[0] = gbm_bo_get_modifier(renderer->gbmTestBo);
     dma.fds[0] = gbm_bo_get_fd(renderer->gbmTestBo);
@@ -268,36 +270,37 @@ UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
     if (!primeBuffer)
         return 0;
 
-    UInt32 stride = 64 * 4;
-    UInt8 *targetPixels = malloc(64 * stride);
-    UInt8 *rendererPixels = malloc(64 * stride);
+    UInt32 stride = size * 4;
+    UInt8 *targetPixels = malloc(size * stride);
+    UInt8 *rendererPixels = malloc(size * stride);
 
     eglMakeCurrent(renderer->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, renderer->eglSharedContext);
 
     glBindFramebuffer(GL_FRAMEBUFFER, renderer->testFB);
 
-    glScissor(0, 0, 32, 32);
-    glViewport(0, 0, 32, 32);
+    UInt32 half = size/2;
+    glScissor(0, 0, half, half);
+    glViewport(0, 0, half, half);
     glClearColor(1.f, 0.f, 0.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glScissor(32, 0, 32, 32);
-    glViewport(32, 0, 32, 32);
+    glScissor(half, 0, half, half);
+    glViewport(half, 0, half, half);
     glClearColor(0.f, 1.f, 0.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glScissor(0, 32, 32, 32);
-    glViewport(0, 32, 32, 32);
+    glScissor(0, half, half, half);
+    glViewport(0, half, half, half);
     glClearColor(0.f, 0.f, 1.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glScissor(32, 32, 32, 32);
-    glViewport(32, 32, 32, 32);
+    glScissor(half, half, half, half);
+    glViewport(half, half, half, half);
     glClearColor(1.f, 1.f, 1.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glFinish();
-    glReadPixels(0, 0, 64, 64, GL_RGBA, GL_UNSIGNED_BYTE, rendererPixels);
+    glReadPixels(0, 0, size, size, GL_RGBA, GL_UNSIGNED_BYTE, rendererPixels);
 
     eglMakeCurrent(target->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, target->eglSharedContext);
 
@@ -316,18 +319,20 @@ UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
     glDisable(GL_BLEND);
     glEnable(GL_SCISSOR_TEST);
     glDisable(GL_DEPTH_BUFFER_BIT);
-    glScissor(0, 0, 64, 64);
-    glViewport(0, 0, 64, 64);
+    glScissor(0, 0, size, size);
+    glViewport(0, 0, size, size);
     glUniform1i(target->textureUniformTest, 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureId);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     glFinish();
-    glReadPixels(0, 0, 64, 64, GL_RGBA, GL_UNSIGNED_BYTE, targetPixels);
+    glReadPixels(0, 0, size, size, GL_RGBA, GL_UNSIGNED_BYTE, targetPixels);
 
     UInt8 ok = 1;
 
-    for (UInt32 i = 0; i < 64 * 64 * 4; i++)
+    for (UInt32 i = 0; i < size * size * 4; i++)
     {
         if (rendererPixels[i] != targetPixels[i])
         {
@@ -352,7 +357,7 @@ void srmCoreAssignRenderingModes(SRMCore *core)
         if (dev == dev->rendererDevice)
         {
             dev->renderMode = SRM_RENDER_MODE_ITSELF;
-            continue;
+            //continue;
         }
 
         if (dev->capPrimeImport && dev->rendererDevice->capPrimeExport && srmCoreCheckPRIME(dev, dev->rendererDevice))

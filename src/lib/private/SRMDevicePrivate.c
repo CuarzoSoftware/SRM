@@ -824,10 +824,10 @@ UInt8 srmDeviceInitializeTestShader(SRMDevice *device)
 {
     static GLfloat square[] =
     {  //  VERTEX       FRAGMENT
-        -1.0f, -1.0f,   0.f, 1.f, // TL
-        -1.0f,  1.0f,   0.f, 0.f, // BL
-        1.0f,  1.0f,   1.f, 0.f, // BR
-        1.0f, -1.0f,   1.f, 1.f  // TR
+        -1.0f,  1.0f,   0.f, 1.f, // TL
+        -1.0f, -1.0f,   0.f, 0.f, // BL
+         1.0f, -1.0f,   1.f, 0.f, // BR
+         1.0f,  1.0f,   1.f, 1.f  // TR
     };
 
    const char *vertexShaderSource = "attribute vec4 position; varying vec2 v_texcoord; void main() { gl_Position = vec4(position.xy, 0.0, 1.0); v_texcoord = position.zw; }";
@@ -1226,6 +1226,8 @@ static UInt8 srmDeviceTestCPUAllocation(const char *modeName, SRMDevice *device,
     glUniform1i(device->textureUniformTest, 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureId);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     glFinish();
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, readPixels);
@@ -1235,7 +1237,7 @@ static UInt8 srmDeviceTestCPUAllocation(const char *modeName, SRMDevice *device,
         for (UInt32 x = 0; x < width; x++)
         {
             pixel = &pixels[y * stride + x * 4];
-            readPixel = &readPixels[(height - 1 - y) * stride + x * 4];
+            readPixel = &readPixels[y * stride + x * 4];
 
             if (pixel[0] != readPixel[2] || pixel[1] != readPixel[1] || pixel[2] != readPixel[0])
                 goto fail;

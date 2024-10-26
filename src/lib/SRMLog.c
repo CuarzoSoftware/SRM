@@ -22,14 +22,28 @@ void SRMLogInit()
     char *env = getenv("SRM_DEBUG");
 
     if (env)
+    {
         level = atoi(env);
+
+        if (level < 0)
+            level = 0;
+        else if (level > 4)
+            level = 4;
+    }
     else
         level = 0;
 
     char *eglEnv = getenv("SRM_EGL_DEBUG");
 
     if (eglEnv)
+    {
         eglLevel = atoi(eglEnv);
+
+        if (eglLevel < 0)
+            eglLevel = 0;
+        else if (eglLevel > 4)
+            eglLevel = 4;
+    }
     else
         eglLevel = 0;
 }

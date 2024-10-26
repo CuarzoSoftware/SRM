@@ -14,21 +14,6 @@
 extern "C" {
 #endif
 
-#define EGL_DMA_PLANE_DEF(planes_n) \
-if (buffer->planesCount > planes_n) \
-{ \
-    imageAttribs[index++] = EGL_DMA_BUF_PLANE ## planes_n ## _FD_EXT; \
-    imageAttribs[index++] = buffer->fds[planes_n]; \
-    imageAttribs[index++] = EGL_DMA_BUF_PLANE ## planes_n ## _OFFSET_EXT; \
-    imageAttribs[index++] = buffer->offsets[planes_n]; \
-    imageAttribs[index++] = EGL_DMA_BUF_PLANE ## planes_n ## _PITCH_EXT; \
-    imageAttribs[index++] = buffer->strides[planes_n]; \
-    imageAttribs[index++] = EGL_DMA_BUF_PLANE ## planes_n ## _MODIFIER_LO_EXT; \
-    imageAttribs[index++] = buffer->modifiers[planes_n] & 0xffffffff; \
-    imageAttribs[index++] = EGL_DMA_BUF_PLANE ## planes_n ## _MODIFIER_HI_EXT; \
-    imageAttribs[index++] = buffer->modifiers[planes_n] >> 32; \
-} \
-
 struct SRMBufferTexture
 {
     SRMDevice *device;
@@ -46,18 +31,18 @@ typedef enum SRM_BUFFER_WRITE_MODE_ENUM
 
 struct SRMBufferStruct
 {
+    // DMA
+    SRMBufferDMAData dma;
+    void *map;
+    struct dma_buf_sync sync;
+
     // Common
     SRMDevice *allocator;
     pthread_mutex_t mutex;
     enum SRM_BUFFER_SRC src;
     SRM_BUFFER_WRITE_MODE writeMode;
     UInt32 refCount;
-
-    UInt32 width;
-    UInt32 height;
-    UInt32 format;
     UInt32 caps;
-
     UInt32 bpp;
     UInt32 pixelSize;
     SRMCore *core;
@@ -73,15 +58,6 @@ struct SRMBufferStruct
         struct gbm_bo *bo; // Can be NULL
         SRMFormat fmt;
     } scanout;
-
-    // DMA
-    UInt32 planesCount;
-    UInt64 modifiers[SRM_MAX_PLANES];
-    Int32 fds[SRM_MAX_PLANES];
-    UInt32 strides[SRM_MAX_PLANES];
-    UInt32 offsets[SRM_MAX_PLANES];
-    void *map;
-    struct dma_buf_sync sync;
 
     // GL
     GLenum target;
@@ -99,6 +75,8 @@ void *srmBufferMapFD(Int32 fd, size_t len, UInt32 *caps);
 struct gbm_bo *srmBufferCreateLinearBO(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format);
 struct gbm_surface *srmBufferCreateGBMSurface(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags);
 struct gbm_bo *srmBufferCreateGBMBo(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags);
+void srmBufferFillParamsFromBO(SRMBuffer *buffer, struct gbm_bo *bo);
+void srmBufferSetTargetFromFormat(SRMBuffer *buffer);
 
 #ifdef __cplusplus
 }

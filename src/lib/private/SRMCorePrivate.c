@@ -386,11 +386,7 @@ UInt8 srmCoreUpdateBestConfiguration(SRMCore *core)
         return 0;
     }
 
-    eglMakeCurrent(bestAllocatorDevice->eglDisplay,
-                   EGL_NO_SURFACE,
-                   EGL_NO_SURFACE,
-                   bestAllocatorDevice->eglSharedContext);
-
+    eglMakeCurrent(bestAllocatorDevice->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, bestAllocatorDevice->eglSharedContext);
     core->allocatorDevice = bestAllocatorDevice;
     srmCoreAssignRendererDevices(core);
     srmCoreUpdateSharedDMATextureFormats(core);
@@ -539,11 +535,7 @@ UInt8 srmCoreUpdateEGLFunctions(SRMCore *core)
     {
         core->eglFunctions.eglDebugMessageControlKHR = (PFNEGLDEBUGMESSAGECONTROLKHRPROC) eglGetProcAddress("eglDebugMessageControlKHR");
 
-        UInt32 level = 0;
-        const char *env = getenv("SRM_EGL_DEBUG");
-
-        if (env)
-            level = atoi(env);
+        Int32 level = SRMLogEGLGetLevel();
 
         EGLAttrib debugAttribs[] =
         {

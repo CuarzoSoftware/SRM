@@ -2,6 +2,7 @@
 #define SRMEGL_H
 
 #include <SRMTypes.h>
+#include <SRMBuffer.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
@@ -38,7 +39,7 @@ static const EGLint commonEGLConfigAttribs[] =
 };
 
 /**
- * @brief Structure representing common EGL extensions.
+ * @brief Structure representing client EGL extensions.
  */
 typedef struct SRMEGLCoreExtensionsStruct
 {
@@ -54,7 +55,7 @@ typedef struct SRMEGLCoreExtensionsStruct
 } SRMEGLCoreExtensions;
 
 /**
- * @brief Structure representing common EGL functions.
+ * @brief Structure representing client EGL functions.
  */
 typedef struct SRMEGLCoreFunctionsStruct
 {
@@ -66,7 +67,7 @@ typedef struct SRMEGLCoreFunctionsStruct
 } SRMEGLCoreFunctions;
 
 /**
- * @brief Structure representing device-specific EGL extensions.
+ * @brief Structure representing display-specific EGL extensions.
  */
 typedef struct SRMEGLDeviceExtensionsStruct
 {
@@ -93,7 +94,7 @@ typedef struct SRMEGLDeviceExtensionsStruct
 } SRMEGLDeviceExtensions;
 
 /**
- * @brief Structure representing device-specific EGL functions.
+ * @brief Structure representing display-specific EGL functions.
  */
 typedef struct SRMEGLDeviceFunctionsStruct
 {
@@ -147,6 +148,9 @@ UInt8 srmEGLHasExtension(const char *extensions, const char *extension);
  * @brief Get a human-readable string for an EGL context priority.
  */
 const char *srmEGLGetContextPriorityString(EGLint priority);
+
+// TODO: Add doc
+EGLImage srmEGLCreateImageFromDMA(SRMDevice *device, const SRMBufferDMAData *dma);
 
 /**
  * @}

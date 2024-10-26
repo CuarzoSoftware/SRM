@@ -531,7 +531,7 @@ static UInt8 flipPage(SRMConnector *connector)
     UInt32 p = data->dumbBuffers[b].pitch;
     UInt32 s = data->dumbBuffers[b].bpp/8;
 
-    UInt8 useBufferRead = data->buffers[b] && data->buffers[b]->map && data->buffers[b]->modifiers[0] == DRM_FORMAT_MOD_LINEAR;
+    UInt8 useBufferRead = data->buffers[b] && data->buffers[b]->map && data->buffers[b]->dma.modifiers[0] == DRM_FORMAT_MOD_LINEAR;
 
     if (useBufferRead)
     {

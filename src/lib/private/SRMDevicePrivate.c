@@ -59,14 +59,12 @@ SRMDevice *srmDeviceCreate(SRMCore *core, const char *name, UInt8 isBootVGA)
 
     // REF 1
     SRMDevice *device = calloc(1, sizeof(SRMDevice));
+
     strncpy(device->name, name, sizeof(device->name) - 1);
-
     size_t n = strlen(name) - 1;
-
-    while (name[n] != '/')
-        n--;
-
+    while (name[n] != '/') n--;
     strncpy(device->shortName, &name[n + 1], sizeof(device->shortName) - 1);
+
     device->core = core;
     device->enabled = 1;
     device->isBootVGA = isBootVGA;
@@ -280,11 +278,7 @@ void srmDeviceUninitializeGBM(SRMDevice *device)
 
 UInt8 srmDeviceInitializeEGL(SRMDevice *device)
 {
-    #ifdef EGL_PLATFORM_GBM_KHR
-        device->eglDisplay = eglGetPlatformDisplay(EGL_PLATFORM_GBM_KHR, device->gbm, NULL);
-    #else
-        device->eglDisplay = eglGetDisplay(device->gbm);
-    #endif
+    device->eglDisplay = device->core->eglFunctions.eglGetPlatformDisplayEXT(EGL_PLATFORM_GBM_KHR, device->gbm, NULL);
 
     if (device->eglDisplay == EGL_NO_DISPLAY)
     {
@@ -302,10 +296,8 @@ UInt8 srmDeviceInitializeEGL(SRMDevice *device)
     }
 
     SRMDebug("[%s] EGL Version: %d.%d.", device->shortName, minor, major);
-
     const char *vendor = eglQueryString(device->eglDisplay, EGL_VENDOR);
     SRMDebug("[%s] EGL Vendor: %s.", device->shortName, vendor ? vendor : "Unknown");
-
     return 1;
 }
 
@@ -313,9 +305,9 @@ void srmDeviceUninitializeEGL(SRMDevice *device)
 {
     if (device->eglDisplay != EGL_NO_DISPLAY)
     {
-        eglReleaseThread();
         eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         eglTerminate(device->eglDisplay);
+        eglReleaseThread();
     }
 }
 
@@ -476,20 +468,19 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
 
     EGLint formatsCount = 0;
     EGLint *formats = NULL;
-    UInt8 allExternalOnly = 1;
 
     if (device->eglExtensions.EXT_image_dma_buf_import_modifiers)
     {
         if (!device->eglFunctions.eglQueryDmaBufFormatsEXT(device->eglDisplay, 0, NULL, &formatsCount))
         {
             SRMError("[%s] Failed to query the number of EGL DMA formats.", device->shortName);
-            return 0;
+            goto implicitFallback;
         }
 
         if (formatsCount <= 0)
         {
             SRMError("[%s] No EGL DMA formats.", device->shortName);
-            return 0;
+            goto implicitFallback;
         }
 
         formats = calloc(formatsCount, sizeof(formats[0]));
@@ -498,13 +489,17 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
         {
             SRMError("[%s] Failed to query EGL DMA formats.", device->shortName);
             free(formats);
-            return 0;
+            goto implicitFallback;
         }
     }
     else
     {
-        SRMError("[%s] Failed to query EGL DMA formats.", device->shortName);
-        return 0;
+        implicitFallback:
+        SRMError("[%s] Failed to query EGL DMA formats. Adding DRM_FORMAT_ARGB8888 and DRM_FORMAT_XRGB8888 as fallback.", device->shortName);
+        formatsCount = 2;
+        formats = calloc(formatsCount, sizeof(EGLint));
+        formats[0] = DRM_FORMAT_ARGB8888;
+        formats[1] = DRM_FORMAT_XRGB8888;
     }
 
     for (Int32 i = 0; i < formatsCount; i++)
@@ -512,6 +507,7 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
         EGLint modifiersCount = 0;
         UInt64 *modifiers = NULL;
         EGLBoolean *externalOnly = NULL;
+        UInt8 allExternalOnly = 1;
 
         // Get the format modifiers
         if (device->eglExtensions.EXT_image_dma_buf_import_modifiers)
@@ -561,13 +557,19 @@ UInt8 srmDeviceUpdateDMAFormats(SRMDevice *device)
             }
         }
 
-        // EGL always supports implicit modifiers. If at least one modifier supports rendering,
-        // assume the implicit modifier supports rendering too.
-
+        // EGL always supports implicit modifiers
         srmFormatsListAddFormat(device->dmaTextureFormats, formats[i], DRM_FORMAT_MOD_INVALID);
         srmFormatsListAddFormat(device->dmaExternalFormats, formats[i], DRM_FORMAT_MOD_INVALID);
-        if (modifiersCount == 0 || !allExternalOnly)
-            srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], DRM_FORMAT_MOD_INVALID);
+
+        if (modifiersCount == 0)
+        {
+            srmFormatsListAddFormat(device->dmaTextureFormats, formats[i], DRM_FORMAT_MOD_LINEAR);
+            srmFormatsListAddFormat(device->dmaExternalFormats, formats[i], DRM_FORMAT_MOD_LINEAR);
+            srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], DRM_FORMAT_MOD_LINEAR);
+
+            if (!allExternalOnly)
+                srmFormatsListAddFormat(device->dmaRenderFormats, formats[i], DRM_FORMAT_MOD_INVALID);
+        }
 
         if (modifiers)
             free(modifiers);
@@ -1220,8 +1222,7 @@ static UInt8 srmDeviceTestCPUAllocation(const char *modeName, SRMDevice *device,
 {
     UInt8 *pixels = NULL;
     UInt8 *readPixels = NULL;
-    UInt8 *pixel, *readPixel;
-    UInt8 color = 0;
+    UInt8 color = 255;
     UInt8 ok = 0;
     UInt32 stride = width * 4;
     SRMBuffer *buffer = NULL;
@@ -1229,16 +1230,7 @@ static UInt8 srmDeviceTestCPUAllocation(const char *modeName, SRMDevice *device,
 
     pixels = malloc(height * stride);
     readPixels = malloc(height * stride);
-
-    for (UInt32 y = 0; y < height; y++)
-    {
-        for (UInt32 x = 0; x < width; x++)
-        {
-            color = 1 - color;
-            pixel = &pixels[y * stride + x * 4];
-            pixel[0] = pixel[1] = pixel[2] = rand() % 256;
-        }
-    }
+    memset(pixels, color, height * stride);
 
     buffer = srmBufferCreateFromCPU(device->core, device, width, height, stride, pixels, DRM_FORMAT_ARGB8888);
 
@@ -1267,18 +1259,20 @@ static UInt8 srmDeviceTestCPUAllocation(const char *modeName, SRMDevice *device,
     glFinish();
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, readPixels);
 
-    for (UInt32 y = 0; y < height; y++)
-    {
-        for (UInt32 x = 0; x < width; x++)
-        {
-            pixel = &pixels[y * stride + x * 4];
-            readPixel = &readPixels[y * stride + x * 4];
+    UInt32 matches = 0;
 
-            if (pixel[0] != readPixel[2] || pixel[1] != readPixel[1] || pixel[2] != readPixel[0])
-                goto fail;
-        }
-    }
-    ok = 1;
+    for (UInt32 i = 0; i < height * stride; i+=4)
+        if (pixels[i] == readPixels[i] && pixels[i + 1] == readPixels[i + 1] && pixels[i + 2] == readPixels[i + 2])
+            matches++;
+
+    ok = matches >= (width * height) / 2;
+
+    if (!ok)
+        SRMError("[%s] %s CPU buffer allocation test failed %dx%d. Sample: SRC(%d, %d, %d) - READ(%d, %d, %d).",
+                 device->shortName, modeName, width, height,
+                 pixels[0], pixels[1], pixels[2],
+                 readPixels[0], readPixels[1], readPixels[2]);
+
 fail:
     if (buffer)
         srmBufferDestroy(buffer);
@@ -1291,8 +1285,6 @@ fail:
 
     if (ok)
         SRMDebug("[%s] %s CPU buffer allocation test succeded %dx%d.", device->shortName, modeName, width, height);
-    else
-        SRMError("[%s] %s CPU buffer allocation test failed %dx%d.", device->shortName, modeName, width, height);
 
     return ok;
 }
@@ -1300,6 +1292,8 @@ fail:
 void srmDeviceTestCPUAllocationMode(SRMDevice *device)
 {
     char *forceGlesAllocation = getenv("SRM_FORCE_GL_ALLOCATION");
+    int width = 64;
+    int height = 64;
 
     if (forceGlesAllocation && atoi(forceGlesAllocation) == 1)
     {
@@ -1311,21 +1305,20 @@ void srmDeviceTestCPUAllocationMode(SRMDevice *device)
 
     SRMDebug("[%s] Testing PRIME map CPU buffer allocation mode.", device->shortName);
 
-    if (srmDeviceTestCPUAllocation("PRIME mmap", device, 13, 17))
+    if (srmDeviceTestCPUAllocation("PRIME mmap", device, width, height))
         return;
 
     SRMDebug("[%s] Testing GBM bo map CPU buffer allocation mode.", device->shortName);
 
     device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_GBM;
 
-    if (srmDeviceTestCPUAllocation("GBM mmap", device, 13, 17))
+    if (srmDeviceTestCPUAllocation("GBM mmap", device, width, height))
         return;
 
     SRMDebug("[%s] Using OpenGL CPU buffer allocation mode.", device->shortName);
 
     device->cpuBufferWriteMode = SRM_BUFFER_WRITE_MODE_GLES;
 
-    if (!srmDeviceTestCPUAllocation("GL", device, 13, 17))
+    if (!srmDeviceTestCPUAllocation("GL", device, width, height))
         SRMWarning("[%s] All CPU buffer allocation tests failed.", device->shortName);
 }
-

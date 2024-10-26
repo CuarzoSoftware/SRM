@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <private/SRMBufferPrivate.h>
 #include <private/SRMDevicePrivate.h>
 
@@ -24,10 +23,10 @@ SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator)
     buffer->refCount = 1;
 
     for (int i = 0; i < SRM_MAX_PLANES; i++)
-        buffer->fds[i] = -1;
+        buffer->dma.fds[i] = -1;
 
     buffer->textures = srmListCreate();
-    buffer->modifiers[0] = DRM_FORMAT_MOD_INVALID;
+    buffer->dma.modifiers[0] = DRM_FORMAT_MOD_INVALID;
 
     if (allocator)
         buffer->allocator = allocator;
@@ -94,22 +93,9 @@ void *srmBufferMapFD(Int32 fd, size_t len, UInt32 *caps)
 struct gbm_bo *srmBufferCreateLinearBO(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format)
 {
     UInt64 mod = DRM_FORMAT_MOD_LINEAR;
-    struct gbm_bo *bo = NULL;
+    struct gbm_bo *bo;
 
-    bo = gbm_bo_create_with_modifiers2(
-        dev, width, height, format, &mod, 1, GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR | GBM_BO_USE_SCANOUT);
-
-    if (bo)
-        return bo;
-
-    bo = gbm_bo_create_with_modifiers2(
-        dev, width, height, format, &mod, 1, GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
-
-    if (bo)
-        return bo;
-
-    bo = gbm_bo_create_with_modifiers(
-        dev, width, height, format, &mod, 1);
+    bo = gbm_bo_create_with_modifiers(dev, width, height, format, &mod, 1);
 
     if (bo)
         return bo;
@@ -161,15 +147,7 @@ struct gbm_bo *srmBufferCreateGBMBo(struct gbm_device *dev, UInt32 width, UInt32
     struct gbm_bo *bo = NULL;
 
     if (modifier == DRM_FORMAT_MOD_INVALID)
-    {
         return gbm_bo_create(dev, width, height, format, flags);
-    }
-    else if (modifier == DRM_FORMAT_MOD_LINEAR)
-    {
-        bo = gbm_bo_create(dev, width, height, format, flags | GBM_BO_USE_LINEAR);
-
-        if (bo) return bo;
-    }
 
     bo = gbm_bo_create_with_modifiers2(
         dev, width, height, format, &modifier, 1, flags);
@@ -179,5 +157,60 @@ struct gbm_bo *srmBufferCreateGBMBo(struct gbm_device *dev, UInt32 width, UInt32
     bo = gbm_bo_create_with_modifiers(
         dev, width, height, format, &modifier, 1);
 
+    if (bo) return bo;
+
+    if (modifier == DRM_FORMAT_MOD_LINEAR)
+        bo = gbm_bo_create(dev, width, height, format, flags | GBM_BO_USE_LINEAR);
+
     return bo;
+}
+
+void srmBufferFillParamsFromBO(SRMBuffer *buffer, struct gbm_bo *bo)
+{
+    buffer->dma.num_fds = gbm_bo_get_plane_count(bo);
+    buffer->bpp = gbm_bo_get_bpp(bo);
+    buffer->pixelSize = buffer->bpp/8;
+    buffer->dma.format = gbm_bo_get_format(bo);
+    buffer->dma.width = gbm_bo_get_width(bo);
+    buffer->dma.height = gbm_bo_get_height(bo);
+
+    for (UInt32 i = 0; i < buffer->dma.num_fds; i++)
+    {
+        buffer->dma.modifiers[i] = gbm_bo_get_modifier(bo);
+        buffer->dma.strides[i] = gbm_bo_get_stride_for_plane(bo, i);
+        buffer->dma.offsets[i] = gbm_bo_get_offset(bo, i);
+    }
+}
+
+void srmBufferSetTargetFromFormat(SRMBuffer *buffer)
+{
+    if (srmFormatIsInList(buffer->allocator->dmaExternalFormats, buffer->dma.format, buffer->dma.modifiers[0]))
+    {
+        if (!buffer->allocator->glExtensions.OES_EGL_image_external)
+        {
+            SRMError("Buffer has GL_TEXTURE_EXTERNAL_OES target but OES_EGL_image_external is not available.");
+            goto fail;
+        }
+
+        buffer->target = GL_TEXTURE_EXTERNAL_OES;
+    }
+    else if (srmFormatIsInList(buffer->allocator->dmaTextureFormats, buffer->dma.format, buffer->dma.modifiers[0]))
+    {
+        if (!buffer->allocator->glExtensions.OES_EGL_image)
+        {
+            SRMError("Buffer has GL_TEXTURE_2D target but OES_EGL_image is not available.");
+            goto fail;
+        }
+
+        buffer->target = GL_TEXTURE_2D;
+    }
+    else
+    {
+        SRMError("Buffer has GL_TEXTURE_2D target but OES_EGL_image is not available.");
+        goto fail;
+    }
+
+    return;
+fail:
+    buffer->target = GL_NONE;
 }

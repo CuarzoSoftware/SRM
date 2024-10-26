@@ -877,7 +877,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
     {
         ret = drmModeAddFB2WithModifiers(
             connector->device->fd,
-            buffer->width, buffer->height,
+            buffer->dma.width, buffer->dma.height,
             buffer->scanout.fmt.format, handles, pitches, offsets, modifiers,
             &buffer->scanout.fb, DRM_MODE_FB_MODIFIERS);
     }
@@ -898,7 +898,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
         ret = drmModeAddFB2(
             connector->device->fd,
-            buffer->width, buffer->height,
+            buffer->dma.width, buffer->dma.height,
             buffer->scanout.fmt.format, handles, pitches, offsets,
             &buffer->scanout.fb, DRM_MODE_FB_MODIFIERS);
     }
@@ -923,7 +923,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 
         ret = drmModeAddFB(
             connector->device->fd,
-            buffer->width, buffer->height,
+            buffer->dma.width, buffer->dma.height,
             depth, bpp, pitches[0], handles[0],
             &buffer->scanout.fb);
     }

@@ -857,7 +857,7 @@ static UInt8 flipPage(SRMConnector *connector)
     UInt8 mapEnabled = connector->device->glExtensions.EXT_texture_format_BGRA8888 &&
                        data->rendererBuffers[data->currentBufferIndex] &&
                        data->rendererBuffers[data->currentBufferIndex]->map &&
-                       data->rendererBuffers[data->currentBufferIndex]->modifiers[0] == DRM_FORMAT_MOD_LINEAR;
+                       data->rendererBuffers[data->currentBufferIndex]->dma.modifiers[0] == DRM_FORMAT_MOD_LINEAR;
 
     SRMBox defaultDamage =
     {
@@ -939,14 +939,14 @@ static UInt8 flipPage(SRMConnector *connector)
     if (mapEnabled)
     {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, data->rendererBuffers[data->currentBufferIndex]->strides[0]/4);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, data->rendererBuffers[data->currentBufferIndex]->dma.strides[0]/4);
 
         UInt8 *mp, *buff;
         for (UInt32 i = 0; i < damageCount; i++)
         {
             mp = data->rendererBuffers[data->currentBufferIndex]->map;
             buff = &mp[data->rendererBuffers[
-                data->currentBufferIndex]->offsets[0]
+                data->currentBufferIndex]->dma.offsets[0]
             ];
 
             glPixelStorei(GL_UNPACK_SKIP_PIXELS, damage[i].x1);

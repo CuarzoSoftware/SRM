@@ -227,25 +227,36 @@ static UInt8 createDRMFramebuffers(SRMConnector *connector)
 
     for (UInt32 i = 0; i < data->buffersCount; i++)
     {
-        if (connector->currentFormat.modifier != DRM_FORMAT_MOD_LINEAR)
+        UInt32 boHandles[4] = { 0 };
+        UInt32 pitches[4] = { 0 };
+        UInt32 offsets[4] = { 0 };
+        UInt64 mods[4] = { 0 };
+
+        for (int plane = 0; plane < 4; plane++)
         {
-            UInt32 boHandles[4] = { 0 };
-            boHandles[0] = gbm_bo_get_handle_for_plane(data->rendererBOs[i], 0).u32;
+            if (plane < gbm_bo_get_plane_count(data->rendererBOs[i]))
+            {
+                boHandles[plane] = gbm_bo_get_handle_for_plane(data->rendererBOs[i], plane).u32;
+                pitches[plane] = gbm_bo_get_stride_for_plane(data->rendererBOs[i], plane);
+                offsets[plane] = gbm_bo_get_offset(data->rendererBOs[i], plane);
+                mods[plane] = gbm_bo_get_modifier(data->rendererBOs[i]);
+            }
+            else
+            {
+                boHandles[plane] = 0;
+                pitches[plane] = 0;
+                offsets[plane] = 0;
+                mods[plane] = 0;
+            }
+        }
 
-            UInt32 pitches[4] = { 0 };
-            pitches[0] = gbm_bo_get_stride_for_plane(data->rendererBOs[i], 0);
-
-            UInt32 offsets[4] = { 0 };
-            offsets[0] = gbm_bo_get_offset(data->rendererBOs[i], 0);
-
-            UInt64 mods[4] = { 0 };
-            mods[0] = connector->currentFormat.modifier;
-
+        if (connector->currentFormat.modifier != DRM_FORMAT_MOD_INVALID)
+        {
             ret = drmModeAddFB2WithModifiers(
                 connector->device->fd,
                 connector->currentMode->info.hdisplay,
                 connector->currentMode->info.vdisplay,
-                connector->currentFormat.format,
+                gbm_bo_get_format(data->rendererBOs[i]),
                 boHandles,
                 pitches,
                 offsets,
@@ -253,9 +264,33 @@ static UInt8 createDRMFramebuffers(SRMConnector *connector)
                 &data->drmFBs[i],
                 DRM_MODE_FB_MODIFIERS);
 
-            if (ret == 0)
-                goto skipLegacy;
+            if (ret || data->drmFBs[i] == 0)
+            {
+                SRMError("[%s] [%s] [%s MODE] Failed o create DRM framebuffer %d with drmModeAddFB2WithModifiers, trying drmModeAddFB2. DRM Error: %d.",
+                         connector->device->shortName, connector->name, MODE_NAME, i, ret);
+            }
+            else
+                continue;
         }
+
+        ret = drmModeAddFB2(
+            connector->device->fd,
+            connector->currentMode->info.hdisplay,
+            connector->currentMode->info.vdisplay,
+            gbm_bo_get_format(data->rendererBOs[i]),
+            boHandles,
+            pitches,
+            offsets,
+            &data->drmFBs[i],
+            0);
+
+        if (ret)
+        {
+            SRMError("[%s] [%s] [%s MODE] Failed o create DRM framebuffer %d with drmModeAddFB2, trying drmModeAddFB. DRM Error: %d.",
+                     connector->device->shortName, connector->name, MODE_NAME, i, ret);
+        }
+        else
+            continue;
 
         ret = drmModeAddFB(
             connector->device->fd,
@@ -275,7 +310,6 @@ static UInt8 createDRMFramebuffers(SRMConnector *connector)
         }
     }
 
-skipLegacy:
     data->currentBufferIndex = 0;
     return 1;
 }
@@ -384,8 +418,10 @@ fail:
 
     if (connector->allowModifiers)
     {
-        SRMError("[%s] [%s] [%s MODE] Failed to initialize with explicit modifiers, falling back to implicit modifiers.",
-            connector->device->shortName, connector->name, MODE_NAME);
+        SRMError("[%s] [%s] [%s MODE] Failed to initialize with explicit modifiers %s - %s, falling back to implicit modifiers.",
+            connector->device->shortName, connector->name, MODE_NAME,
+            drmGetFormatName(connector->currentFormat.format),
+            drmGetFormatModifierName(connector->currentFormat.modifier));
         connector->allowModifiers = 0;
         goto retry;
     }

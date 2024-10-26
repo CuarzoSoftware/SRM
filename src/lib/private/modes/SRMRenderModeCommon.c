@@ -910,6 +910,7 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
     }
 }
 
+
 Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
 {
     Int32 ret;
@@ -920,40 +921,12 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
         drmModeAtomicReqPtr req;
         req = drmModeAtomicAlloc();
 
-        if (connector->currentModeBlobId)
-        {
-            drmModeDestroyPropertyBlob(connector->device->fd, connector->currentModeBlobId);
-            connector->currentModeBlobId = 0;
-        }
-
-        drmModeCreatePropertyBlob(connector->device->fd,
-                                  &connector->currentMode->info,
-                                  sizeof(drmModeModeInfo),
-                                  &connector->currentModeBlobId);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCrtc->id,
-                                 connector->currentCrtc->propIDs.MODE_ID,
-                                 connector->currentModeBlobId);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentCrtc->id,
-                                 connector->currentCrtc->propIDs.ACTIVE,
-                                 1);
-
-        // Connector
-
-        drmModeAtomicAddProperty(req,
-                                 connector->id,
-                                 connector->propIDs.CRTC_ID,
-                                 connector->currentCrtc->id);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->id,
-                                 connector->propIDs.link_status,
-                                 DRM_MODE_LINK_STATUS_GOOD);
-
         // Plane
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentPrimaryPlane->id,
+                                 connector->currentPrimaryPlane->propIDs.FB_ID,
+                                 fb);
 
         drmModeAtomicAddProperty(req,
                                  connector->currentPrimaryPlane->id,
@@ -982,11 +955,6 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
 
         drmModeAtomicAddProperty(req,
                                  connector->currentPrimaryPlane->id,
-                                 connector->currentPrimaryPlane->propIDs.FB_ID,
-                                 fb);
-
-        drmModeAtomicAddProperty(req,
-                                 connector->currentPrimaryPlane->id,
                                  connector->currentPrimaryPlane->propIDs.SRC_X,
                                  0);
 
@@ -1004,6 +972,41 @@ Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb)
                                  connector->currentPrimaryPlane->id,
                                  connector->currentPrimaryPlane->propIDs.SRC_H,
                                  (UInt64)connector->currentMode->info.vdisplay << 16);
+
+        // CRTC
+
+        if (connector->currentModeBlobId)
+        {
+            drmModeDestroyPropertyBlob(connector->device->fd, connector->currentModeBlobId);
+            connector->currentModeBlobId = 0;
+        }
+
+        drmModeCreatePropertyBlob(connector->device->fd,
+                                  &connector->currentMode->info,
+                                  sizeof(drmModeModeInfo),
+                                  &connector->currentModeBlobId);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentCrtc->id,
+                                 connector->currentCrtc->propIDs.MODE_ID,
+                                 connector->currentModeBlobId);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->currentCrtc->id,
+                                 connector->currentCrtc->propIDs.ACTIVE,
+                                 1);
+        // Connector
+
+        drmModeAtomicAddProperty(req,
+                                 connector->id,
+                                 connector->propIDs.CRTC_ID,
+                                 connector->currentCrtc->id);
+
+        drmModeAtomicAddProperty(req,
+                                 connector->id,
+                                 connector->propIDs.link_status,
+                                 DRM_MODE_LINK_STATUS_GOOD);
+
 
         UInt32 prevCursorIndex = connector->cursorIndex;
         srmRenderModeCommitAtomicChanges(connector, req, 0);
@@ -1422,7 +1425,7 @@ void srmRenderModeCommonSyncState(SRMConnector *connector)
 void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
 {
     connector->currentFormat.format = DRM_FORMAT_XRGB8888;
-    connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
+    connector->currentFormat.modifier = DRM_FORMAT_MOD_INVALID;
 
     if (!connector->device->clientCapAtomic || !connector->device->capAddFb2Modifiers || !connector->allowModifiers)
         return;
@@ -1433,8 +1436,7 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
 
         if (fmt->format == DRM_FORMAT_XRGB8888
             && fmt->modifier != DRM_FORMAT_MOD_LINEAR
-            && fmt->modifier != DRM_FORMAT_MOD_INVALID
-            && srmFormatIsInList(srmDeviceGetDMATextureFormats(connector->device), fmt->format, fmt->modifier))
+            && srmFormatIsInList(srmDeviceGetDMARenderFormats(connector->device), fmt->format, fmt->modifier))
         {
             SRMDebug("[%s] [%s] Using format: %s - %s.",
                 connector->device->shortName,
@@ -1449,7 +1451,7 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
 
 void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struct gbm_surface **surface)
 {
-    if (connector->currentFormat.modifier != DRM_FORMAT_MOD_LINEAR)
+    if (connector->currentFormat.modifier != DRM_FORMAT_MOD_INVALID)
     {
         *surface = srmBufferCreateGBMSurface(
             connector->device->gbm,
@@ -1462,7 +1464,7 @@ void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struc
         if (*surface)
             return;
 
-        connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
+        connector->currentFormat.modifier = DRM_FORMAT_MOD_INVALID;
     }
 
     *surface = srmBufferCreateGBMSurface(
@@ -1476,7 +1478,7 @@ void srmRenderModeCommonCreateConnectorGBMSurface(SRMConnector *connector, struc
 
 void srmRenderModeCommonCreateConnectorGBMBo(SRMConnector *connector, struct gbm_bo **bo)
 {
-    if (connector->currentFormat.modifier != DRM_FORMAT_MOD_LINEAR)
+    if (connector->currentFormat.modifier != DRM_FORMAT_MOD_INVALID)
     {
         *bo = srmBufferCreateGBMBo(
             connector->device->gbm,
@@ -1489,7 +1491,7 @@ void srmRenderModeCommonCreateConnectorGBMBo(SRMConnector *connector, struct gbm
         if (*bo)
             return;
 
-        connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
+        connector->currentFormat.modifier = DRM_FORMAT_MOD_INVALID;
     }
 
     *bo = srmBufferCreateGBMBo(
@@ -1497,7 +1499,7 @@ void srmRenderModeCommonCreateConnectorGBMBo(SRMConnector *connector, struct gbm
         connector->currentMode->info.hdisplay,
         connector->currentMode->info.vdisplay,
         GBM_FORMAT_XRGB8888,
-        DRM_FORMAT_MOD_INVALID,
+        connector->currentFormat.modifier,
         GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
 }
 

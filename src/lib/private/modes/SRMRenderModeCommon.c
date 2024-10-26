@@ -1530,7 +1530,7 @@ void srmRenderModeCommonCreateSync(SRMConnector *connector)
 
     SRMEGLDeviceFunctions *f = &connector->device->eglFunctions;
 
-    if (!connector->device->clientCapAtomic || !f->eglDupNativeFenceFDANDROID)
+    if (!connector->device->clientCapAtomic || !connector->currentPrimaryPlane->propIDs.IN_FENCE_FD || !f->eglDupNativeFenceFDANDROID)
         goto fallback;
 
     static const EGLint attribs[] =
@@ -1586,4 +1586,86 @@ void srmRenderModeCommonDestroySync(SRMConnector *connector)
         close(connector->fenceFD);
         connector->fenceFD = -1;
     }
+}
+
+UInt8 srmRenderModeCommonCreateDRMFBsFromBOs(SRMConnector *connector, const char *mode, UInt32 count, struct gbm_bo **bos, UInt32 *fbs)
+{
+    Int32 ret;
+
+    for (UInt32 i = 0; i < count; i++)
+    {
+        UInt32 boHandles[4] = { 0 };
+        UInt32 pitches[4] = { 0 };
+        UInt32 offsets[4] = { 0 };
+        UInt64 mods[4] = { 0 };
+
+        for (int plane = 0; plane < gbm_bo_get_plane_count(bos[i]); plane++)
+        {
+            boHandles[plane] = gbm_bo_get_handle_for_plane(bos[i], plane).u32;
+            pitches[plane] = gbm_bo_get_stride_for_plane(bos[i], plane);
+            offsets[plane] = gbm_bo_get_offset(bos[i], plane);
+            mods[plane] = gbm_bo_get_modifier(bos[i]);
+        }
+
+        if (connector->currentFormat.modifier != DRM_FORMAT_MOD_INVALID)
+        {
+            ret = drmModeAddFB2WithModifiers(
+                connector->device->fd,
+                connector->currentMode->info.hdisplay,
+                connector->currentMode->info.vdisplay,
+                gbm_bo_get_format(bos[i]),
+                boHandles,
+                pitches,
+                offsets,
+                mods,
+                &fbs[i],
+                DRM_MODE_FB_MODIFIERS);
+
+            if (ret)
+            {
+                SRMError("[%s] [%s] [%s MODE] Failed o create DRM framebuffer %d with drmModeAddFB2WithModifiers, trying drmModeAddFB2. DRM Error: %d.",
+                         connector->device->shortName, connector->name, mode, i, ret);
+            }
+            else
+                continue;
+        }
+
+        ret = drmModeAddFB2(
+            connector->device->fd,
+            connector->currentMode->info.hdisplay,
+            connector->currentMode->info.vdisplay,
+            gbm_bo_get_format(bos[i]),
+            boHandles,
+            pitches,
+            offsets,
+            &fbs[i],
+            0);
+
+        if (ret)
+        {
+            SRMError("[%s] [%s] [%s MODE] Failed o create DRM framebuffer %d with drmModeAddFB2, trying drmModeAddFB. DRM Error: %d.",
+                     connector->device->shortName, connector->name, mode, i, ret);
+        }
+        else
+            continue;
+
+        ret = drmModeAddFB(
+            connector->device->fd,
+            connector->currentMode->info.hdisplay,
+            connector->currentMode->info.vdisplay,
+            24,
+            gbm_bo_get_bpp(bos[i]),
+            gbm_bo_get_stride(bos[i]),
+            gbm_bo_get_handle(bos[i]).u32,
+            &fbs[i]);
+
+        if (ret)
+        {
+            SRMError("[%s] [%s] [%s MODE] Failed o create DRM framebuffer %d. DRM Error: %d.",
+                     connector->device->shortName, connector->name, mode, i, ret);
+            return 0;
+        }
+    }
+
+    return 1;
 }

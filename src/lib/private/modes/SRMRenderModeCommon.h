@@ -58,6 +58,7 @@ void srmRenderModeCommonCreateSync(SRMConnector *connector);
 void srmRenderModeCommonDestroySync(SRMConnector *connector);
 struct gbm_bo *srmRenderModeCommonSurfaceLockFrontBufferSafe(struct gbm_surface *surface);
 void srmRenderModeCommonSurfaceReleaseBufferSafe(struct gbm_surface *surface, struct gbm_bo *bo);
+UInt8 srmRenderModeCommonCreateDRMFBsFromBOs(SRMConnector *connector, const char *mode, UInt32 count, struct gbm_bo **bos, UInt32 *fbs);
 
 #ifdef __cplusplus
 }

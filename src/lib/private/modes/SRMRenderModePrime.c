@@ -518,59 +518,9 @@ static UInt8 createDRMFramebuffers(SRMConnector *connector)
     if (data->c.drmFBs[0])
         return 1; // Already created
 
-    Int32 ret;
+    if (!srmRenderModeCommonCreateDRMFBsFromBOs(connector, MODE_NAME, data->c.buffersCount, data->connectorBOs, data->c.drmFBs))
+        return 0;
 
-    for (UInt32 i = 0; i < data->c.buffersCount; i++)
-    {
-        if (connector->currentFormat.modifier != DRM_FORMAT_MOD_LINEAR)
-        {
-            UInt32 boHandles[4] = { 0 };
-            boHandles[0] = gbm_bo_get_handle_for_plane(data->connectorBOs[i], 0).u32;
-
-            UInt32 pitches[4] = { 0 };
-            pitches[0] = gbm_bo_get_stride_for_plane(data->connectorBOs[i], 0);
-
-            UInt32 offsets[4] = { 0 };
-            offsets[0] = gbm_bo_get_offset(data->connectorBOs[i], 0);
-
-            UInt64 mods[4] = { 0 };
-            mods[0] = connector->currentFormat.modifier;
-
-            ret = drmModeAddFB2WithModifiers(connector->device->fd,
-                                             connector->currentMode->info.hdisplay,
-                                             connector->currentMode->info.vdisplay,
-                                             connector->currentFormat.format,
-                                             boHandles,
-                                             pitches,
-                                             offsets,
-                                             mods,
-                                             &data->c.drmFBs[i],
-                                             DRM_MODE_FB_MODIFIERS);
-
-            if (ret == 0)
-                goto skipLegacy;
-        }
-
-        ret = drmModeAddFB(connector->device->fd,
-                           connector->currentMode->info.hdisplay,
-                           connector->currentMode->info.vdisplay,
-                           24,
-                           gbm_bo_get_bpp(data->connectorBOs[i]),
-                           gbm_bo_get_stride(data->connectorBOs[i]),
-                           gbm_bo_get_handle(data->connectorBOs[i]).u32,
-                           &data->c.drmFBs[i]);
-
-        if (ret)
-        {
-            SRMError("[%s] [%s] [%s MODE] Failed o create DRM framebuffer %d.",
-                     connector->device->shortName,
-                     connector->device->name, MODE_NAME, i);
-            return 0;
-        }
-
-    }
-
-skipLegacy:
     data->c.currentBufferIndex = 0;
     return 1;
 }

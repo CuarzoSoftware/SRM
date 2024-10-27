@@ -332,6 +332,7 @@ UInt8 srmDeviceUpdateEGLExtensions(SRMDevice *device)
     device->eglExtensions.KHR_image_pixmap = srmEGLHasExtension(extensions, "EGL_KHR_image_pixmap");
     device->eglExtensions.KHR_gl_texture_2D_image = srmEGLHasExtension(extensions, "EGL_KHR_gl_texture_2D_image");
     device->eglExtensions.KHR_gl_renderbuffer_image = srmEGLHasExtension(extensions, "EGL_KHR_gl_renderbuffer_image");
+    device->eglExtensions.KHR_wait_sync = srmEGLHasExtension(extensions, "EGL_KHR_wait_sync");
     device->eglExtensions.KHR_fence_sync = srmEGLHasExtension(extensions, "EGL_KHR_fence_sync");
     device->eglExtensions.ANDROID_native_fence_sync = srmEGLHasExtension(extensions, "EGL_ANDROID_native_fence_sync");
 
@@ -424,14 +425,14 @@ UInt8 srmDeviceUpdateEGLFunctions(SRMDevice *device)
 
     const UInt8 hasEGLSync = device->glExtensions.OES_EGL_sync &&
                              device->eglExtensions.KHR_fence_sync &&
+                             device->eglExtensions.KHR_wait_sync &&
                              device->eglExtensions.ANDROID_native_fence_sync;
 
     if (hasEGLSync)
     {
         device->eglFunctions.eglCreateSyncKHR = (PFNEGLCREATESYNCKHRPROC)eglGetProcAddress("eglCreateSyncKHR");
         device->eglFunctions.eglDestroySyncKHR = (PFNEGLDESTROYSYNCKHRPROC)eglGetProcAddress("eglDestroySyncKHR");
-        device->eglFunctions.eglClientWaitSyncKHR = (PFNEGLCLIENTWAITSYNCKHRPROC)eglGetProcAddress("eglClientWaitSyncKHR");
-        device->eglFunctions.eglGetSyncAttribKHR = (PFNEGLGETSYNCATTRIBKHRPROC)eglGetProcAddress("eglGetSyncAttribKHR");
+        device->eglFunctions.eglWaitSyncKHR = (PFNEGLWAITSYNCKHRPROC)eglGetProcAddress("eglWaitSyncKHR");
         device->eglFunctions.eglDupNativeFenceFDANDROID = (PFNEGLDUPNATIVEFENCEFDANDROIDPROC)eglGetProcAddress("eglDupNativeFenceFDANDROID");
     }
 

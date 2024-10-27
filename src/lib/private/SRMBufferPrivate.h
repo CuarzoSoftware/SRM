@@ -60,6 +60,7 @@ struct SRMBufferStruct
     } scanout;
 
     // GL
+    EGLSyncKHR fence;
     GLenum target;
     GLint glInternalFormat;
     GLint glFormat;
@@ -77,6 +78,8 @@ struct gbm_surface *srmBufferCreateGBMSurface(struct gbm_device *dev, UInt32 wid
 struct gbm_bo *srmBufferCreateGBMBo(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags);
 void srmBufferFillParamsFromBO(SRMBuffer *buffer, struct gbm_bo *bo);
 void srmBufferSetTargetFromFormat(SRMBuffer *buffer);
+void srmBufferCreateSync(SRMBuffer *buffer);
+void srmBufferWaitSync(SRMBuffer *buffer);
 
 #ifdef __cplusplus
 }

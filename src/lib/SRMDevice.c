@@ -222,23 +222,25 @@ void srmDeviceMakeCurrent(SRMDevice *device)
 
 void srmDeviceSyncWait(SRMDevice *device)
 {
-    glFlush();
-    glFinish();
-    return;
-
-    if (device->eglFunctions.eglCreateSyncKHR && device->eglFunctions.eglClientWaitSyncKHR)
+    if (device->eglFunctions.eglDupNativeFenceFDANDROID)
     {
-        EGLSyncKHR sync = device->eglFunctions.eglCreateSyncKHR(device->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);
+        static const EGLint attribs[] =
+        {
+            EGL_SYNC_NATIVE_FENCE_FD_ANDROID, EGL_NO_NATIVE_FENCE_FD_ANDROID,
+            EGL_NONE,
+        };
+
+        EGLSyncKHR sync = device->eglFunctions.eglCreateSyncKHR(device->eglDisplay, EGL_SYNC_NATIVE_FENCE_ANDROID, attribs);
 
         if (sync == EGL_NO_SYNC_KHR)
             goto fallback;
 
         glFlush();
-        EGLint result = device->eglFunctions.eglClientWaitSyncKHR(device->eglDisplay, sync, 0, EGL_FOREVER_KHR);
+        EGLint result = device->eglFunctions.eglWaitSyncKHR(device->eglDisplay, sync, 0);
         device->eglFunctions.eglDestroySyncKHR(device->eglDisplay, sync);
 
-        if (result == EGL_CONDITION_SATISFIED_KHR)
-            return;
+        if (result != EGL_CONDITION_SATISFIED_KHR)
+            SRMWarning("[%s] srmDeviceSyncWait: eglWaitSyncKHR failed. Falling back to glFinish().", device->shortName);
     }
 
 fallback:

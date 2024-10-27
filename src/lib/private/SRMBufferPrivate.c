@@ -21,6 +21,7 @@ SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator)
     pthread_mutex_init(&buffer->mutex, NULL);
     buffer->core = core;
     buffer->refCount = 1;
+    buffer->fence = EGL_NO_SYNC_KHR;
 
     for (int i = 0; i < SRM_MAX_PLANES; i++)
         buffer->dma.fds[i] = -1;
@@ -213,4 +214,46 @@ void srmBufferSetTargetFromFormat(SRMBuffer *buffer)
     return;
 fail:
     buffer->target = GL_NONE;
+}
+
+// A valid EGLDisplay and EGLContext must be current before calling this function
+void srmBufferCreateSync(SRMBuffer *buffer)
+{
+    SRMEGLDeviceFunctions *f = &buffer->allocator->eglFunctions;
+
+    if (!f->eglDupNativeFenceFDANDROID)
+        goto fallback;
+
+    if (buffer->fence != EGL_NO_SYNC_KHR)
+    {
+        f->eglDestroySyncKHR(buffer->allocator->eglDisplay, buffer->fence);
+        buffer->fence = EGL_NO_SYNC_KHR;
+    }
+
+    static const EGLint attribs[] =
+    {
+        EGL_SYNC_NATIVE_FENCE_FD_ANDROID, EGL_NO_NATIVE_FENCE_FD_ANDROID,
+        EGL_NONE,
+    };
+
+    buffer->fence = f->eglCreateSyncKHR(buffer->allocator->eglDisplay, EGL_SYNC_NATIVE_FENCE_ANDROID, attribs);
+
+    if (buffer->fence == EGL_NO_SYNC_KHR)
+        goto fallback;
+
+    glFlush();
+    return;
+
+fallback:
+    glFinish();
+}
+
+void srmBufferWaitSync(SRMBuffer *buffer)
+{
+    if (buffer->fence == EGL_NO_SYNC_KHR)
+        return;
+
+    buffer->allocator->eglFunctions.eglWaitSyncKHR(buffer->allocator->eglDisplay, buffer->fence, 0);
+    buffer->allocator->eglFunctions.eglDestroySyncKHR(buffer->allocator->eglDisplay, buffer->fence);
+    buffer->fence = EGL_NO_SYNC_KHR;
 }

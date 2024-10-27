@@ -90,6 +90,7 @@ typedef struct SRMEGLDeviceExtensionsStruct
     UInt8 KHR_surfaceless_context;
     UInt8 IMG_context_priority;
     UInt8 KHR_fence_sync;
+    UInt8 KHR_wait_sync;
     UInt8 ANDROID_native_fence_sync;
 } SRMEGLDeviceExtensions;
 
@@ -106,8 +107,7 @@ typedef struct SRMEGLDeviceFunctionsStruct
     PFNGLEGLIMAGETARGETRENDERBUFFERSTORAGEOESPROC glEGLImageTargetRenderbufferStorageOES;
     PFNEGLCREATESYNCKHRPROC eglCreateSyncKHR;
     PFNEGLDESTROYSYNCKHRPROC eglDestroySyncKHR;
-    PFNEGLCLIENTWAITSYNCKHRPROC eglClientWaitSyncKHR;
-    PFNEGLGETSYNCATTRIBKHRPROC eglGetSyncAttribKHR;
+    PFNEGLWAITSYNCKHRPROC eglWaitSyncKHR;
     PFNEGLDUPNATIVEFENCEFDANDROIDPROC eglDupNativeFenceFDANDROID;
 } SRMEGLDeviceFunctions;
 

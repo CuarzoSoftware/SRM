@@ -222,6 +222,10 @@ void srmDeviceMakeCurrent(SRMDevice *device)
 
 void srmDeviceSyncWait(SRMDevice *device)
 {
+    glFlush();
+    glFinish();
+    return;
+
     if (device->eglFunctions.eglCreateSyncKHR && device->eglFunctions.eglClientWaitSyncKHR)
     {
         EGLSyncKHR sync = device->eglFunctions.eglCreateSyncKHR(device->eglDisplay, EGL_SYNC_FENCE_KHR, NULL);

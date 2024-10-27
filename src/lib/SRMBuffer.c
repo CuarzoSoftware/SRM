@@ -202,7 +202,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     if (pixels)
     {
-        glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / buffer->pixelSize);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / buffer->pixelSize);
         glTexImage2D(GL_TEXTURE_2D,
                      0,
                      glFmt->glInternalFormat,
@@ -231,13 +231,18 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     if (buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
     {
+        EGLint attribs[3];
+        attribs[0] = EGL_IMAGE_PRESERVED_KHR;
+        attribs[1] = EGL_TRUE;
+        attribs[2] = EGL_NONE;
+
         /* This is used to later get a gbm bo if the buffer is used for scanout */
         texture->image = buffer->allocator->eglFunctions.eglCreateImageKHR(
             eglGetCurrentDisplay(),
             eglGetCurrentContext(),
             EGL_GL_TEXTURE_2D_KHR,
             (EGLClientBuffer)(UInt64)texture->texture,
-            NULL);
+            attribs);
     }
 
     srmRestoreContext();

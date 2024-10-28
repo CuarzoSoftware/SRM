@@ -129,51 +129,9 @@ static UInt8 createRenderBuffers(SRMConnector *connector)
             return 0;
         }
 
-        data->rendererBOWrappers[i] = srmBufferCreateFromGBM(connector->device->core, data->rendererBOs[i]);
-
-        if (!data->rendererBOWrappers[i])
+        if (!srmBufferCreateRBFromBO(connector->device->core, data->rendererBOs[i], &data->rendererFBs[i], &data->rendererRBs[i], &data->rendererBOWrappers[i]))
         {
-            SRMError("[%s] [%s] [%s MODE] Failed to create SRMBuffer for renderbuffer %d.",
-                     connector->device->shortName, connector->name, MODE_NAME, i);
-            return 0;
-        }
-
-        EGLImage image = srmBufferGetEGLImage(connector->device, data->rendererBOWrappers[i]);
-
-        if (image == EGL_NO_IMAGE)
-        {
-            SRMError("[%s] [%s] [%s MODE] Failed to get EGLImage for renderbuffer %d.",
-                     connector->device->shortName, connector->name, MODE_NAME, i);
-            return 0;
-        }
-
-        glGenRenderbuffers(1, &data->rendererRBs[i]);
-
-        if (data->rendererRBs[i] == 0)
-        {
-            SRMError("[%s] [%s] [%s MODE] Failed to generate GL renderbuffer %d.",
-                     connector->device->shortName, connector->name, MODE_NAME, i);
-            return 0;
-        }
-
-        glBindRenderbuffer(GL_RENDERBUFFER, data->rendererRBs[i]);
-        connector->device->eglFunctions.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER, image);
-        glGenFramebuffers(1, &data->rendererFBs[i]);
-
-        if (data->rendererFBs[i] == 0)
-        {
-            SRMError("[%s] [%s] [%s MODE] Failed to generate GL framebuffer %d.",
-                     connector->device->shortName, connector->name, MODE_NAME, i);
-            return 0;
-        }
-
-        glBindFramebuffer(GL_FRAMEBUFFER, data->rendererFBs[i]);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, data->rendererRBs[i]);
-        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-
-        if (status != GL_FRAMEBUFFER_COMPLETE)
-        {
-            SRMError("[%s] [%s] [%s MODE] Incomplete GL framebuffer %d.",
+            SRMError("[%s] [%s] [%s MODE] Failed to create create renderbuffer %d.",
                      connector->device->shortName, connector->name, MODE_NAME, i);
             return 0;
         }

@@ -253,7 +253,81 @@ void srmBufferWaitSync(SRMBuffer *buffer)
     if (buffer->fence == EGL_NO_SYNC_KHR)
         return;
 
-    buffer->allocator->eglFunctions.eglWaitSyncKHR(buffer->allocator->eglDisplay, buffer->fence, 0);
+    if (buffer->allocator->eglFunctions.eglWaitSyncKHR(buffer->allocator->eglDisplay, buffer->fence, 0) != EGL_TRUE)
+        SRMWarning("[%s] eglWaitSyncKHR failed.", buffer->allocator->shortName);
+
     buffer->allocator->eglFunctions.eglDestroySyncKHR(buffer->allocator->eglDisplay, buffer->fence);
     buffer->fence = EGL_NO_SYNC_KHR;
+}
+
+UInt8 srmBufferCreateRBFromBO(SRMCore *core, struct gbm_bo *bo, GLuint *outFB, GLuint *outRB, SRMBuffer **outWrapper)
+{
+    if (!bo)
+    {
+        SRMError("[SRMBuffer] srmBufferCreateRBFromBO: Invalid gbm_bo.");
+        return 0;
+    }
+
+    *outWrapper = srmBufferCreateFromGBM(core, bo);
+
+    if (!outWrapper)
+    {
+        SRMError("[SRMBuffer] srmBufferCreateRBFromBO: Failed to create SRMBuffer wrapper for gbm_bo.");
+        return 0;
+    }
+
+    if (!(*outWrapper)->allocator->eglFunctions.glEGLImageTargetRenderbufferStorageOES)
+    {
+        SRMError("[SRMBuffer] srmBufferCreateRBFromBO: glEGLImageTargetRenderbufferStorageOES is not available.");
+        goto failWrapper;
+    }
+
+    EGLImage image = srmBufferGetEGLImage((*outWrapper)->allocator, *outWrapper);
+
+    if (image == EGL_NO_IMAGE)
+    {
+        SRMError("[SRMBuffer] srmBufferCreateRBFromBO: Failed to get EGLImage.");
+        goto failWrapper;
+    }
+
+    glGenRenderbuffers(1, outRB);
+
+    if (*outRB == 0)
+    {
+        SRMError("[SRMBuffer] srmBufferCreateRBFromBO: Failed to generate GL renderbuffer.");
+        goto failWrapper;
+    }
+
+    glBindRenderbuffer(GL_RENDERBUFFER, *outRB);
+    (*outWrapper)->allocator->eglFunctions.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER, image);
+    glGenFramebuffers(1, outFB);
+
+    if (*outFB == 0)
+    {
+        SRMError("[SRMBuffer] srmBufferCreateRBFromBO: Failed to generate GL framebuffer.");
+        goto failGLRB;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, *outFB);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, *outRB);
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+
+    if (status != GL_FRAMEBUFFER_COMPLETE)
+    {
+        SRMError("[SRMBuffer] srmBufferCreateRBFromBO: Incomplete GL framebuffer.");
+        goto failGLFB;
+    }
+
+    return 1;
+
+failGLFB:
+    glDeleteFramebuffers(1, outFB);
+    *outFB = 0;
+failGLRB:
+    glDeleteRenderbuffers(1, outRB);
+    *outRB = 0;
+failWrapper:
+    srmBufferDestroy(*outWrapper);
+    *outWrapper = NULL;
+    return 0;
 }

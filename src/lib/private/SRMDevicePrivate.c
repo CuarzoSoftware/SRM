@@ -795,6 +795,10 @@ fallback:
     SRMWarning("[%s] srmDeviceInitializeTestGBMSurface: Fallback to GL texture.", device->shortName);
     srmDeviceUninitializeTestGBM(device);
     glGenFramebuffers(1, &device->testFB);
+
+    if (!device->testFB)
+        goto fail;
+
     glBindFramebuffer(GL_FRAMEBUFFER, device->testFB);
 
     if (device->testFB == 0)
@@ -804,11 +808,13 @@ fallback:
     }
 
     glGenTextures(1, &device->testTex);
+
+    if (!device->testTex)
+        goto fail;
+
     glBindTexture(GL_TEXTURE_2D, device->testTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 64, 64, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, device->testTex, 0);
-    glFinish();
-
     status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 
     if (status != GL_FRAMEBUFFER_COMPLETE)

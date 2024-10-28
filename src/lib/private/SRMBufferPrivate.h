@@ -80,6 +80,7 @@ void srmBufferFillParamsFromBO(SRMBuffer *buffer, struct gbm_bo *bo);
 void srmBufferSetTargetFromFormat(SRMBuffer *buffer);
 void srmBufferCreateSync(SRMBuffer *buffer);
 void srmBufferWaitSync(SRMBuffer *buffer);
+UInt8 srmBufferCreateRBFromBO(SRMCore *core, struct gbm_bo *bo, GLuint *outFB, GLuint *outRB, SRMBuffer **outWrapper);
 
 #ifdef __cplusplus
 }

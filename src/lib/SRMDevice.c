@@ -239,8 +239,10 @@ void srmDeviceSyncWait(SRMDevice *device)
         EGLint result = device->eglFunctions.eglWaitSyncKHR(device->eglDisplay, sync, 0);
         device->eglFunctions.eglDestroySyncKHR(device->eglDisplay, sync);
 
-        if (result != EGL_CONDITION_SATISFIED_KHR)
-            SRMWarning("[%s] srmDeviceSyncWait: eglWaitSyncKHR failed. Falling back to glFinish().", device->shortName);
+        if (result == EGL_TRUE)
+            return;
+
+        SRMWarning("[%s] srmDeviceSyncWait: eglWaitSyncKHR failed. Falling back to glFinish().", device->shortName);
     }
 
 fallback:

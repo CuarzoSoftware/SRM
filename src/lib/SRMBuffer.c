@@ -61,7 +61,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 {
     if (width == 0 || height == 0)
     {
-        SRMError("Can not create CPU buffer with size %dx%dpx.", width, height);
+        SRMError("srmBufferCreateFromCPU: Invalid buffer dimensions %dx%dpx.", width, height);
         return NULL;
     }
 
@@ -177,7 +177,6 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
         buffer->dma.strides[0] = buffer->pixelSize*width;
     }
 
-    // Creates the texture
     struct SRMBufferTexture *texture = calloc(1, sizeof(struct SRMBufferTexture));
     texture->device = buffer->allocator;
     texture->image = EGL_NO_IMAGE;
@@ -229,10 +228,12 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     if (buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
     {
-        EGLint attribs[3];
-        attribs[0] = EGL_IMAGE_PRESERVED_KHR;
-        attribs[1] = EGL_TRUE;
-        attribs[2] = EGL_NONE;
+        static const EGLint attribs[3] =
+        {
+            EGL_IMAGE_PRESERVED_KHR,
+            EGL_TRUE,
+            EGL_NONE
+        };
 
         /* This is used to later get a gbm bo if the buffer is used for scanout */
         texture->image = buffer->allocator->eglFunctions.eglCreateImageKHR(
@@ -291,13 +292,13 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 {
     if (!device || !buffer)
     {
-        SRMError("Invalid parameters passed to srmBufferGetTextureID().");
+        SRMError("[SRMBuffer] srmBufferGetTextureID: Invalid device or buffer.");
         return 0;
     }
 
-    if (buffer->src == SRM_BUFFER_SRC_WL_DRM && device != buffer->allocator)
+    if ((buffer->src == SRM_BUFFER_SRC_WL_DRM || buffer->src == SRM_BUFFER_SRC_GL) && device != buffer->allocator)
     {
-        SRMError("[%s] wl_drm buffers can only be accessed from allocator device.", device->shortName);
+        SRMError("[%s] srmBufferGetTextureID: wl_drm buffers and GL wrappers can only be accessed from allocator device.", device->shortName);
         return 0;
     }
 
@@ -334,10 +335,13 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
 
     if (device->eglExtensions.KHR_image_pixmap && device == buffer->allocator && buffer->bo && device)
     {
-        EGLint attribs[3];
-        attribs[0] = EGL_IMAGE_PRESERVED_KHR;
-        attribs[1] = EGL_TRUE;
-        attribs[2] = EGL_NONE;
+        static const EGLint attribs[3] =
+        {
+            EGL_IMAGE_PRESERVED_KHR,
+            EGL_TRUE,
+            EGL_NONE
+        };
+
         texture->image = device->eglFunctions.eglCreateImageKHR(device->eglDisplay, EGL_NO_CONTEXT, EGL_NATIVE_PIXMAP_KHR, buffer->bo, attribs);
 
         if (texture->image != EGL_NO_IMAGE)
@@ -418,7 +422,7 @@ void srmBufferDestroy(SRMBuffer *buffer)
 
             srmDeviceMakeCurrent(texture->device);
 
-            if (texture->texture != 0)
+            if (!buffer->keepTexturesAlive && texture->texture != 0)
                 glDeleteTextures(1, &texture->texture);
 
             if (texture->image != EGL_NO_IMAGE)
@@ -664,7 +668,7 @@ SRMDevice *srmBufferGetAllocatorDevice(SRMBuffer *buffer)
 
 UInt8 srmBufferRead(SRMBuffer *buffer, Int32 srcX, Int32 srcY, Int32 srcW, Int32 srcH, Int32 dstX, Int32 dstY, Int32 dstStride, UInt8 *dstBuffer)
 {
-    /* TODO: Check READ cap */
+    /* TODO: Use READ cap and add GL support */
 
     if (buffer->map && buffer->dma.modifiers[0] == DRM_FORMAT_MOD_LINEAR)
     {
@@ -710,4 +714,89 @@ EGLImage srmBufferGetEGLImage(SRMDevice *device, SRMBuffer *buffer)
     }
 
     return EGL_NO_IMAGE;
+}
+
+SRMBuffer *srmBufferCreateGLTextureWrapper(SRMDevice *device, GLuint id, GLenum target, SRM_BUFFER_FORMAT format, UInt32 width, UInt32 height, UInt8 transferOwnership)
+{
+    if (!device)
+    {
+        SRMError("srmBufferCreateGLTextureWrapper: Invalid SRMDevice (NULL).");
+        return NULL;
+    }
+
+    if (width == 0 || height == 0)
+    {
+        SRMError("srmBufferCreateGLTextureWrapper: Invalid buffer dimensions %dx%dpx.", width, height);
+        return NULL;
+    }
+
+    if (id == 0)
+    {
+        SRMError("srmBufferCreateGLTextureWrapper: Invalid texture ID (0).");
+        return NULL;
+    }
+
+    const SRMGLFormat *glFmt = srmFormatDRMToGL(format);
+
+    if (!glFmt)
+    {
+        SRMError("srmBufferCreateGLTextureWrapper: Could not find the equivalent GL format and type from DRM format %s.", drmGetFormatName(format));
+        return NULL;
+    }
+
+    UInt32 depth, bpp;
+
+    if (!srmFormatGetDepthBpp(format, &depth, &bpp))
+    {
+        SRMError("srmBufferCreateGLTextureWrapper: Failed to get depth and bpp for DRM format %s.", drmGetFormatName(format));
+        return NULL;
+    }
+
+    SRMBuffer *buffer = srmBufferCreate(device->core, device);
+    buffer->src = SRM_BUFFER_SRC_GBM;
+    buffer->writeMode = SRM_BUFFER_WRITE_MODE_GLES;
+    buffer->caps |= SRM_BUFFER_CAP_WRITE;
+    buffer->keepTexturesAlive = !transferOwnership;
+    buffer->target = target;
+    buffer->allocator = device;
+    buffer->glType = glFmt->glType;
+    buffer->glFormat = glFmt->glFormat;
+    buffer->glInternalFormat = glFmt->glInternalFormat;
+    buffer->dma.num_fds = 1;
+    buffer->dma.format = format;
+    buffer->dma.width = width;
+    buffer->dma.height = height;
+    buffer->pixelSize = buffer->bpp/8;
+    buffer->dma.strides[0] = buffer->pixelSize*width;
+
+    struct SRMBufferTexture *texture = calloc(1, sizeof(struct SRMBufferTexture));
+    texture->device = buffer->allocator;
+    texture->texture = id;
+    texture->image = EGL_NO_IMAGE;
+    srmListAppendData(buffer->textures, texture);
+
+    if (buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
+    {
+        static const EGLint attribs[3] =
+        {
+            EGL_IMAGE_PRESERVED_KHR,
+            EGL_TRUE,
+            EGL_NONE
+        };
+
+        srmSaveContext();
+        srmDeviceMakeCurrent(buffer->allocator);
+
+        /* This is used to later get a gbm bo if the buffer is used for scanout */
+        texture->image = buffer->allocator->eglFunctions.eglCreateImageKHR(
+            eglGetCurrentDisplay(),
+            eglGetCurrentContext(),
+            EGL_GL_TEXTURE_2D_KHR,
+            (EGLClientBuffer)(UInt64)texture->texture,
+            attribs);
+
+        srmRestoreContext();
+    }
+
+    return buffer;
 }

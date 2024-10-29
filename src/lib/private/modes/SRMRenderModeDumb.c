@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <private/modes/SRMRenderModeDumb.h>
 #include <private/modes/SRMRenderModeCommon.h>
 
@@ -8,6 +7,7 @@
 #include <private/SRMCrtcPrivate.h>
 #include <private/SRMBufferPrivate.h>
 #include <private/SRMPlanePrivate.h>
+#include <private/SRMEGLPrivate.h>
 
 #include <SRMList.h>
 #include <SRMLog.h>
@@ -17,6 +17,7 @@
 #include <sys/mman.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 
 #define MODE_NAME "DUMB"
 
@@ -26,7 +27,6 @@ typedef struct RenderModeDataStruct
     struct drm_mode_create_dumb *dumbBuffers;
     struct drm_mode_map_dumb *dumbMapRequests;
     UInt8 **dumbMaps;
-    GLuint fallbackTextures[SRM_MAX_BUFFERING];
 } RenderModeData;
 
 static UInt8 createData(SRMConnector *connector)
@@ -145,12 +145,6 @@ static void destroyRendererBuffers(SRMConnector *connector)
             data->c.rendererRBs[i] = 0;
         }
 
-        if (data->fallbackTextures[i])
-        {
-            glDeleteTextures(1, &data->fallbackTextures[i]);
-            data->fallbackTextures[i] = 0;
-        }
-
         if (data->c.rendererBOWrappers[i])
         {
             srmBufferDestroy(data->c.rendererBOWrappers[i]);
@@ -260,19 +254,30 @@ glesFallback:
             goto fail;
 
         glBindFramebuffer(GL_FRAMEBUFFER, data->c.rendererFBs[i]);
-        glGenTextures(1, &data->fallbackTextures[i]);
 
-        if (data->fallbackTextures[i] == 0)
+        GLuint texture;
+        glGenTextures(1, &texture);
+
+        if (texture == 0)
             goto fail;
 
-        glBindTexture(GL_TEXTURE_2D, data->fallbackTextures[i]);
+        glBindTexture(GL_TEXTURE_2D, texture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
                      connector->currentMode->info.hdisplay,
                      connector->currentMode->info.vdisplay,
                      0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, data->fallbackTextures[i], 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
 
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            goto fail;
+
+        data->c.rendererBOWrappers[i] = srmBufferCreateGLTextureWrapper(
+            dev, texture, GL_TEXTURE_2D, connector->currentFormat.format,
+            connector->currentMode->info.hdisplay,
+            connector->currentMode->info.vdisplay,
+            1);
+
+        if (!data->c.rendererBOWrappers[i])
             goto fail;
     }
 

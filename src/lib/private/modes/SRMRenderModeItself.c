@@ -7,6 +7,7 @@
 #include <private/SRMCrtcPrivate.h>
 #include <private/SRMBufferPrivate.h>
 #include <private/SRMPlanePrivate.h>
+#include <private/SRMEGLPrivate.h>
 
 #include <SRMList.h>
 #include <SRMLog.h>

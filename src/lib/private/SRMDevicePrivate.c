@@ -1,4 +1,4 @@
-#include <assert.h>
+#include <private/modes/SRMRenderModeCommon.h>
 #include <private/SRMListenerPrivate.h>
 #include <private/SRMCorePrivate.h>
 #include <private/SRMDevicePrivate.h>
@@ -7,7 +7,7 @@
 #include <private/SRMPlanePrivate.h>
 #include <private/SRMConnectorPrivate.h>
 #include <private/SRMBufferPrivate.h>
-#include <private/modes/SRMRenderModeCommon.h>
+#include <private/SRMEGLPrivate.h>
 
 #include <SRMFormat.h>
 #include <SRMList.h>
@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include <xf86drm.h>
 #include <xf86drmMode.h>

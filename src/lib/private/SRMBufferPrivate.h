@@ -54,9 +54,9 @@ struct SRMBufferStruct
 
     // Scanout
     struct {
-        UInt32 fb;
+        UInt32 fb; // DRM
         struct gbm_bo *bo; // Can be NULL
-        SRMFormat fmt;
+        SRMFormat fmt; // For alpha substitute cases
     } scanout;
 
     // GL
@@ -65,6 +65,7 @@ struct SRMBufferStruct
     GLint glInternalFormat;
     GLint glFormat;
     GLint glType;
+    UInt8 keepTexturesAlive; // For GL wrapper case
 };
 
 SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator);

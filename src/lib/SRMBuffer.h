@@ -75,7 +75,12 @@ enum SRM_BUFFER_SRC
     /**
      * The buffer source is a bo from the Generic Buffer Manager (GBM) library.
      */
-    SRM_BUFFER_SRC_GBM
+    SRM_BUFFER_SRC_GBM,
+
+    /**
+     * The buffer source is an already existing OpenGL texture.
+     */
+    SRM_BUFFER_SRC_GL
 };
 
 /**
@@ -202,6 +207,25 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer);
 
 /**
+ * @brief Creates a wrapper for an already created OpenGL texture.
+ *
+ * This function allows you to use an existing OpenGL texture within the SRM framework.
+ *
+ * @note The texture can only be used by the provided @ref SRMDevice.
+ *
+ * @param device The @ref SRMDevice whose `EGLDisplay` was used to create the texture.
+ * @param id The OpenGL texture ID of the existing texture.
+ * @param target The target for the texture (e.g., `GL_TEXTURE_2D` or `GL_TEXTURE_EXTERNAL_OES`).
+ * @param format The DRM format of the texture.
+ * @param width The width of the texture in pixels.
+ * @param height The height of the texture in pixels.
+ * @param transferOwnership If non-zero, the texture will be destroyed when @ref srmBufferDestroy() is called.
+ * @return A pointer to the created @ref SRMBuffer, or `NULL` on failure.
+ */
+SRMBuffer *srmBufferCreateGLTextureWrapper(SRMDevice *device, GLuint id, GLenum target, SRM_BUFFER_FORMAT format,
+                                           UInt32 width, UInt32 height, UInt8 transferOwnership);
+
+/**
  * @brief Destroys an SRMBuffer.
  *
  * This function destroys an @ref SRMBuffer, freeing associated resources.
@@ -209,9 +233,6 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer);
  * @param buffer Pointer to the @ref SRMBuffer to be destroyed.
  */
 void srmBufferDestroy(SRMBuffer *buffer);
-
-// TODO: add doc
-EGLImage srmBufferGetEGLImage(SRMDevice *device, SRMBuffer *buffer);
 
 /**
  * @brief Retrieves an OpenGL texture ID associated with an @ref SRMBuffer for a specific device (GPU).
@@ -229,7 +250,7 @@ EGLImage srmBufferGetEGLImage(SRMDevice *device, SRMBuffer *buffer);
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
 
 /**
- * @brief Get the OpenGL texture target associated with an @ref SRMBuffer.
+ * @brief Gets the OpenGL texture target associated with an @ref SRMBuffer.
  *
  * This function retrieves the OpenGL texture target associated with the provided @ref SRMBuffer.
  * 
@@ -253,6 +274,18 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
  * @return The associated OpenGL texture target, which can be either `GL_TEXTURE_2D` or `GL_TEXTURE_EXTERNAL_OES`.
  */
 GLenum srmBufferGetTextureTarget(SRMBuffer *buffer);
+
+/**
+ * @brief Gets an `EGLImage` associated with a specific device.
+ *
+ * The returned image is owned by the SRMBuffer and should not be destroyed manually.
+ *
+ * @param device The device whose `EGLDisplay` is used to create the image.
+ * @param buffer Pointer to the @ref SRMBuffer.
+ *
+ * @return An `EGLImage` associated with the SRMDevice or `EGL_NO_IMAGE` on failure.
+ */
+EGLImage srmBufferGetEGLImage(SRMDevice *device, SRMBuffer *buffer);
 
 /**
  * @brief Writes pixel data to an @ref SRMBuffer.
@@ -280,7 +313,10 @@ UInt8 srmBufferWrite(SRMBuffer *buffer,
  * @brief Reads pixel data from an @ref SRMBuffer.
  *
  * This function reads pixel data from the specified region of an @ref SRMBuffer and copies it to the destination buffer.
- * 
+ *
+ * @note On failure, the texture should still be readable by attaching the texture ID returned by @ref srmBufferGetTextureID()
+ *       to a GL framebuffer and using `glReadPixels()`.
+ *
  * @param buffer Pointer to the @ref SRMBuffer to read data from.
  * @param srcX X-coordinate of the top-left corner of the source region.
  * @param srcY Y-coordinate of the top-left corner of the source region.

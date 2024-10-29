@@ -7,6 +7,7 @@
 #include <private/SRMCrtcPrivate.h>
 #include <private/SRMBufferPrivate.h>
 #include <private/SRMPlanePrivate.h>
+#include <private/SRMEGLPrivate.h>
 
 #include <SRMList.h>
 #include <SRMLog.h>
@@ -17,23 +18,12 @@
 #include <GL/gl.h>
 #include <GLES2/gl2.h>
 
-static const EGLint eglConfigAttribs[] =
-{
-    EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-    EGL_RED_SIZE, 8,
-    EGL_GREEN_SIZE, 8,
-    EGL_BLUE_SIZE, 8,
-    EGL_ALPHA_SIZE, 0,
-    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-    EGL_NONE
-};
-
 static GLfloat square[16] =
 {  //  VERTEX       FRAGMENT
     -1.0f,  1.0f,   0.f, 1.f, // TL
     -1.0f, -1.0f,   0.f, 0.f, // BL
-    1.0f, -1.0f,   1.f, 0.f, // BR
-    1.0f,  1.0f,   1.f, 1.f  // TR
+     1.0f, -1.0f,   1.f, 0.f, // BR
+     1.0f,  1.0f,   1.f, 1.f  // TR
 };
 
 static GLchar vShaderStr[] =
@@ -208,7 +198,7 @@ static UInt8 getEGLConfiguration(SRMConnector *connector)
     RenderModeData *data = (RenderModeData*)connector->renderData;
 
     if (!srmRenderModeCommonChooseEGLConfiguration(connector->device->eglDisplay,
-                                                   eglConfigAttribs,
+                                                   commonEGLConfigAttribs,
                                                    GBM_FORMAT_XRGB8888,
                                                    &data->connectorEGLConfig))
     {
@@ -219,7 +209,7 @@ static UInt8 getEGLConfiguration(SRMConnector *connector)
     }
 
     if (!srmRenderModeCommonChooseEGLConfiguration(connector->device->rendererDevice->eglDisplay,
-                                                   eglConfigAttribs,
+                                                   commonEGLConfigAttribs,
                                                    GBM_FORMAT_XRGB8888,
                                                    &data->rendererEGLConfig))
     {

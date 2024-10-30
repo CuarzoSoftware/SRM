@@ -55,7 +55,7 @@ static GLchar fShaderStr[] =
 typedef struct RenderModeDataStruct
 {
     RenderModeCommonData c;
-    struct gbm_bo *connectorBOs[3];
+    struct gbm_bo *connectorBOs[SRM_MAX_BUFFERING];
     SRMBuffer *connectorBOWrappers[SRM_MAX_BUFFERING];
     GLuint connectorRBs[SRM_MAX_BUFFERING];
     GLuint connectorFBs[SRM_MAX_BUFFERING];
@@ -81,9 +81,8 @@ static UInt8 createData(SRMConnector *connector)
 
     if (!data)
     {
-        SRMError("[%s] Could not allocate data for connector %d render mode (PRIME MODE).",
-                 connector->device->name,
-                 connector->id);
+        SRMError("[%s] [%s] [%s MODE] Could not allocate render mode data.",
+                 connector->device->shortName, connector->name, MODE_NAME);
         return 0;
     }
 

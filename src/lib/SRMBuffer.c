@@ -552,6 +552,7 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         srmDeviceMakeCurrent(buffer->allocator);
 
         glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(buffer->allocator, buffer));
+        glPixelStorei(GL_UNPACK_ALIGNMENT, buffer->pixelSize);
         glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / buffer->pixelSize);
         glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
         glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
@@ -560,6 +561,7 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
                         buffer->glFormat, buffer->glType, pixels);
 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         srmBufferCreateSync(buffer);
         srmRestoreContext();
         return 1;
@@ -766,6 +768,7 @@ SRMBuffer *srmBufferCreateGLTextureWrapper(SRMDevice *device, GLuint id, GLenum 
     buffer->dma.format = format;
     buffer->dma.width = width;
     buffer->dma.height = height;
+    buffer->bpp = bpp;
     buffer->pixelSize = buffer->bpp/8;
     buffer->dma.strides[0] = buffer->pixelSize*width;
 

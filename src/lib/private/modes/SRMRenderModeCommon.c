@@ -1599,6 +1599,9 @@ UInt8 srmRenderModeCommonCreateDRMFBsFromBOs(SRMConnector *connector, const char
         UInt32 offsets[4] = { 0 };
         UInt64 mods[4] = { 0 };
 
+        if (!bos[i])
+            return 0;
+
         for (int plane = 0; plane < gbm_bo_get_plane_count(bos[i]); plane++)
         {
             boHandles[plane] = gbm_bo_get_handle_for_plane(bos[i], plane).u32;

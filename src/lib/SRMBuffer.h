@@ -291,14 +291,16 @@ EGLImage srmBufferGetEGLImage(SRMDevice *device, SRMBuffer *buffer);
  * @brief Writes pixel data to an @ref SRMBuffer.
  *
  * This function writes pixel data to the specified region of an @ref SRMBuffer.
+ *
+ * @note The source and destination buffer pixel format must match.
  * 
  * @param buffer Pointer to the @ref SRMBuffer to write data to.
- * @param stride Stride (row pitch) of the source pixel data.
+ * @param stride Stride of the source pixel data.
  * @param dstX X-coordinate of the top-left corner of the destination region.
  * @param dstY Y-coordinate of the top-left corner of the destination region.
  * @param dstWidth Width of the destination region.
  * @param dstHeight Height of the destination region.
- * @param pixels Pointer to the source pixel data. Must point to the top-left of the source buffer.
+ * @param pixels Pointer within the source buffer to copy from (not affected by dstX and dstY).
  * @return 1 on success, or 0 on failure.
  */
 UInt8 srmBufferWrite(SRMBuffer *buffer,

@@ -324,12 +324,6 @@ static UInt8 updateMode(SRMConnector *connector)
     return 1;
 }
 
-static UInt32 getFramebufferID(SRMConnector *connector)
-{
-    RenderModeCommonData *data = (RenderModeCommonData*)connector->renderData;
-    return data->rendererFBs[data->currentBufferIndex];
-}
-
 static UInt32 getCurrentBufferIndex(SRMConnector *connector)
 {
     RenderModeCommonData *data = (RenderModeCommonData*)connector->renderData;
@@ -361,6 +355,12 @@ static void resumeRendering(SRMConnector *connector)
 {
     RenderModeCommonData *data = (RenderModeCommonData*)connector->renderData;
     srmRenderModeCommonResumeRendering(connector, data->drmFBs[data->currentBufferIndex]);
+}
+
+static UInt32 getFramebufferID(SRMConnector *connector)
+{
+    RenderModeCommonData *data = (RenderModeCommonData*)connector->renderData;
+    return data->rendererFBs[data->currentBufferIndex];
 }
 
 static EGLContext getEGLContext(SRMConnector *connector)

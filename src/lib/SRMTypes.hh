@@ -397,8 +397,19 @@ typedef enum SRM_CONNECTOR_CONTENT_TYPE_ENUM
  */
 const char *srmGetConnectorContentTypeString(SRM_CONNECTOR_CONTENT_TYPE contentType);
 
-// TODO: add doc
+/**
+ * @brief Saves the current EGL context state.
+ *
+ * This method stores the currently bound `EGLDisplay`, as well as the read and write
+ * `EGLSurfaces` and `EGLContext`.
+ */
 void srmSaveContext();
+
+/**
+ * @brief Restores the previously saved context.
+ *
+ * @see @ref srmSaveContext()
+ */
 void srmRestoreContext();
 
 /**

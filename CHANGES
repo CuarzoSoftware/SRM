@@ -1,3 +1,34 @@
+SRM (0.8.0-1)
+
+  # API Additions
+
+  * srmDeviceMakeCurrent: Makes the EGL display and context associated with a device current for the calling thread, or creates a new shared one if it doesn't exist.
+  * srmDeviceSyncWait: Forces pending rendering commands to finish using fences, with glFinish() as a fallback.
+  * srmBufferGetEGLImage: Retrieves an EGLImage of an SRMBuffer for a specific SRMDevice.
+  * srmBufferCreateGLTextureWrapper: Creates SRMBuffers from existing OpenGL textures.
+  * srmConnectorGetFramebufferID: Retrieves the ID of the currently bound OpenGL framebuffer.
+  * srmConnectorGetContext: Retrieves the EGLContext associated with the connector's rendering thread.
+  * srmSaveContext: Saves the current EGL context.
+  * srmRestoreContext: Restores the context previously saved with srmSaveContext().
+
+  # Internal Changes
+
+  * All rendering modes now use renderbuffers instead of EGLSurfaces to prevent buffer ordering issues.
+  * Fences are used to synchronize buffer updates and access, providing better performance and ensuring no partial updates occur.
+  * IN_FENCE_FD and sync files are now used when available to wait for rendering commands to finish instead of using glFinish(), improving performance.
+
+  # Bug Fixes
+
+  * Fixed buffer allocation issues, particularly on NVIDIA proprietary drivers, which resulted in black textures.
+  * Corrected framebuffer rendering order in proprietary NVIDIA drivers.
+  * Resolved the issue of partial buffer updates by implementing fences.
+  * Fixed a bug preventing the use of DRM framebuffers with explicit modifiers.
+
+  Special thanks to @renhiyama, @kingdomkind, and @Fox2Code for their invaluable help!
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Wed, 30 Oct 2024 21:21:08 -0300
+
+
 SRM (0.7.2-1)
 
   # New Environment Variables

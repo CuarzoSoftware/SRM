@@ -950,3 +950,11 @@ UInt32 srmConnectorGetFramebufferID(SRMConnector *connector)
 
     return connector->renderInterface.getFramebufferID(connector);
 }
+
+EGLContext srmConnectorGetContext(SRMConnector *connector)
+{
+    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
+        return EGL_NO_CONTEXT;
+
+    return connector->renderInterface.getEGLContext(connector);
+}

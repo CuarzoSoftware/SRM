@@ -238,14 +238,8 @@ void srmBufferCreateSync(SRMBuffer *buffer)
 
     buffer->fence = f->eglCreateSyncKHR(buffer->allocator->eglDisplay, EGL_SYNC_NATIVE_FENCE_ANDROID, attribs);
 
-    if (buffer->fence == EGL_NO_SYNC_KHR)
-        goto fallback;
-
-    glFlush();
-    return;
-
 fallback:
-    glFinish();
+    glFlush();
 }
 
 void srmBufferWaitSync(SRMBuffer *buffer)

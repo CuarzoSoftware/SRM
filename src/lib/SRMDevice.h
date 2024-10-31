@@ -312,8 +312,19 @@ const SRMEGLDeviceFunctions *srmDeviceGetEGLFunctions(SRMDevice *device);
  */
 const SRMGLDeviceExtensions *srmDeviceGetGLExtensions(SRMDevice *device);
 
-// TODO: Makes current the EGL context associated with the calling thread
+/**
+ * @brief Sets the EGL display and context for the specified device as current for the calling thread.
+ *
+ * If no existing EGL context is associated with the calling thread, a new one
+ * is created and made current.
+ *
+ * @param device Pointer to the @ref SRMDevice whose EGL context should be made current.
+ */
 void srmDeviceMakeCurrent(SRMDevice *device);
+
+/**
+ * @brief Ensures that all pending rendering commands are completed before continuing.
+ */
 void srmDeviceSyncWait(SRMDevice *device);
 
 /// @cond OMIT

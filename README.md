@@ -5,7 +5,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="SRM is released under the MIT license." />
   </a>
   <a href="https://github.com/CuarzoSoftware/SRM">
-    <img src="https://img.shields.io/badge/version-0.7.2-brightgreen" alt="Current SRM version." />
+    <img src="https://img.shields.io/badge/version-0.8.0-brightgreen" alt="Current SRM version." />
   </a>
 </p>
 
@@ -48,7 +48,7 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 ### Tested on
 
 * Intel GPUs (i915 driver)
-* NVIDIA GPUs (Nouveau & nvidia_drm)
+* NVIDIA GPUs (Nouveau & proprietary)
 * AMD GPUs (AMDGPU driver)
 * Mali GPUs (Lima driver)
 

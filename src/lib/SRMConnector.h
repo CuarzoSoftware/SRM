@@ -1,6 +1,7 @@
 #ifndef SRMCONNECTOR_H
 #define SRMCONNECTOR_H
 
+#include <EGL/egl.h>
 #include <SRMTypes.h>
 #include <xf86drmMode.h>
 
@@ -497,7 +498,17 @@ UInt8 srmConnectorSuspend(SRMConnector *connector);
  */
 UInt8 srmConnectorResume(SRMConnector *connector);
 
+/**
+ * @brief Retrieves the ID of the currently bound OpenGL framebuffer.
+ */
 UInt32 srmConnectorGetFramebufferID(SRMConnector *connector);
+
+/**
+ * @brief Retrieves the `EGLContext` associated with the rendering thread.
+ *
+ * @return The `EGLContext` of the rendering thread, or `EGL_NO_CONTEXT` if it is uninitialized.
+ */
+EGLContext srmConnectorGetContext(SRMConnector *connector);
 
 /**
  * @brief Returns the current framebuffer index.

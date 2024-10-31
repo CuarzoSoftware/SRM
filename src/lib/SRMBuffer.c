@@ -551,6 +551,12 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
         srmSaveContext();
         srmDeviceMakeCurrent(buffer->allocator);
 
+        if (buffer->fence != EGL_NO_SYNC_KHR)
+        {
+            buffer->allocator->eglFunctions.eglDestroySyncKHR(buffer->allocator->eglDisplay, buffer->fence);
+            buffer->fence = EGL_NO_SYNC_KHR;
+        }
+
         glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(buffer->allocator, buffer));
         glPixelStorei(GL_UNPACK_ALIGNMENT, buffer->pixelSize);
         glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / buffer->pixelSize);

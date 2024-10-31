@@ -71,9 +71,6 @@ struct ConnectorUserData
 
     // Quick access to current screen mode dimensions
     UInt32 w, h;
-
-    // Count FPS
-    UInt64 framesCount, msStart, sec;
 };
 
 UInt64 getMilliseconds(const struct timespec *ts)
@@ -182,8 +179,6 @@ static void initializeGL(SRMConnector *connector, void *userData)
 
     // Schedule a repaint
     srmConnectorRepaint(connector);
-
-    data->msStart = 0;
 }
 
 static void paintGL(SRMConnector *connector, void *userData)
@@ -254,24 +249,8 @@ static void resizeGL(SRMConnector *connector, void *userData)
 
 static void pageFlipped(SRMConnector *connector, void *userData)
 {
-    struct ConnectorUserData *data = userData;
-    const SRMPresentationTime *pt = srmConnectorGetPresentationTime(connector);
-
-    if (data->msStart == 0)
-        data->msStart = getMilliseconds(&pt->time);
-
-    data->framesCount++;
-    UInt64 msDiff = getMilliseconds(&pt->time) - data->msStart;
-
-    if ((UInt64)pt->time.tv_sec != data->sec && pt->time.tv_sec % 5 == 0)
-    {
-        data->sec = pt->time.tv_sec;
-
-        if (msDiff != 0)
-            SRMLog("[srm-all-connectors] Connector (%d) FPS: %d.",
-                   srmConnectorGetID(connector),
-                   (UInt32)((data->framesCount * 1000) / msDiff));
-    }
+    SRM_UNUSED(connector);
+    SRM_UNUSED(userData);
 }
 
 static void uninitializeGL(SRMConnector *connector, void *userData)

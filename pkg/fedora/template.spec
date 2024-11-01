@@ -10,6 +10,8 @@ Summary:        C Library for building OpenGL ES 2.0 applications on top of DRM/
 License:        MIT
 URL:            https://cuarzosoftware.github.io/SRM
 
+BuildRequires:  tar
+BuildRequires:  wget
 BuildRequires:  meson
 BuildRequires:  gcc-c++
 BuildRequires:  pkgconfig(gl)

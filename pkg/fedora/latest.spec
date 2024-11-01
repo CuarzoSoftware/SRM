@@ -2,13 +2,13 @@
 %global origrel 1
 %global somajor 0
 
-Name:           srmng
+Name:           cuarzo-srm
 Version:        %{basever}%{?origrel:_%{origrel}}
 Release:        1%{?dist}
-Summary:        C Library for building OpenGL ES 2.0 applications on top of DRM/KMS
+Summary:        Simple Rendering Manager: C library for building OpenGL ES 2.0 applications on top of DRM/KMS
 
 License:        MIT
-URL:            https://cuarzosoftware.github.io/SRM
+URL:            https://github.com/CuarzoSoftware/SRM
 
 BuildRequires:  tar
 BuildRequires:  wget
@@ -60,7 +60,7 @@ The %{name}-examples package contains example applications using
 rm -rf repo
 rm -f src.tar.gz
 mkdir -p repo
-wget -O src.tar.gz https://github.com/CuarzoSoftware/SRM/archive/refs/tags/v%{basever}-%{origrel}.tar.gz
+wget -O src.tar.gz %{url}/archive/refs/tags/v%{basever}-%{origrel}.tar.gz
 tar --strip-components=1 -xzvf src.tar.gz -C repo
 
 %build
@@ -91,7 +91,7 @@ pushd repo/src
 %{_libdir}/pkgconfig/SRM.pc
 
 %changelog
-* Thu Oct 31 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
+* Fri Nov 01 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
 - srmDeviceMakeCurrent: Makes the EGL display and context associated with a device current for the calling thread, or creates a new shared one if it doesn't exist.
 - srmDeviceSyncWait: Forces pending rendering commands to finish using fences, with glFinish() as a fallback.
 - srmBufferGetEGLImage: Retrieves an EGLImage of an SRMBuffer for a specific SRMDevice.

@@ -2,13 +2,13 @@
 %global origrel __BUILD__
 %global somajor __MAJOR__
 
-Name:           srmng
+Name:           cuarzo-srm
 Version:        %{basever}%{?origrel:_%{origrel}}
 Release:        1%{?dist}
-Summary:        C Library for building OpenGL ES 2.0 applications on top of DRM/KMS
+Summary:        Simple Rendering Manager: C library for building OpenGL ES 2.0 applications on top of DRM/KMS
 
 License:        MIT
-URL:            https://cuarzosoftware.github.io/SRM
+URL:            https://github.com/CuarzoSoftware/SRM
 
 BuildRequires:  tar
 BuildRequires:  wget
@@ -60,7 +60,7 @@ The %{name}-examples package contains example applications using
 rm -rf repo
 rm -f src.tar.gz
 mkdir -p repo
-wget -O src.tar.gz https://github.com/CuarzoSoftware/SRM/archive/refs/tags/v%{basever}-%{origrel}.tar.gz
+wget -O src.tar.gz %{url}/archive/refs/tags/v%{basever}-%{origrel}.tar.gz
 tar --strip-components=1 -xzvf src.tar.gz -C repo
 
 %build

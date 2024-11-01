@@ -1,5 +1,5 @@
 %global basever 0.8.0
-%global origrel 1
+%global origrel 2
 %global somajor 0
 
 Name:           cuarzo-srm
@@ -92,18 +92,4 @@ pushd repo/src
 
 %changelog
 * Fri Nov 01 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
-- srmDeviceMakeCurrent: Makes the EGL display and context associated with a device current for the calling thread, or creates a new shared one if it doesn't exist.
-- srmDeviceSyncWait: Forces pending rendering commands to finish using fences, with glFinish() as a fallback.
-- srmBufferGetEGLImage: Retrieves an EGLImage of an SRMBuffer for a specific SRMDevice.
-- srmBufferCreateGLTextureWrapper: Creates SRMBuffers from existing OpenGL textures.
-- srmConnectorGetFramebufferID: Retrieves the ID of the currently bound OpenGL framebuffer.
-- srmConnectorGetContext: Retrieves the EGLContext associated with the connector's rendering thread.
-- srmSaveContext: Saves the current EGL context.
-- srmRestoreContext: Restores the context previously saved with srmSaveContext().
-- All rendering modes now use renderbuffers instead of EGLSurfaces to prevent buffer ordering issues.
-- Fences are used to synchronize buffer updates and access, providing better performance and ensuring no partial updates occur.
-- IN_FENCE_FD and sync files are now used when available to wait for rendering commands to finish instead of using glFinish(), improving performance.
-- Fixed buffer allocation issues, particularly on NVIDIA proprietary drivers, which resulted in black textures.
-- Corrected framebuffer rendering order in proprietary NVIDIA drivers.
-- Resolved the issue of partial buffer updates by implementing fences.
-- Fixed a bug preventing the use of DRM framebuffers with explicit modifiers.
+- Added official Fedora COPR link to the downloads page.

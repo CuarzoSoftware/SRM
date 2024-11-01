@@ -1,3 +1,12 @@
+SRM (0.8.0-2)
+
+  # Packaging
+
+  * Added official Fedora COPR link to the downloads page.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Wed, 30 Oct 2024 21:21:08 -0300
+
+
 SRM (0.8.0-1)
 
   # API Additions

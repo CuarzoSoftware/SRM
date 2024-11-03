@@ -53,6 +53,7 @@ struct SRMConnectorStruct
     SRMDevice *device;
     SRMListItem *deviceLink;
     struct SRMConnectorPropIDs propIDs;
+    UInt8 nonDesktop;
     SRMList *encoders, *modes;
     UInt32 mmWidth, mmHeight;
     SRM_CONNECTOR_SUBPIXEL subpixel;

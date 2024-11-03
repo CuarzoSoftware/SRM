@@ -112,7 +112,10 @@ UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
         else if (strcmp(prop->name, "link-status") == 0)
             connector->propIDs.link_status = prop->prop_id;
         else if (strcmp(prop->name, "non-desktop") == 0)
+        {
             connector->propIDs.non_desktop = prop->prop_id;
+            connector->nonDesktop = props->prop_values[i] == 1;
+        }
         else if (strcmp(prop->name, "content type") == 0)
             connector->propIDs.content_type = prop->prop_id;
         else if (strcmp(prop->name, "panel orientation") == 0)

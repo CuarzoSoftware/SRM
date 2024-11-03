@@ -958,3 +958,8 @@ EGLContext srmConnectorGetContext(SRMConnector *connector)
 
     return connector->renderInterface.getEGLContext(connector);
 }
+
+UInt8 srmConnectorIsNonDesktop(SRMConnector *connector)
+{
+    return connector->nonDesktop;
+}

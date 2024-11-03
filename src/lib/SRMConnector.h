@@ -781,6 +781,15 @@ SRM_CONNECTOR_CONTENT_TYPE srmConnectorGetContentType(SRMConnector *connector);
 UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buffer);
 
 /**
+ * @brief Checks if the connector is not intended for desktop usage.
+ *
+ * Some connectors, such as VR headsets, set this property to 1 to indicate they are not meant for desktop use.
+ *
+ * @return 1 if not meant for desktop usage, 0 if meant for desktop or if disconnected.
+ */
+UInt8 srmConnectorIsNonDesktop(SRMConnector *connector);
+
+/**
  * @}
  */
 

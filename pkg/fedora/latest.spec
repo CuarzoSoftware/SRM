@@ -1,5 +1,5 @@
-%global basever 0.8.0
-%global origrel 2
+%global basever 0.9.0
+%global origrel 1
 %global somajor 0
 
 Name:           cuarzo-srm
@@ -91,5 +91,6 @@ pushd repo/src
 %{_libdir}/pkgconfig/SRM.pc
 
 %changelog
-* Fri Nov 01 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
-- Added official Fedora COPR link to the downloads page.
+* Sat Nov 02 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
+- srmConnectorIsNonDesktop: Checks if a connector is not intended for desktop usage such as VR headsets.
+- Added a new Arch AUR (devel branch) to the downloads page. Thanks @kingdomkind!

@@ -21,6 +21,16 @@ extern "C" {
  */
 
 /**
+ * @brief Sets the device user data.
+ */
+void srmDeviceSetUserData(SRMDevice *device, void *userData);
+
+/**
+ * @brief Retrieves the device user data.
+ */
+void *srmDeviceGetUserData(SRMDevice *device);
+
+/**
  * @brief Get the @ref SRMCore instance to which this device belongs.
  *
  * @param device A pointer to the @ref SRMDevice instance.

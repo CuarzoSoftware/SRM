@@ -29,6 +29,7 @@ typedef struct SRMDeviceThreadContextStruct
 
 struct SRMDeviceStruct
 {
+    void *userData;
     SRMCore *core;
     SRM_DEVICE_DRIVER driver;
     SRM_BUFFER_WRITE_MODE cpuBufferWriteMode;

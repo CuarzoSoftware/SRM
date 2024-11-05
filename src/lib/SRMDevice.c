@@ -5,6 +5,16 @@
 #include <SRMLog.h>
 #include <fcntl.h>
 
+void srmDeviceSetUserData(SRMDevice *device, void *userData)
+{
+    device->userData = userData;
+}
+
+void *srmDeviceGetUserData(SRMDevice *device)
+{
+    return device->userData;
+}
+
 const char *srmDeviceGetName(SRMDevice *device)
 {
     return device->name;

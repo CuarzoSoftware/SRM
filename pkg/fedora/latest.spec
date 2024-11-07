@@ -91,6 +91,7 @@ pushd repo/src
 %{_libdir}/pkgconfig/SRM.pc
 
 %changelog
-* Sat Nov 02 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
+* Thu Nov 07 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
 - srmConnectorIsNonDesktop: Checks if a connector is not intended for desktop usage such as VR headsets.
+- srmDeviceSetUserData and srmDeviceGetUserData.
 - Added a new Arch AUR (devel branch) to the downloads page. Thanks @kingdomkind!

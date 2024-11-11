@@ -191,6 +191,7 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
 
     connector->manufacturer = di_info_get_make(info);
     connector->model = di_info_get_model(info);
+    connector->serial = di_info_get_serial(info);
     di_info_destroy(info);
     drmModeFreePropertyBlob(blob);
     drmModeFreeConnector(connectorRes);
@@ -215,6 +216,12 @@ void srmConnectorDestroyNames(SRMConnector *connector)
     {
         free(connector->model);
         connector->model = NULL;
+    }
+
+    if (connector->serial)
+    {
+        free(connector->serial);
+        connector->serial = NULL;
     }
 }
 
@@ -243,7 +250,6 @@ UInt8 srmConnectorUpdateEncoders(SRMConnector *connector)
     }
 
     drmModeFreeConnector(connectorRes);
-
     return 1;
 }
 

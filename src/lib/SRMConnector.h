@@ -207,40 +207,38 @@ UInt32 srmConnectorGetType(SRMConnector *connector);
 /**
  * @brief Get the name of the connector.
  *
- * This function returns the name of the connector. The name is always unique, even across devices.
- * For example, if there are two **HDMI-A** connectors, one will be called **HDMI-A-0**, and the other **HDMI-A-1**.
+ * The name is always unique, even across devices but could change after a reboot.
  *
- * @param connector Pointer to the @ref SRMConnector for which to retrieve the name.
- * @return The name of the connector.
+ * @return The name of the connector, e.g. HDMI-A-1 or "Unknown" if not available.
  */
 const char *srmConnectorGetName(SRMConnector *connector);
 
 /**
- * @brief Get the manufacturer of the connector.
+ * @brief Get the manufacturer of the connected display.
  *
- * This function returns the manufacturer of the connector.
- *
- * @param connector Pointer to the @ref SRMConnector for which to retrieve the manufacturer.
- * @return The manufacturer of the connector.
+ * @return The manufacturer name or "Unknown" if not available.
  */
 const char *srmConnectorGetManufacturer(SRMConnector *connector);
 
 /**
- * @brief Get the model of the connector.
+ * @brief Get the model of the connected display.
  *
- * This function returns the model of the connector.
- *
- * @param connector Pointer to the @ref SRMConnector for which to retrieve the model.
- * @return The model of the connector.
+ * @return The model name or "Unknown" if not available.
  */
 const char *srmConnectorGetModel(SRMConnector *connector);
 
 /**
+ * @brief Get the serial number of the connected display.
+ *
+ * @note The serial number is unique and persistent across reboots.
+ *
+ * @return The serial number of the connected display or `NULL` if not available.
+ */
+const char *srmConnectorGetSerial(SRMConnector *connector);
+
+/**
  * @brief Get a list of available connector encoders.
  *
- * This function returns a list of available encoders for the given @ref SRMConnector.
- *
- * @param connector Pointer to the @ref SRMConnector for which to retrieve the encoders.
  * @return A list of available connector encoders (@ref SRMEncoder).
  */
 SRMList *srmConnectorGetEncoders(SRMConnector *connector);

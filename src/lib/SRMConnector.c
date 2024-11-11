@@ -80,6 +80,11 @@ const char *srmConnectorGetModel(SRMConnector *connector)
     return connector->model ? connector->model : "Unknown";
 }
 
+const char *srmConnectorGetSerial(SRMConnector *connector)
+{
+    return connector->serial;
+}
+
 SRMList *srmConnectorGetEncoders(SRMConnector *connector)
 {
     return connector->encoders;

@@ -290,16 +290,6 @@ UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels);
 UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y);
 
 /**
- * @brief Get the model of the connector.
- *
- * This function returns the model of the connector.
- *
- * @param connector Pointer to the @ref SRMConnector for which to retrieve the model.
- * @return The model of the connector.
- */
-const char *srmConnectorGetModel(SRMConnector *connector);
-
-/**
  * @brief Get a list of available connector encoders.
  *
  * This function returns a list of available encoders for the given @ref SRMConnector.

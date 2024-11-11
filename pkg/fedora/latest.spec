@@ -1,4 +1,4 @@
-%global basever 0.9.0
+%global basever 0.10.0
 %global origrel 1
 %global somajor 0
 
@@ -91,7 +91,5 @@ pushd repo/src
 %{_libdir}/pkgconfig/SRM.pc
 
 %changelog
-* Thu Nov 07 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
-- srmConnectorIsNonDesktop: Checks if a connector is not intended for desktop usage such as VR headsets.
-- srmDeviceSetUserData and srmDeviceGetUserData.
-- Added a new Arch AUR (devel branch) to the downloads page. Thanks @kingdomkind!
+* Mon Nov 11 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
+- srmConnectorGetSerial: Retrieves the serial number of a connected display.

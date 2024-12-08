@@ -499,6 +499,15 @@ UInt32 srmConnectorGetFramebufferID(SRMConnector *connector);
 EGLContext srmConnectorGetContext(SRMConnector *connector);
 
 /**
+ * @brief Retrieves the age of the current buffer.
+ *
+ * This function returns the age of the buffer as specified in the
+ * [EGL_EXT_buffer_age](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_buffer_age.txt)
+ * extension specification.
+ */
+UInt32 srmConnectorGetCurrentBufferAge(SRMConnector *connector);
+
+/**
  * @brief Returns the current framebuffer index.
  *
  * This function returns the index of the current framebuffer where the rendered content is stored

@@ -443,7 +443,7 @@ void *srmConnectorRenderThread(void *conn)
         connector->hasRepaintCond = 1;
 
     connector->pendingPageFlip = 0;
-
+    connector->bufferAgeFrame = 0;
     connector->drmEventCtx.version = DRM_EVENT_CONTEXT_VERSION,
     connector->drmEventCtx.vblank_handler = NULL,
     connector->drmEventCtx.page_flip_handler = &srmRenderModeCommonPageFlipHandler,
@@ -516,13 +516,19 @@ void *srmConnectorRenderThread(void *conn)
                     /* Scanning out a custom user buffer (skip the render mode interface) */
                     if (connector->userScanoutBufferRef[0])
                     {
+                        connector->bufferAgeFrame = 0;
                         srmRenderModeCommonDestroySync(connector);
                         srmRenderModeCommonPageFlip(connector, connector->userScanoutBufferRef[0]->scanout.fb);
                         connector->interface->pageFlipped(connector, connector->interfaceData);
                     }
                     /* Normal connector rendering */
                     else
+                    {
                         connector->renderInterface.flipPage(connector);
+
+                        if (connector->bufferAgeFrame < connector->renderInterface.getBuffersCount(connector))
+                            connector->bufferAgeFrame++;
+                    }
 
                     /* Release previous custom scanout buffer if any */
                     if (connector->userScanoutBufferRef[0] || connector->userScanoutBufferRef[1])
@@ -544,6 +550,8 @@ void *srmConnectorRenderThread(void *conn)
         if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
         {
             SRMWarning("[connector] Changing mode started.");
+
+            connector->bufferAgeFrame = 0;
 
             if (connector->renderInterface.updateMode(connector))
             {
@@ -572,6 +580,7 @@ void *srmConnectorRenderThread(void *conn)
         else if (connector->state == SRM_CONNECTOR_STATE_RESUMING)
         {
             connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
+            connector->bufferAgeFrame = 0;
             connector->renderInterface.resume(connector);
             pthread_mutex_unlock(&connector->stateMutex);
             usleep(1000);

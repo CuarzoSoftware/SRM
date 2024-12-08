@@ -406,6 +406,19 @@ void srmConnectorUninitialize(SRMConnector *connector)
     SRMDebug("[%s] [%s] Uninitialized.", connector->device->shortName, connector->name);
 }
 
+UInt32 srmConnectorGetCurrentBufferAge(SRMConnector *connector)
+{
+    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
+        return 0;
+
+    UInt32 num = srmConnectorGetBuffersCount(connector);
+
+    if (connector->bufferAgeFrame >= num)
+        return num;
+
+    return 0;
+}
+
 UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)
 {
     if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)

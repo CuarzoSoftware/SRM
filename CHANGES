@@ -1,3 +1,17 @@
+SRM (0.11.0-1)
+
+  # License
+
+  * Updated license to LGPLv2.1.
+
+  # API Additions
+
+  * srmConnectorGetCurrentBufferAge: Retrieves the age of the current buffer according to the [EGL_EXT_buffer_age](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_buffer_age.txt) extension specification.
+  * srmBufferWrite2(Begin/Update/End): An alternative to srmBufferWrite() that allows multiple texture updates without issuing an immediate internal synchronization.
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sun, 08 Dec 2024 20:12:27 -0300
+
+
 SRM (0.10.0-1)
 
   # API Additions

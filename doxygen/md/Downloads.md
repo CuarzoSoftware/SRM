@@ -5,9 +5,8 @@
 Pre-built binaries are provided for the following distributions. Please be aware that their versions may not always match the latest SRM release.
 
 * **Arch** : [libsrm](https://aur.archlinux.org/packages/libsrm) - *Thanks to [@TrialnError](https://aur.archlinux.org/account/TrialnError)*.
-* **Arch** : [libsrm-devel-git](https://aur.archlinux.org/packages/libsrm-devel-git) - *Thanks to [@kingdomkind ](https://github.com/kingdomkind) (devel branch)*.
 * **Debian** : [libsrm](https://packages.debian.org/source/sid/libsrm) - *Thanks to [Sudip Mukherjee](https://github.com/sudipm-mukherjee)*.
-* **Fedora** : [cuarzo-srm](https://copr.fedorainfracloud.org/coprs/ehopperdietzel/cuarzo/) - *By [Eduardo Hopperdietzel](https://github.com/ehopperdietzel) (always up to date)*.
+* **Fedora** : [cuarzo-srm](https://copr.fedorainfracloud.org/coprs/cuarzo/software/) - *By [Cuarzo Software](https://github.com/CuarzoSoftware) (always up to date)*.
 * **NixOS** : [srm-cuarzo](https://search.nixos.org/packages?channel=unstable&show=srm-cuarzo&from=0&size=50&sort=relevance&type=packages&query=srm) - *Thanks to [Marco Rebhan](https://github.com/2xsaiko)*.
 
 ## Manual Building

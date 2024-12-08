@@ -1,4 +1,4 @@
-%global basever 0.10.0
+%global basever 0.11.0
 %global origrel 1
 %global somajor 0
 
@@ -7,7 +7,7 @@ Version:        %{basever}%{?origrel:_%{origrel}}
 Release:        1%{?dist}
 Summary:        Simple Rendering Manager: C library for building OpenGL ES 2.0 applications on top of DRM/KMS
 
-License:        MIT
+License:        LGPLv2.1
 URL:            https://github.com/CuarzoSoftware/SRM
 
 BuildRequires:  tar
@@ -91,5 +91,7 @@ pushd repo/src
 %{_libdir}/pkgconfig/SRM.pc
 
 %changelog
-* Mon Nov 11 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
-- srmConnectorGetSerial: Retrieves the serial number of a connected display.
+* Sun Dec 08 2024 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
+- Updated license to LGPLv2.1.
+- srmConnectorGetCurrentBufferAge: Retrieves the age of the current buffer according to the [EGL_EXT_buffer_age](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_buffer_age.txt) extension specification.
+- srmBufferWrite2(Begin/Update/End): An alternative to srmBufferWrite() that allows multiple texture updates without issuing an immediate internal synchronization.

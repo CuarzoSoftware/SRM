@@ -7,7 +7,7 @@ Version:        %{basever}%{?origrel:_%{origrel}}
 Release:        1%{?dist}
 Summary:        Simple Rendering Manager: C library for building OpenGL ES 2.0 applications on top of DRM/KMS
 
-License:        MIT
+License:        LGPLv2.1
 URL:            https://github.com/CuarzoSoftware/SRM
 
 BuildRequires:  tar

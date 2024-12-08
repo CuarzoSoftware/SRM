@@ -66,6 +66,12 @@ struct SRMBufferStruct
     GLint glFormat;
     GLint glType;
     UInt8 keepTexturesAlive; // For GL wrapper case
+
+    // Write 2
+    struct
+    {
+        UInt8 began;
+    } w2;
 };
 
 SRMBuffer *srmBufferCreate(SRMCore *core, SRMDevice *allocator);

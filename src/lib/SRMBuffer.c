@@ -578,6 +578,157 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
     return 0;
 }
 
+UInt8 srmBufferWrite2Begin(SRMBuffer *buffer)
+{
+    if (!buffer)
+        return 0;
+
+    if (!(buffer->caps & SRM_BUFFER_CAP_WRITE))
+        goto fail;
+
+    if (buffer->src != SRM_BUFFER_SRC_CPU && buffer->target == GL_TEXTURE_EXTERNAL_OES)
+    {
+        SRMError("[%s] srmBufferWrite() failed. Buffers with the GL_TEXTURE_EXTERNAL_OES target are immutable.", buffer->allocator->name);
+        return 0;
+    }
+
+    pthread_mutex_lock(&buffer->mutex);
+    buffer->w2.began = 1;
+
+    if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_PRIME)
+    {
+        assert(buffer->map != NULL);
+        buffer->sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_WRITE;
+        ioctl(buffer->dma.fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
+        return 1;
+    }
+    else if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_GBM)
+    {
+        assert(buffer->bo != NULL);
+        return 1;
+    }
+    else if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_GLES)
+    {
+        srmSaveContext();
+        srmDeviceMakeCurrent(buffer->allocator);
+
+        if (buffer->fence != EGL_NO_SYNC_KHR)
+        {
+            buffer->allocator->eglFunctions.eglDestroySyncKHR(buffer->allocator->eglDisplay, buffer->fence);
+            buffer->fence = EGL_NO_SYNC_KHR;
+        }
+        return 1;
+    }
+
+fail:
+    SRMError("[%s] Buffer can not be written.", buffer->allocator->name);
+    return 0;
+}
+
+UInt8 srmBufferWrite2Update(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY, UInt32 dstWidth, UInt32 dstHeight, const void *pixels)
+{
+    if (!pixels || !buffer || !buffer->w2.began)
+        return 0;
+
+    if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_PRIME)
+    {
+        const UInt8 *src = pixels;
+        UInt8 *dst = buffer->map;
+        dst = &dst[buffer->dma.offsets[0] + dstY*buffer->dma.strides[0] + dstX*buffer->pixelSize];
+
+        if (dstX == 0 && dstWidth == buffer->dma.width && stride == buffer->dma.strides[0])
+        {
+            memcpy(dst,
+                   src,
+                   stride * dstHeight);
+        }
+        else
+        {
+            for (UInt32 i = 0; i < dstHeight; i++)
+            {
+                memcpy(dst,
+                       src,
+                       buffer->pixelSize * dstWidth);
+
+                dst += buffer->dma.strides[0];
+                src += stride;
+            }
+        }
+        return 1;
+    }
+    else if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_GBM)
+    {
+        UInt32 mapStride;
+        void *mapData = NULL;
+        UInt8 *dst = gbm_bo_map(buffer->bo, dstX, dstY, dstWidth, dstHeight, GBM_BO_TRANSFER_WRITE, &mapStride, &mapData);
+
+        if (dst == NULL)
+            return 0;
+
+        const UInt8 *src = pixels;
+
+        if (dstX == 0 && dstWidth == buffer->dma.width && stride == mapStride)
+        {
+            memcpy(dst,
+                   src,
+                   stride * dstHeight);
+        }
+        else
+        {
+            for (UInt32 i = 0; i < dstHeight; i++)
+            {
+                memcpy(dst,
+                       src,
+                       buffer->pixelSize * dstWidth);
+
+                dst += mapStride;
+                src += stride;
+            }
+        }
+
+        gbm_bo_unmap(buffer->bo, mapData);
+        return 1;
+    }
+    else if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_GLES)
+    {
+        glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(buffer->allocator, buffer));
+        glPixelStorei(GL_UNPACK_ALIGNMENT, buffer->pixelSize);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / buffer->pixelSize);
+        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+        glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+
+        glTexSubImage2D(GL_TEXTURE_2D, 0, dstX, dstY, dstWidth, dstHeight,
+                        buffer->glFormat, buffer->glType, pixels);
+        return 1;
+    }
+
+    return 0;
+}
+
+UInt8 srmBufferWrite2End(SRMBuffer *buffer)
+{
+    if (!buffer || !buffer->w2.began)
+        return 0;
+
+    buffer->w2.began = 0;
+
+    if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_PRIME)
+    {
+        buffer->sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE;
+        ioctl(buffer->dma.fds[0], DMA_BUF_IOCTL_SYNC, &buffer->sync);
+    }
+    else if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_GLES)
+    {
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        srmBufferCreateSync(buffer);
+        srmRestoreContext();
+    }
+
+    pthread_mutex_unlock(&buffer->mutex);
+    return 1;
+}
+
 SRM_BUFFER_FORMAT srmBufferGetFormat(SRMBuffer *buffer)
 {
     return buffer->dma.format;

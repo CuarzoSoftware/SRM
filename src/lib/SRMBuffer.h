@@ -312,6 +312,51 @@ UInt8 srmBufferWrite(SRMBuffer *buffer,
                      const void *pixels);
 
 /**
+ * @brief Prepares an @ref SRMBuffer for writing.
+ *
+ * The srmBufferWrite2 functions provide the same functionality as srmBufferWrite(),
+ * but they allow for multiple writes without requiring immediate internal syncing,
+ * yielding better performance.
+ *
+ * If 1 is returned, calling any function except for srmBufferWrite2Update()
+ * or srmBufferWrite2End() will cause a deadlock.
+ *
+ * If 0 is returned, it means it failed, and neither srmBufferWrite2Update()
+ * nor srmBufferWrite2End() should be called.
+ *
+ * @param buffer Pointer to the @ref SRMBuffer to write data to.
+ * @return 1 on success, or 0 on failure.
+ */
+UInt8 srmBufferWrite2Begin(SRMBuffer *buffer);
+
+/**
+ * @brief Writes pixel data to the buffer.
+ *
+ * This function can only be called if srmBufferWrite2Begin() was previously called and returned 1.
+ * The parameters are the same as those defined in srmBufferWrite().
+ *
+ * @return 1 on success, or 0 on failure.
+ */
+UInt8 srmBufferWrite2Update(SRMBuffer *buffer,
+                            UInt32 stride,
+                            UInt32 dstX,
+                            UInt32 dstY,
+                            UInt32 dstWidth,
+                            UInt32 dstHeight,
+                            const void *pixels);
+
+/**
+ * @brief Finalizes the write operation to the buffer.
+ *
+ * This function should be called after completing all write operations initiated by srmBufferWrite2Begin().
+ * It ensures that any pending writes are completed and the buffer is in a consistent state.
+ *
+ * @param buffer Pointer to the @ref SRMBuffer that was used for writing.
+ * @return 1 on success, or 0 if srmBufferWrite2Begin() wasn't called or failed.
+ */
+UInt8 srmBufferWrite2End(SRMBuffer *buffer);
+
+/**
  * @brief Reads pixel data from an @ref SRMBuffer.
  *
  * This function reads pixel data from the specified region of an @ref SRMBuffer and copies it to the destination buffer.

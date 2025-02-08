@@ -221,7 +221,7 @@ static UInt8 render(SRMConnector *connector)
     glBindFramebuffer(GL_FRAMEBUFFER, data->rendererFBs[data->currentBufferIndex]);
     connector->interface->paintGL(connector, connector->interfaceData);
     eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->rendererContext);
-    return 1;
+    return !connector->lockCurrentBuffer;
 }
 
 static UInt8 flipPage(SRMConnector *connector)
@@ -230,7 +230,6 @@ static UInt8 flipPage(SRMConnector *connector)
     srmRenderModeCommonCreateSync(connector);
     srmRenderModeCommonPageFlip(connector, data->drmFBs[data->currentBufferIndex]);
     data->currentBufferIndex = nextBufferIndex(connector);
-    connector->interface->pageFlipped(connector, connector->interfaceData);
     connector->interface->pageFlipped(connector, connector->interfaceData);
     return 1;
 }

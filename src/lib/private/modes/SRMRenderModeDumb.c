@@ -457,6 +457,9 @@ static UInt8 render(SRMConnector *connector)
                    EGL_NO_SURFACE, EGL_NO_SURFACE,
                    data->c.rendererContext);
 
+    if (connector->lockCurrentBuffer)
+        return 0;
+
     srmDeviceSyncWait(connector->device->rendererDevice);
     return 1;
 }

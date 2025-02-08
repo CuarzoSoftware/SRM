@@ -503,6 +503,11 @@ void *srmConnectorRenderThread(void *conn)
 
         pthread_mutex_lock(&connector->stateMutex);
 
+paintGLChangedLockCurrentBuffer:
+
+        if (connector->lockCurrentBuffer)
+            connector->repaintRequested = 0;
+
         if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
         {
             if (connector->repaintRequested)
@@ -512,6 +517,9 @@ void *srmConnectorRenderThread(void *conn)
                     connector->inPaintGL = 1;
                     connector->renderInterface.render(connector);
                     connector->inPaintGL = 0;
+
+                    if (connector->lockCurrentBuffer)
+                        goto paintGLChangedLockCurrentBuffer;
 
                     /* Scanning out a custom user buffer (skip the render mode interface) */
                     if (connector->userScanoutBufferRef[0])

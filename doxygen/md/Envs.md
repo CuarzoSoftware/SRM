@@ -23,7 +23,7 @@ Writeback connectors are specialized virtual connectors designed to access pixel
 ## Cursor Planes
 
 * **SRM_FORCE_LEGACY_CURSOR**=[0,1] (default = 1)<br>
-The legacy cursor IOCTLs are used by default, even when the atomic API is enabled, as they allow the cursor to be updated asynchronously, providing a much smoother experience.
+The legacy cursor IOCTLs are used by default, even when the atomic API is enabled, as they allow the cursor to be updated asynchronously, providing a much smoother experience. However, on some drivers, this may cause the cursor to flicker.
 
 * **SRM_NVIDIA_CURSOR**=[0,1] (default = 0)<br>
 Cursor planes are disabled by default for proprietary NVIDIA drivers, as updating the cursor can sometimes cause screen stutter. Nouveau drivers are not affected by this option.

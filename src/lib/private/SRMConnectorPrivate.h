@@ -107,6 +107,7 @@ struct SRMConnectorStruct
     UInt8 hasRepaintMutex;
     pthread_mutex_t repaintMutex;
 
+    UInt8 lockCurrentBuffer;
     UInt8 repaintRequested;
     pthread_mutex_t stateMutex;
     SRMBox *damageBoxes;

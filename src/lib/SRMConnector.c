@@ -365,6 +365,9 @@ fail:
 
 UInt8 srmConnectorRepaint(SRMConnector *connector)
 {
+    if (connector->lockCurrentBuffer)
+        return 0;
+
     if (connector->state == SRM_CONNECTOR_STATE_INITIALIZING ||
         connector->state == SRM_CONNECTOR_STATE_INITIALIZED ||
         connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
@@ -980,4 +983,14 @@ EGLContext srmConnectorGetContext(SRMConnector *connector)
 UInt8 srmConnectorIsNonDesktop(SRMConnector *connector)
 {
     return connector->nonDesktop;
+}
+
+void srmConnectorSetCurrentBufferLocked(SRMConnector *connector, UInt8 locked)
+{
+    connector->lockCurrentBuffer = locked;
+}
+
+UInt8 srmConnectorIsCurrentBufferLocked(SRMConnector *connector)
+{
+    return connector->lockCurrentBuffer;
 }

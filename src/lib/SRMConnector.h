@@ -445,7 +445,7 @@ UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *int
  * After each `paintGL()` event, this method must be called again to schedule a new frame.
  *
  * @param connector Pointer to the @ref SRMConnector to schedule a new rendering frame.
- * @return 1 if scheduling is successful, 0 if an error occurs.
+ * @return 1 if scheduling is successful, 0 otherwise.
  *
  * @note This function triggers paintGL() and pageFlipped() events in the rendering process.
  */
@@ -785,6 +785,26 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
  * @return 1 if not meant for desktop usage, 0 if meant for desktop or if disconnected.
  */
 UInt8 srmConnectorIsNonDesktop(SRMConnector *connector);
+
+/**
+ * @brief Locks the buffer currently being displayed and ignores srmConnectorRepaint() calls.
+ *
+ * When set to 1, no `paintGL()` or `pageFlipped()` events are triggered. The default value is 0.
+ *
+ * @param connector The @ref SRMConnector instance.
+ * @param locked    A value of 1 locks the current buffer, 0 unlocks it.
+ */
+void srmConnectorSetCurrentBufferLocked(SRMConnector *connector, UInt8 locked);
+
+/**
+ * @brief Retrieves the locked state of the current buffer.
+ *
+ * @see srmConnectorSetCurrentBufferLocked()
+ *
+ * @param connector The @ref SRMConnector instance.
+ * @return          A value of 1 indicates the current buffer is locked, 0 indicates it is unlocked.
+ */
+UInt8 srmConnectorIsCurrentBufferLocked(SRMConnector *connector);
 
 /**
  * @}

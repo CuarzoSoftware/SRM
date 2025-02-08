@@ -614,6 +614,9 @@ static UInt8 render(SRMConnector *connector)
     glBindFramebuffer(GL_FRAMEBUFFER, data->c.rendererFBs[data->c.currentBufferIndex]);
     connector->interface->paintGL(connector, connector->interfaceData);
 
+    if (connector->lockCurrentBuffer)
+        return 0;
+
     /* Attempt to directly scan the texture if not set by the user, otherwise, fall back to blitting. */
     if (!connector->userScanoutBufferRef[0])
     {

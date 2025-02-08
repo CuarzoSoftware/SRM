@@ -473,6 +473,10 @@ static UInt8 render(SRMConnector *connector)
     glBindFramebuffer(GL_FRAMEBUFFER, data->c.rendererFBs[data->c.currentBufferIndex]);
     connector->interface->paintGL(connector, connector->interfaceData);
     eglMakeCurrent(connector->device->rendererDevice->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->c.rendererContext);
+
+    if (connector->lockCurrentBuffer)
+        return 0;
+
     srmDeviceSyncWait(connector->device->rendererDevice);
     return 1;
 }

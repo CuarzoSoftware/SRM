@@ -1,12 +1,13 @@
 <doxygenlayout version="1.0">
   <navindex>
-    <tab type="mainpage" title="🏠 Home" visible="yes" url="md_md__mainpage.html"></tab>
-    <tab type="modules" visible="yes" title="📖 API"></tab>
-    <tab type="usergroup" visible="yes" title="🎓 Tutorial" url="md_md__tutorial.html"/>
-    <tab type="usergroup" visible="yes" title="🕹️ Examples" url="md_md__examples.html"/>
-    <tab type="usergroup" visible="yes" title="📦 Downloads" url="md_md__downloads.html"/>
-    <tab type="usergroup" visible="yes" title="⚙️ Environment" url="md_md__envs.html"/>
-    <tab type="usergroup" visible="yes" title="💬 Contact" url="md_md__contact.html"/>
+    <tab type="mainpage" title="🏠 Home" visible="yes" url="@ref main_page"></tab>
+    <tab type="classes" visible="yes" title="📖 API"/>
+   
+    <tab type="usergroup" visible="yes" title="🎓 Tutorial" url="@ref tutorial_page"/>
+    <tab type="usergroup" visible="yes" title="🕹️ Examples" url="@ref examples_page"/>
+    <tab type="usergroup" visible="yes" title="📦 Downloads" url="@ref downloads_page"/>
+    <tab type="usergroup" visible="yes" title="⚙️ Environment" url="@ref envs_page"/>
+    <tab type="usergroup" visible="yes" title="💬 Contact" url="@ref contact_page"/>
   </navindex>
   <group>
   	<includes visible="$SHOW_INCLUDE_FILES"/>

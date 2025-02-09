@@ -17,12 +17,12 @@ It also ensures textures can be rendered across all screens, even if they are at
 
 ### Links
 
-* [📖 C API Documentation](https://cuarzosoftware.github.io/SRM/modules.html)
-* [🎓 Tutorial](https://cuarzosoftware.github.io/SRM/md_md__tutorial.html)
-* [🕹️ Examples](https://cuarzosoftware.github.io/SRM/md_md__examples.html)
-* [📦 Downloads](https://cuarzosoftware.github.io/SRM/md_md__downloads.html)
-* [⚙️ Environment](https://cuarzosoftware.github.io/SRM/md_md__envs.html)
-* [💬 Contact](https://cuarzosoftware.github.io/SRM/md_md__contact.html)
+* [📖 C API Documentation](https://cuarzosoftware.github.io/SRM/annotated.html)
+* [🎓 Tutorial](https://cuarzosoftware.github.io/SRM/tutorial_page.html)
+* [🕹️ Examples](https://cuarzosoftware.github.io/SRM/examples_page.html)
+* [📦 Downloads](https://cuarzosoftware.github.io/SRM/downloads_page.html)
+* [⚙️ Environment](https://cuarzosoftware.github.io/SRM/envs_page.html)
+* [💬 Contact](https://cuarzosoftware.github.io/SRM/contact_page.html)
 
 ### Used By
 

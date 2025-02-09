@@ -1,4 +1,4 @@
-# 🎓 Tutorial
+# 🎓 Tutorial {#tutorial_page}
 
 In this tutorial, you will learn the basics of SRM to kickstart your journey into creating DRM/KMS applications with OpenGL ES 2.0. 
 

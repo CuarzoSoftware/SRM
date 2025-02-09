@@ -1,4 +1,4 @@
-# 🕹️ Examples
+# 🕹️ Examples {#examples_page}
 
 1. **For learning the basics:**
    - Refer to the **[srm-basic example](https://github.com/CuarzoSoftware/SRM/tree/main/src/examples/srm-basic)**.

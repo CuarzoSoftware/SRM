@@ -1,4 +1,4 @@
-# 📦 Downloads
+# 📦 Downloads {#downloads_page}
 
 ## Pre-built Binaries
 

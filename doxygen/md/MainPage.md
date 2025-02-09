@@ -1,4 +1,4 @@
-# 🏠 Simple Rendering Manager
+# 🏠 Simple Rendering Manager {#main_page}
 
 SRM is a C library that simplifies the development of Linux DRM/KMS applications.
 

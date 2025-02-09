@@ -1,12 +1,7 @@
 <doxygenlayout version="1.0">
   <navindex>
     <tab type="mainpage" title="🏠 Home" visible="yes" url="@ref main_page"></tab>
-    <tab type="classes" visible="yes" title="📖 API">
-      <tab type="classes" visible="yes" title=""/>
-      <tab type="classindex" visible="$ALPHABETICAL_INDEX" title=""/> 
-      <tab type="hierarchy" visible="yes" title=""/>
-      <tab type="classmembers" visible="yes" title=""/>
-    </tab>
+    <tab type="topics" title="📖 API"/>
     <tab type="usergroup" visible="yes" title="🎓 Tutorial" url="@ref tutorial_page"/>
     <tab type="usergroup" visible="yes" title="🕹️ Examples" url="@ref examples_page"/>
     <tab type="usergroup" visible="yes" title="📦 Downloads" url="@ref downloads_page"/>

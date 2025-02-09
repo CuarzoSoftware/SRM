@@ -17,7 +17,7 @@ It also ensures textures can be rendered across all screens, even if they are at
 
 ### Links
 
-* [📖 C API Documentation](https://cuarzosoftware.github.io/SRM/annotated.html)
+* [📖 C API Documentation](https://cuarzosoftware.github.io/SRM/topics.html)
 * [🎓 Tutorial](https://cuarzosoftware.github.io/SRM/tutorial_page.html)
 * [🕹️ Examples](https://cuarzosoftware.github.io/SRM/examples_page.html)
 * [📦 Downloads](https://cuarzosoftware.github.io/SRM/downloads_page.html)

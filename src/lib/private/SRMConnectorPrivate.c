@@ -38,11 +38,20 @@ SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id)
     pthread_mutex_init(&connector->stateMutex, NULL);
     pthread_mutex_init(&connector->propsMutex, NULL);
 
-    srmConnectorUpdateProperties(connector);
-    srmConnectorUpdateNames(connector);
-    srmConnectorUpdateEncoders(connector);
-    srmConnectorUpdateModes(connector);
+    drmModeConnector *res = drmModeGetConnector(device->fd, connector->id);
+
+    srmConnectorUpdateProperties(connector, res);
+    srmConnectorUpdateNames(connector, res);
+    srmConnectorUpdateEncoders(connector, res);
+    srmConnectorUpdateModes(connector, res);
+
+    if (res)
+        drmModeFreeConnector(res);
+    else
+        SRMError("[srmConnectorCreate] Failed to get resources for connector %d.", id);
+
     srmConnectorSetContentType(connector, SRM_CONNECTOR_CONTENT_TYPE_GRAPHICS);
+
     return connector;
 }
 
@@ -62,24 +71,16 @@ void srmConnectorDestroy(SRMConnector *connector)
     free(connector);
 }
 
-UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
+UInt8 srmConnectorUpdateProperties(SRMConnector *connector, drmModeConnector *res)
 {
-    drmModeConnector *connectorRes = drmModeGetConnector(connector->device->fd, connector->id);
+    if (!res) return 0;
 
-    if (!connectorRes)
-    {
-        SRMError("[%s] Could not get connector %d resources.", connector->device->shortName, connector->id);
-        return 0;
-    }
-
-    connector->subpixel = (SRM_CONNECTOR_SUBPIXEL)connectorRes->subpixel;
-    connector->mmHeight = connectorRes->mmHeight;
-    connector->mmWidth = connectorRes->mmWidth;
-    connector->connected = connectorRes->connection == DRM_MODE_CONNECTED;
-    connector->type = connectorRes->connector_type;
-    connector->nameID = connectorRes->connector_type_id;
-
-    drmModeFreeConnector(connectorRes);
+    connector->subpixel = (SRM_CONNECTOR_SUBPIXEL)res->subpixel;
+    connector->mmHeight = res->mmHeight;
+    connector->mmWidth = res->mmWidth;
+    connector->connected = res->connection == DRM_MODE_CONNECTED;
+    connector->type = res->connector_type;
+    connector->nameID = res->connector_type_id;
 
     drmModeObjectPropertiesPtr props = drmModeObjectGetProperties(connector->device->fd, connector->id, DRM_MODE_OBJECT_CONNECTOR);
 
@@ -133,7 +134,7 @@ UInt8 srmConnectorUpdateProperties(SRMConnector *connector)
     return 1;
 }
 
-UInt8 srmConnectorUpdateNames(SRMConnector *connector)
+UInt8 srmConnectorUpdateNames(SRMConnector *connector, drmModeConnector *res)
 {
     srmConnectorDestroyNames(connector);
 
@@ -142,29 +143,21 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
     snprintf(name, sizeof(name) - 1, "%s-%d", srmGetConnectorTypeString(connector->type), connector->nameID);
     connector->name = strdup(name);
 
-    if (!connector->connected)
+    if (!connector->connected || !res)
         return 0;
-
-    drmModeConnector *connectorRes = drmModeGetConnector(connector->device->fd, connector->id);
-
-    if (!connectorRes)
-    {
-        SRMError("[%s] Could not get connector %d resources.", connector->device->shortName, connector->id);
-        return 0;
-    }
 
     drmModePropertyBlobPtr blob = NULL;
 
-    for (int i = 0; i < connectorRes->count_props; i++)
+    for (int i = 0; i < res->count_props; i++)
     {
-        drmModePropertyPtr prop = drmModeGetProperty(connector->device->fd, connectorRes->props[i]);
+        drmModePropertyPtr prop = drmModeGetProperty(connector->device->fd, res->props[i]);
 
         if (!prop)
             continue;
 
         if (strcmp(prop->name, "EDID") == 0)
         {
-            blob = drmModeGetPropertyBlob(connector->device->fd, connectorRes->prop_values[i]);
+            blob = drmModeGetPropertyBlob(connector->device->fd, res->prop_values[i]);
             drmModeFreeProperty(prop);
             break;
         }
@@ -175,7 +168,6 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
     if (!blob)
     {
         SRMError("[%s] Error getting EDID property blob for connector %d: %s", connector->device->shortName, connector->id, strerror(errno));
-        drmModeFreeConnector(connectorRes);
         return 0;
     }
 
@@ -185,7 +177,6 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
     {
         SRMError("[%s] Failed to parse EDID of connector %d: %s", connector->device->shortName, connector->id, strerror(errno));
         drmModeFreePropertyBlob(blob);
-        drmModeFreeConnector(connectorRes);
         return 0;
     }
 
@@ -194,7 +185,6 @@ UInt8 srmConnectorUpdateNames(SRMConnector *connector)
     connector->serial = di_info_get_serial(info);
     di_info_destroy(info);
     drmModeFreePropertyBlob(blob);
-    drmModeFreeConnector(connectorRes);
     return 1;
 }
 
@@ -225,31 +215,24 @@ void srmConnectorDestroyNames(SRMConnector *connector)
     }
 }
 
-UInt8 srmConnectorUpdateEncoders(SRMConnector *connector)
+UInt8 srmConnectorUpdateEncoders(SRMConnector *connector, drmModeConnector *res)
 {
     srmConnectorDestroyEncoders(connector);
     connector->encoders = srmListCreate();
 
-    drmModeConnector *connectorRes = drmModeGetConnector(connector->device->fd, connector->id);
+    if (!res) return 0;
 
-    if (!connectorRes)
-    {
-        SRMError("[%s] [%s] Could not get connector resources.", connector->device->shortName, connector->name);
-        return 0;
-    }
-
-    for (int i = 0; i < connectorRes->count_encoders; i++)
+    for (int i = 0; i < res->count_encoders; i++)
     {
         SRMListForeach(item, connector->device->encoders)
         {
             SRMEncoder *encoder = srmListItemGetData(item);
 
-            if (encoder->id == connectorRes->encoders[i])
+            if (encoder->id == res->encoders[i])
                 srmListAppendData(connector->encoders, encoder);
         }
     }
 
-    drmModeFreeConnector(connectorRes);
     return 1;
 }
 
@@ -262,22 +245,16 @@ void srmConnectorDestroyEncoders(SRMConnector *connector)
     }
 }
 
-UInt8 srmConnectorUpdateModes(SRMConnector *connector)
+UInt8 srmConnectorUpdateModes(SRMConnector *connector, drmModeConnector *res)
 {
     srmConnectorDestroyModes(connector);
     connector->modes = srmListCreate();
 
-    drmModeConnector *connectorRes = drmModeGetConnector(connector->device->fd, connector->id);
+    if (!res) return 0;
 
-    if (!connectorRes)
+    for (int i = 0; i < res->count_modes; i++)
     {
-        SRMError("[%s] [%s] Could not get connector resources.", connector->device->shortName, connector->name);
-        return 0;
-    }
-
-    for (int i = 0; i < connectorRes->count_modes; i++)
-    {
-        SRMConnectorMode *connectorMode = srmConnectorModeCreate(connector, (void*)&connectorRes->modes[i]);
+        SRMConnectorMode *connectorMode = srmConnectorModeCreate(connector, (void*)&res->modes[i]);
 
         if (connectorMode)
             connectorMode->connectorLink = srmListAppendData(connector->modes, connectorMode);
@@ -287,9 +264,6 @@ UInt8 srmConnectorUpdateModes(SRMConnector *connector)
 
     // Set the preferred as default
     connector->currentMode = connector->preferredMode;
-
-    drmModeFreeConnector(connectorRes);
-
     return 1;
 }
 

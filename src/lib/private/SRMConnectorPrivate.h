@@ -140,15 +140,15 @@ struct SRMConnectorStruct
 SRMConnector *srmConnectorCreate(SRMDevice *device, UInt32 id);
 void srmConnectorDestroy(SRMConnector *connector);
 
-UInt8 srmConnectorUpdateProperties(SRMConnector *connector);
+UInt8 srmConnectorUpdateProperties(SRMConnector *connector, drmModeConnector *res);
 
-UInt8 srmConnectorUpdateNames(SRMConnector *connector);
+UInt8 srmConnectorUpdateNames(SRMConnector *connector, drmModeConnector *res);
 void srmConnectorDestroyNames(SRMConnector *connector);
 
-UInt8 srmConnectorUpdateEncoders(SRMConnector *connector);
+UInt8 srmConnectorUpdateEncoders(SRMConnector *connector, drmModeConnector *res);
 void srmConnectorDestroyEncoders(SRMConnector *connector);
 
-UInt8 srmConnectorUpdateModes(SRMConnector *connector);
+UInt8 srmConnectorUpdateModes(SRMConnector *connector, drmModeConnector *res);
 void srmConnectorDestroyModes(SRMConnector *connector);
 
 void srmConnectorSetCursorPlaneToNeededConnector(SRMPlane *cursorPlane);

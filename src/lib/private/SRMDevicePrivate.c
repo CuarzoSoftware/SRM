@@ -1150,21 +1150,23 @@ UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
         return 0;
     }
 
+    // TODO: Check if the kernel registered/unregistered connectors
+
     device->pendingUdevEvents = 0;
 
     // Check connector states
     SRMListForeach(connectorIt, device->connectors)
     {
         SRMConnector *connector = srmListItemGetData(connectorIt);
-        drmModeConnector *connectorRes = drmModeGetConnector(device->fd, connector->id);
+        drmModeConnector *res = drmModeGetConnector(device->fd, connector->id);
 
-        if (!connectorRes)
+        if (!res)
         {
             SRMError("Failed to get device %s connector %d resources in hotplug event.", connector->device->shortName, connector->id);
             continue;
         }
 
-        UInt8 connected = connectorRes->connection == DRM_MODE_CONNECTED;
+        UInt8 connected = res->connection == DRM_MODE_CONNECTED;
 
         // Connector changed state
         if (connector->connected != connected)
@@ -1172,10 +1174,10 @@ UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
             // Plugged event
             if (connected)
             {
-                srmConnectorUpdateProperties(connector);
-                srmConnectorUpdateNames(connector);
-                srmConnectorUpdateEncoders(connector);
-                srmConnectorUpdateModes(connector);
+                srmConnectorUpdateProperties(connector, res);
+                srmConnectorUpdateNames(connector, res);
+                srmConnectorUpdateEncoders(connector, res);
+                srmConnectorUpdateModes(connector, res);
 
                 SRMDebug("[%s] Connector (%d) %s, %s, %s plugged.",
                          connector->device->shortName,
@@ -1213,14 +1215,14 @@ UInt8 srmDeviceHandleHotpluggingEvent(SRMDevice *device)
 
                 // Uninitialize after notify so users can for example backup some data
                 srmConnectorUninitialize(connector);
-                srmConnectorUpdateProperties(connector);
-                srmConnectorUpdateNames(connector);
-                srmConnectorUpdateEncoders(connector);
-                srmConnectorUpdateModes(connector);
+                srmConnectorUpdateProperties(connector, res);
+                srmConnectorUpdateNames(connector, res);
+                srmConnectorUpdateEncoders(connector, res);
+                srmConnectorUpdateModes(connector, res);
             }
         }
 
-        drmModeFreeConnector(connectorRes);
+        drmModeFreeConnector(res);
     }
 
     return 1;

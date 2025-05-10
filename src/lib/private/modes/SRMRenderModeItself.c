@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #define MODE_NAME "ITSELF"
 
@@ -228,6 +229,10 @@ static UInt8 flipPage(SRMConnector *connector)
 {
     RenderModeCommonData *data = (RenderModeCommonData*)connector->renderData;
     srmRenderModeCommonCreateSync(connector);
+
+    if (connector->pendingResume)
+        srmRenderModeCommonResumeRendering(connector, data->drmFBs[data->currentBufferIndex]);
+
     srmRenderModeCommonPageFlip(connector, data->drmFBs[data->currentBufferIndex]);
     data->currentBufferIndex = nextBufferIndex(connector);
     connector->interface->pageFlipped(connector, connector->interfaceData);
@@ -352,8 +357,8 @@ static void pauseRendering(SRMConnector *connector)
 
 static void resumeRendering(SRMConnector *connector)
 {
-    RenderModeCommonData *data = (RenderModeCommonData*)connector->renderData;
-    srmRenderModeCommonResumeRendering(connector, data->drmFBs[data->currentBufferIndex]);
+    // This is now handled in flipPage
+    connector->pendingResume = 1;
 }
 
 static UInt32 getFramebufferID(SRMConnector *connector)

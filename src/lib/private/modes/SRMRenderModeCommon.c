@@ -775,7 +775,7 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
 {
     Int32 ret;
     connector->lastFb = fb;
-
+    connector->pendingResume = 0;
     srmRenderModeCommonSyncState(connector);
 
     if (connector->device->clientCapAtomic)

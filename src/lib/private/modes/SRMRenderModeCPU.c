@@ -690,6 +690,10 @@ static UInt8 flipPage(SRMConnector *connector)
     crossGPUCopy(connector);
     blitTextures(connector);
     srmRenderModeCommonCreateSync(connector);
+
+    if (connector->pendingResume)
+        srmRenderModeCommonResumeRendering(connector, data->c.drmFBs[data->c.currentBufferIndex]);
+
     srmRenderModeCommonPageFlip(connector, data->c.drmFBs[data->c.currentBufferIndex]);
     data->c.currentBufferIndex = nextBufferIndex(connector);
     connector->interface->pageFlipped(connector, connector->interfaceData);
@@ -823,8 +827,8 @@ static void pauseRendering(SRMConnector *connector)
 
 static void resumeRendering(SRMConnector *connector)
 {
-    RenderModeData *data = (RenderModeData*)connector->renderData;
-    srmRenderModeCommonResumeRendering(connector, data->c.drmFBs[data->c.currentBufferIndex]);
+    // This is now handled in flipPage
+    connector->pendingResume = 1;
 }
 
 static UInt32 getFramebufferID(SRMConnector *connector)

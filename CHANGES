@@ -1,3 +1,15 @@
+SRM (0.12.1-1)
+
+  # Bug Fixes
+
+  * Each UDEV hotplug event now maps to a single drmModeGetConnector() call, preventing SRM from going out-of-sync with the UDEV queue.
+  * When resuming a suspended connector, framebuffers are restored after paintGL(), preventing outdated content from being displayed.
+
+  Special thanks to @LeKinaSa and @jgroboredo for discovering the bugs and testing!
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sat, 10 May 2025 20:44:54 -0400
+
+
 SRM (0.12.0-1)
 
   # API Additions

@@ -1,4 +1,4 @@
-%global basever 0.12.0
+%global basever 0.12.1
 %global origrel 1
 %global somajor 0
 
@@ -91,6 +91,6 @@ pushd repo/src
 %{_libdir}/pkgconfig/SRM.pc
 
 %changelog
-* Sat Feb 08 2025 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
-- srmConnectorSetCurrentBufferLocked: Keeps the last rendered frame and ignores repaints for a specific connector.
-- Removed double call to pageFlipped in the SELF mode.
+* Sat May 10 2025 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
+- Each UDEV hotplug event now maps to a single drmModeGetConnector() call, preventing SRM from going out-of-sync with the UDEV queue.
+- When resuming a suspended connector, framebuffers are restored after paintGL(), preventing outdated content from being displayed.

@@ -223,6 +223,10 @@ static void enableSeat(struct libseat *seat, void *userdata)
             srmConnectorSetCursor(connector, NULL);
             srmConnectorSetCursor(connector, cursorPixels);
             srmConnectorSetCursorPos(connector, cursorX + 1, cursorY);
+
+            // Framebuffers are not restored until paintGL is handled
+            // to prevent displaying out of sync content
+            srmConnectorRepaint(connector);
         }
     }
 

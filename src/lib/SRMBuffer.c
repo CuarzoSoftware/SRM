@@ -912,7 +912,7 @@ SRMBuffer *srmBufferCreateGLTextureWrapper(SRMDevice *device, GLuint id, GLenum 
     }
 
     SRMBuffer *buffer = srmBufferCreate(device->core, device);
-    buffer->src = SRM_BUFFER_SRC_GBM;
+    buffer->src = SRM_BUFFER_SRC_GL;
     buffer->writeMode = SRM_BUFFER_WRITE_MODE_GLES;
     buffer->caps |= SRM_BUFFER_CAP_WRITE;
     buffer->keepTexturesAlive = !transferOwnership;
@@ -935,7 +935,8 @@ SRMBuffer *srmBufferCreateGLTextureWrapper(SRMDevice *device, GLuint id, GLenum 
     texture->image = EGL_NO_IMAGE;
     srmListAppendData(buffer->textures, texture);
 
-    if (buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
+    /* Only allow ths if ownership is tranferred since it can mess fb attachments */
+    if (transferOwnership && buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
     {
         static const EGLint attribs[3] =
         {

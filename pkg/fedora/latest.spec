@@ -1,4 +1,4 @@
-%global basever 0.12.1
+%global basever 0.13.0
 %global origrel 1
 %global somajor 0
 
@@ -91,6 +91,10 @@ pushd repo/src
 %{_libdir}/pkgconfig/SRM.pc
 
 %changelog
-* Sat May 10 2025 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
-- Each UDEV hotplug event now maps to a single drmModeGetConnector() call, preventing SRM from going out-of-sync with the UDEV queue.
-- When resuming a suspended connector, framebuffers are restored after paintGL(), preventing outdated content from being displayed.
+* Sun Jun 01 2025 Eduardo Hopperdietzel <ehopperdietzel@gmail.com> - %{basever}-%{origrel}
+- Flickering and performance issues have been resolved for hybrid GPU setups.
+- Cursor planes are no longer disabled by default for nvidia-drm drivers (SRM_NVIDIA_CURSOR environment variable).
+- srmBufferGetTextureTarget() and srmBufferGetTextureID() are now deprecated. Use srmBufferGetTexture() instead, which returns both the texture ID and target in a single call.
+- srmBufferCreateGLTextureWrapper() no longer generates an EGLImage for direct scanout if ownership is not transferred, preventing interference with existing framebuffer attachments.
+- Retrieving texture handles from an SRMbuffer across different GPUs did not always provide the correct GL_TEXTURE target.
+- The PRIME rendering mode was missing a fragment shader with a GL_TEXTURE_EXTERNAL_OES sampler, causing PRIME tests to fail and forcing a fallback to the DUMB or CPU rendering modes.

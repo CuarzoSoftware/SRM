@@ -1,3 +1,28 @@
+SRM (0.13.0-1)
+
+  # Improvements
+
+  * Flickering and performance issues have been resolved for hybrid GPU setups.
+
+  # Environment
+
+  * Cursor planes are no longer disabled by default for nvidia-drm drivers (SRM_NVIDIA_CURSOR environment variable).
+
+  # API Changes
+
+  * srmBufferGetTextureTarget() and srmBufferGetTextureID() are now deprecated. Use srmBufferGetTexture() instead, which returns both the texture ID and target in a single call.
+
+  # Bug Fixes
+
+  * srmBufferCreateGLTextureWrapper() no longer generates an EGLImage for direct scanout if ownership is not transferred, preventing interference with existing framebuffer attachments.
+  * Retrieving texture handles from an SRMbuffer across different GPUs did not always provide the correct GL_TEXTURE target.
+  * The PRIME rendering mode was missing a fragment shader with a GL_TEXTURE_EXTERNAL_OES sampler, causing PRIME tests to fail and forcing a fallback to the DUMB or CPU rendering modes.
+
+  Thanks @LeKinaSa and @jgroboredo for discovering bugs and testing!
+
+-- Eduardo Hopperdietzel <ehopperdietzel@gmail.com>  Sun, 01 Jun 2025 18:36:00 -0400
+
+
 SRM (0.12.1-1)
 
   # Bug Fixes

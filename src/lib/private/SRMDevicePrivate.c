@@ -877,11 +877,13 @@ UInt8 srmDeviceInitializeTestShader(SRMDevice *device)
 
    const char *vertexShaderSource = "attribute vec4 position; varying vec2 v_texcoord; void main() { gl_Position = vec4(position.xy, 0.0, 1.0); v_texcoord = position.zw; }";
    const char *fragmentShaderSource = "precision mediump float; uniform sampler2D tex; varying vec2 v_texcoord; void main() { gl_FragColor = texture2D(tex, v_texcoord); }";
+   const char *fragmentShaderSourceExternal = "#extension GL_OES_EGL_image_external : require\nprecision mediump float; uniform samplerExternalOES tex; varying vec2 v_texcoord; void main() { gl_FragColor = texture2D(tex, v_texcoord); }";
 
    eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
 
    GLint success = 0;
    GLchar infoLog[256];
+   UInt8 hasExternal = 1;
 
    device->vertexShaderTest = glCreateShader(GL_VERTEX_SHADER);
    glShaderSource(device->vertexShaderTest, 1, &vertexShaderSource, NULL);
@@ -908,6 +910,21 @@ UInt8 srmDeviceInitializeTestShader(SRMDevice *device)
        return 0;
    }
 
+   // EXTERNAL
+
+   device->fragmentShaderTestExternal = glCreateShader(GL_FRAGMENT_SHADER);
+   glShaderSource(device->fragmentShaderTestExternal, 1, &fragmentShaderSourceExternal, NULL);
+   glCompileShader(device->fragmentShaderTestExternal);
+   success = 0;
+   glGetShaderiv(device->fragmentShaderTestExternal, GL_COMPILE_STATUS, &success);
+
+   if (!success)
+   {
+       glGetShaderInfoLog(device->fragmentShaderTestExternal, sizeof(infoLog), NULL, infoLog);
+       SRMWarning("[SRMDevice] External fragment shader compilation error: %s.", infoLog);
+       hasExternal = 0;
+   }
+
    device->programTest = glCreateProgram();
    glAttachShader(device->programTest, device->vertexShaderTest);
    glAttachShader(device->programTest, device->fragmentShaderTest);
@@ -917,6 +934,20 @@ UInt8 srmDeviceInitializeTestShader(SRMDevice *device)
    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, square);
    glEnableVertexAttribArray(0);
    device->textureUniformTest = glGetUniformLocation(device->programTest, "tex");
+
+   // External
+
+   if (hasExternal)
+   {
+       device->programTestExternal = glCreateProgram();
+       glAttachShader(device->programTestExternal, device->vertexShaderTest);
+       glAttachShader(device->programTestExternal, device->fragmentShaderTestExternal);
+       glLinkProgram(device->programTestExternal);
+       glUseProgram(device->programTestExternal);
+       glBindAttribLocation(device->programTestExternal, 0, "position");
+       device->textureUniformTestExternal = glGetUniformLocation(device->programTestExternal, "tex");
+   }
+
    return 1;
 }
 
@@ -932,10 +963,24 @@ void srmDeviceUninitializeTestShader(SRMDevice *device)
         device->programTest = 0;
     }
 
+    if (device->programTestExternal)
+    {
+        glDetachShader(device->programTestExternal, device->fragmentShaderTestExternal);
+        glDetachShader(device->programTestExternal, device->vertexShaderTest);
+        glDeleteProgram(device->programTestExternal);
+        device->programTestExternal = 0;
+    }
+
     if (device->fragmentShaderTest)
     {
         glDeleteShader(device->fragmentShaderTest);
         device->fragmentShaderTest = 0;
+    }
+
+    if (device->fragmentShaderTestExternal)
+    {
+        glDeleteShader(device->fragmentShaderTestExternal);
+        device->fragmentShaderTestExternal = 0;
     }
 
     if (device->vertexShaderTest)
@@ -1236,7 +1281,7 @@ static UInt8 srmDeviceTestCPUAllocation(const char *modeName, SRMDevice *device,
     UInt8 ok = 0;
     UInt32 stride = width * 4;
     SRMBuffer *buffer = NULL;
-    GLuint textureId = 0;
+    SRMTexture texture = { 0, GL_NONE };
 
     pixels = malloc(height * stride);
     readPixels = malloc(height * stride);
@@ -1247,24 +1292,24 @@ static UInt8 srmDeviceTestCPUAllocation(const char *modeName, SRMDevice *device,
     if (!buffer)
         goto fail;
 
-    textureId = srmBufferGetTextureID(device, buffer);
+    texture = srmBufferGetTexture(device, buffer);
 
-    if (textureId == 0)
+    if (texture.id == 0)
         goto fail;
 
     eglMakeCurrent(device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, device->eglSharedContext);
-    glUseProgram(device->programTest);
+    glUseProgram(texture.target == GL_TEXTURE_2D ? device->programTest : device->programTestExternal);
     glBindFramebuffer(GL_FRAMEBUFFER, device->testFB);
     glDisable(GL_BLEND);
     glEnable(GL_SCISSOR_TEST);
     glDisable(GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, width, height);
     glScissor(0, 0, width, height);
-    glUniform1i(device->textureUniformTest, 0);
+    glUniform1i(texture.target == GL_TEXTURE_2D ? device->textureUniformTest : device->textureUniformTestExternal, 0);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureId);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(texture.target, texture.id);
+    glTexParameteri(texture.target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(texture.target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     glFinish();
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, readPixels);

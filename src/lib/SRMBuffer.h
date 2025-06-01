@@ -135,6 +135,27 @@ typedef struct SRMBufferDMADataStruct
 } SRMBufferDMAData;
 
 /**
+ * @brief Handle to an OpenGL texture obtained with srmBufferGetTexture()
+ */
+typedef struct SRMTextureStruct
+{
+    /**
+     * @brief Texture identifier.
+     *
+     * If set to 0, the texture is considered invalid.
+     */
+    GLuint id;
+
+    /**
+     * @brief The OpenGL texture target.
+     *
+     * Specifies the target type (e.g., GL_TEXTURE_2D, GL_TEXTURE_EXTERNAL_OES).
+     */
+    GLenum target;
+
+} SRMTexture;
+
+/**
  * @brief Creates an @ref SRMBuffer from a GBM bo.
  *
  * This function creates an @ref SRMBuffer object using the provided 
@@ -235,7 +256,22 @@ SRMBuffer *srmBufferCreateGLTextureWrapper(SRMDevice *device, GLuint id, GLenum 
 void srmBufferDestroy(SRMBuffer *buffer);
 
 /**
+ * @brief Retrieves an OpenGL texture ID and target associated with an @ref SRMBuffer for a specific device (GPU).
+ *
+ * This function is typically called when rendering on a connector.
+ * To obtain the connector's renderer device, use srmConnectorGetRendererDevice().
+ *
+ * @param device Pointer to the @ref SRMDevice from which to obtain the texture. If `NULL`, the allocator device is used.
+ * @param buffer Pointer to the @ref SRMBuffer for which the texture ID is retrieved.
+ *
+ * @return An SRMTexture structure containing the texture ID and target. On failure, the texture ID is set to 0.
+ */
+SRMTexture srmBufferGetTexture(SRMDevice *device, SRMBuffer *buffer);
+
+/**
  * @brief Retrieves an OpenGL texture ID associated with an @ref SRMBuffer for a specific device (GPU).
+ *
+ * @warning This function is deprecated. Use srmBufferGetTexture() instead.
  *
  * This function retrieves the OpenGL texture ID that corresponds to the given @ref SRMBuffer
  * for the specified device (GPU).
@@ -247,10 +283,13 @@ void srmBufferDestroy(SRMBuffer *buffer);
  * @param buffer Pointer to the @ref SRMBuffer for which the texture ID is requested.
  * @return The OpenGL texture ID associated with the @ref SRMBuffer and device, or 0 on failure.
  */
+__attribute__((deprecated))
 GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
 
 /**
  * @brief Gets the OpenGL texture target associated with an @ref SRMBuffer.
+ *
+ * @warning This function is deprecated. Use srmBufferGetTexture() instead.
  *
  * This function retrieves the OpenGL texture target associated with the provided @ref SRMBuffer.
  * 
@@ -270,9 +309,10 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
  * }
  * @endcode
  *
- * @param buffer Pointer to the @ref SRMBuffer for which the texture target is needed.
+ * @param buffer Pointer to the @ref SRMBuffer the texture belongs to.
  * @return The associated OpenGL texture target, which can be either `GL_TEXTURE_2D` or `GL_TEXTURE_EXTERNAL_OES`.
  */
+__attribute__((deprecated))
 GLenum srmBufferGetTextureTarget(SRMBuffer *buffer);
 
 /**

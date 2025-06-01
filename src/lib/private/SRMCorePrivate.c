@@ -278,25 +278,9 @@ UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
 
     glBindFramebuffer(GL_FRAMEBUFFER, renderer->testFB);
 
-    UInt32 half = size/2;
-    glScissor(0, 0, half, half);
-    glViewport(0, 0, half, half);
-    glClearColor(1.f, 0.f, 0.f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glScissor(half, 0, half, half);
-    glViewport(half, 0, half, half);
-    glClearColor(0.f, 1.f, 0.f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glScissor(0, half, half, half);
-    glViewport(0, half, half, half);
-    glClearColor(0.f, 0.f, 1.f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glScissor(half, half, half, half);
-    glViewport(half, half, half, half);
-    glClearColor(1.f, 1.f, 1.f, 1.f);
+    glScissor(0, 0, size, size);
+    glViewport(0, 0, size, size);
+    glClearColor(1.f, 1.0f, 0.1f, 0.1f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glFinish();
@@ -304,9 +288,9 @@ UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
 
     eglMakeCurrent(target->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, target->eglSharedContext);
 
-    GLuint textureId = srmBufferGetTextureID(target, primeBuffer);
+    SRMTexture texture = srmBufferGetTexture(target, primeBuffer);
 
-    if (textureId == 0)
+    if (texture.id == 0)
     {
         free(rendererPixels);
         free(targetPixels);
@@ -314,18 +298,18 @@ UInt8 srmCoreCheckPRIME(SRMDevice *target, SRMDevice *renderer)
         return 0;
     }
 
-    glUseProgram(target->programTest);
+    glUseProgram(texture.target == GL_TEXTURE_2D ? target->programTest : target->programTestExternal);
     glBindFramebuffer(GL_FRAMEBUFFER, target->testFB);
     glDisable(GL_BLEND);
     glEnable(GL_SCISSOR_TEST);
     glDisable(GL_DEPTH_BUFFER_BIT);
     glScissor(0, 0, size, size);
     glViewport(0, 0, size, size);
-    glUniform1i(target->textureUniformTest, 0);
+    glUniform1i(texture.target == GL_TEXTURE_2D ? target->textureUniformTest : target->textureUniformTestExternal, 0);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureId);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(texture.target, texture.id);
+    glTexParameteri(texture.target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(texture.target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     glFinish();
     glReadPixels(0, 0, size, size, GL_RGBA, GL_UNSIGNED_BYTE, targetPixels);
@@ -360,7 +344,7 @@ void srmCoreAssignRenderingModes(SRMCore *core)
             continue;
         }
 
-        if (dev->capPrimeImport && dev->rendererDevice->capPrimeExport && srmCoreCheckPRIME(dev, dev->rendererDevice))
+        if (/*dev->capPrimeImport && dev->rendererDevice->capPrimeExport && */ srmCoreCheckPRIME(dev, dev->rendererDevice))
         {
             dev->renderMode = SRM_RENDER_MODE_PRIME;
             continue;

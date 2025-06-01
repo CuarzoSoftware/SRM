@@ -18,7 +18,7 @@ struct SRMBufferTexture
 {
     SRMDevice *device;
     EGLImage image;
-    GLuint texture;
+    SRMTexture texture;
 };
 
 typedef enum SRM_BUFFER_WRITE_MODE_ENUM
@@ -84,7 +84,7 @@ struct gbm_bo *srmBufferCreateLinearBO(struct gbm_device *dev, UInt32 width, UIn
 struct gbm_surface *srmBufferCreateGBMSurface(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags);
 struct gbm_bo *srmBufferCreateGBMBo(struct gbm_device *dev, UInt32 width, UInt32 height, UInt32 format, UInt64 modifier, UInt32 flags);
 void srmBufferFillParamsFromBO(SRMBuffer *buffer, struct gbm_bo *bo);
-void srmBufferSetTargetFromFormat(SRMBuffer *buffer);
+GLenum srmBufferGetTargetFromFormat(SRMDevice *device, UInt64 mod, UInt32 fmt);
 void srmBufferCreateSync(SRMBuffer *buffer);
 void srmBufferWaitSync(SRMBuffer *buffer);
 UInt8 srmBufferCreateRBFromBO(SRMCore *core, struct gbm_bo *bo, GLuint *outFB, GLuint *outRB, SRMBuffer **outWrapper);

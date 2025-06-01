@@ -52,6 +52,18 @@ static GLchar fShaderStr[] =
         gl_FragColor = texture2D(tex, v_texcoord);\
 }";
 
+static GLchar fShaderStrExternal[] =
+    "#extension GL_OES_EGL_image_external : require\n\
+    precision lowp float;\
+    precision lowp int;\
+    uniform samplerExternalOES tex;\
+    varying vec2 v_texcoord;\
+    void main()\
+{\
+        gl_FragColor = texture2D(tex, v_texcoord);\
+}";
+
+
 typedef struct RenderModeDataStruct
 {
     RenderModeCommonData c;
@@ -63,13 +75,21 @@ typedef struct RenderModeDataStruct
     EGLConfig connectorConfig;
     EGLContext connectorContext;
 
+    // EGLSync sync;
+    // int fenceFd;
+
     GLuint
         texSizeUniform,
         srcRectUniform,
         activeTextureUniform;
 
-    GLuint vertexShader,fragmentShader;
-    GLuint programObject;
+    GLuint
+        texSizeUniformExternal,
+        srcRectUniformExternal,
+        activeTextureUniformExternal;
+
+    GLuint vertexShader, fragmentShader, fragmentShaderExternal;
+    GLuint programObject, programObjectExternal;
 } RenderModeData;
 
 static UInt8 createData(SRMConnector *connector)
@@ -85,6 +105,9 @@ static UInt8 createData(SRMConnector *connector)
                  connector->device->shortName, connector->name, MODE_NAME);
         return 0;
     }
+
+    // data->sync = EGL_NO_SYNC;
+    // data->fenceFd = EGL_NO_NATIVE_FENCE_FD_ANDROID;
 
     connector->renderData = data;
     data->c.rendererContext = EGL_NO_CONTEXT;
@@ -364,6 +387,7 @@ static UInt8 createGLES2(SRMConnector *connector)
     eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->connectorContext);
     data->vertexShader = compileShader(GL_VERTEX_SHADER, vShaderStr);
     data->fragmentShader = compileShader(GL_FRAGMENT_SHADER, fShaderStr);
+    data->fragmentShaderExternal = compileShader(GL_FRAGMENT_SHADER, fShaderStrExternal);
     data->programObject = glCreateProgram();
     glAttachShader(data->programObject, data->vertexShader);
     glAttachShader(data->programObject, data->fragmentShader);
@@ -399,14 +423,49 @@ static UInt8 createGLES2(SRMConnector *connector)
     data->texSizeUniform = glGetUniformLocation(data->programObject, "texSize");
     data->srcRectUniform = glGetUniformLocation(data->programObject, "srcRect");
     data->activeTextureUniform = glGetUniformLocation(data->programObject, "tex");
+
+    if (data->fragmentShaderExternal == 0)
+        return 1;
+
+    // EXTERNAL
+
+    data->programObjectExternal = glCreateProgram();
+    glAttachShader(data->programObjectExternal, data->vertexShader);
+    glAttachShader(data->programObjectExternal, data->fragmentShaderExternal);
+    glBindAttribLocation(data->programObjectExternal, 0, "vertexPosition");
+    glLinkProgram(data->programObjectExternal);
+
+    glGetProgramiv(data->programObjectExternal, GL_LINK_STATUS, &linked);
+
+    if (!linked)
+        return 1;
+
+    glUseProgram(data->programObjectExternal);
+
+    // Get Uniform Variables
+    data->texSizeUniformExternal = glGetUniformLocation(data->programObjectExternal, "texSize");
+    data->srcRectUniformExternal = glGetUniformLocation(data->programObjectExternal, "srcRect");
+    data->activeTextureUniformExternal = glGetUniformLocation(data->programObjectExternal, "tex");
     return 1;
 }
 
 static void destroyGLES2(SRMConnector *connector)
 {
     RenderModeData *data = (RenderModeData*)connector->renderData;
-
     eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->connectorContext);
+    glUseProgram(0);
+
+    if (data->fragmentShaderExternal != 0)
+    {
+        if (data->programObjectExternal)
+        {
+            glDeleteProgram(data->programObjectExternal);
+            data->programObjectExternal = 0;
+        }
+
+        glDeleteShader(data->fragmentShaderExternal);
+        data->fragmentShaderExternal = 0;
+    }
 
     if (data->programObject)
     {
@@ -477,16 +536,41 @@ static UInt8 render(SRMConnector *connector)
     if (connector->lockCurrentBuffer)
         return 0;
 
-    srmDeviceSyncWait(connector->device->rendererDevice);
+    /* TODO: This doesn't always work but glFinish does
+    SRMDevice *renderer = connector->device->rendererDevice;
+
+    if (data->fenceFd != EGL_NO_NATIVE_FENCE_FD_ANDROID)
+    {
+        close(data->fenceFd);
+        data->fenceFd = EGL_NO_NATIVE_FENCE_FD_ANDROID;
+    }
+
+    if (data->sync != EGL_NO_SYNC)
+    {
+        renderer->eglFunctions.eglDestroySyncKHR(renderer->eglDisplay, data->sync);
+        data->sync = EGL_NO_SYNC;
+    }
+
+    data->sync = renderer->eglFunctions.eglCreateSyncKHR(renderer->eglDisplay, EGL_SYNC_NATIVE_FENCE_ANDROID, NULL);
+
+    if (data->sync != EGL_NO_SYNC)
+    {
+        glFlush();
+        data->fenceFd = renderer->eglFunctions.eglDupNativeFenceFDANDROID(renderer->eglDisplay, data->sync);
+
+        if (data->fenceFd == EGL_NO_NATIVE_FENCE_FD_ANDROID)
+            // ERROR
+
+    } */
+
     return 1;
 }
 
-static void drawTexture(SRMConnector *connector, Int32 x, Int32 y, Int32 w, Int32 h)
+static void drawTexture(GLuint uniform, Int32 x, Int32 y, Int32 w, Int32 h)
 {
-    RenderModeData *data = (RenderModeData*)connector->renderData;
     glScissor(x, y, w, h);
     glViewport(x, y, w, h);
-    glUniform4f(data->srcRectUniform, x, y + h, w, -h);
+    glUniform4f(uniform, x, y + h, w, -h);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
@@ -505,7 +589,7 @@ static UInt8 flipPage(SRMConnector *connector)
     SRMBox *damage;
     UInt32 damageCount;
 
-    if (/*connector->device->isBootVGA && */ connector->damageBoxesCount > 0)
+    if (connector->device->isBootVGA && connector->damageBoxesCount > 0)
     {
         damage = connector->damageBoxes;
         damageCount = connector->damageBoxesCount;
@@ -516,18 +600,56 @@ static UInt8 flipPage(SRMConnector *connector)
         damageCount = 1;
     }
 
+    eglMakeCurrent(connector->device->rendererDevice->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->c.rendererContext);
+    glFinish();
     eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->connectorContext);
-    glUseProgram(data->programObject);
+
+    /* Using glFinish instead
+    UInt8 hasSync = data->fenceFd != EGL_NO_NATIVE_FENCE_FD_ANDROID;
+
+    eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->connectorContext);
+
+    if (hasSync)
+    {
+        const EGLint attrs[] =
+        {
+            EGL_SYNC_NATIVE_FENCE_FD_ANDROID,
+            data->fenceFd,
+            EGL_NONE
+        };
+
+        EGLSyncKHR sync = connector->device->eglFunctions.eglCreateSyncKHR(connector->device->eglDisplay, EGL_SYNC_NATIVE_FENCE_ANDROID, attrs);
+
+        if (sync == EGL_NO_SYNC)
+            goto callFinish;
+
+        glFlush();
+        connector->device->eglFunctions.eglWaitSyncKHR(connector->device->eglDisplay, sync, 0);
+        connector->device->eglFunctions.eglDestroySyncKHR(connector->device->eglDisplay, sync);
+        goto callFinish;
+    }
+    else
+    {
+        callFinish:
+        eglMakeCurrent(connector->device->rendererDevice->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->c.rendererContext);
+        glFinish();
+        eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->connectorContext);
+    }*/
+
+    SRMTexture texture = srmBufferGetTexture(connector->device, data->importedBuffers[data->c.currentBufferIndex]);
+    glUseProgram(texture.target == GL_TEXTURE_2D ? data->programObject : data->programObjectExternal);
     glBindFramebuffer(GL_FRAMEBUFFER, data->connectorFBs[data->c.currentBufferIndex]);
     glDisable(GL_BLEND);
     glActiveTexture(GL_TEXTURE0);
-    glUniform2f(data->texSizeUniform, connector->currentMode->info.hdisplay, connector->currentMode->info.vdisplay);
-    glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(connector->device, data->importedBuffers[data->c.currentBufferIndex]));
-    glUniform1i(data->activeTextureUniform, 0);
+    glUniform2f(texture.target == GL_TEXTURE_2D ? data->texSizeUniform : data->texSizeUniformExternal,
+        connector->currentMode->info.hdisplay, connector->currentMode->info.vdisplay);
+    glBindTexture(texture.target, texture.id);
+    glUniform1i(texture.target == GL_TEXTURE_2D ? data->activeTextureUniform : data->activeTextureUniformExternal, 0);
+    GLuint rectUniform = texture.target == GL_TEXTURE_2D ? data->srcRectUniform : data->srcRectUniformExternal;
 
     for (UInt32 i = 0; i < damageCount; i++)
     {
-        drawTexture(connector,
+        drawTexture(rectUniform,
                     damage[i].x1,
                     damage[i].y1,
                     damage[i].x2 - damage[i].x1,

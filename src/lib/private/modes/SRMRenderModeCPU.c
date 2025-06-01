@@ -661,7 +661,8 @@ static void blitTextures(SRMConnector *connector)
 
     eglMakeCurrent(connector->device->eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, data->connectorContext);
     glBindFramebuffer(GL_FRAMEBUFFER, data->connectorFBs[data->c.currentBufferIndex]);
-    glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(connector->device, data->connectorTextures[data->c.currentBufferIndex]));
+    SRMTexture texture = srmBufferGetTexture(connector->device, data->connectorTextures[data->c.currentBufferIndex]);
+    glBindTexture(texture.target, texture.id);
     glUseProgram(data->programObject);
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(data->activeTextureUniform, 0);

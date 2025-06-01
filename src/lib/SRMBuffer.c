@@ -43,7 +43,7 @@ SRMBuffer *srmBufferCreateFromDMA(SRMCore *core, SRMDevice *allocator, SRMBuffer
     SRMBuffer *buffer = srmBufferCreate(core, allocator);
     buffer->src = SRM_BUFFER_SRC_DMA;    
     memcpy(&buffer->dma, dmaData, sizeof(*dmaData));
-    srmBufferSetTargetFromFormat(buffer);
+    buffer->target = srmBufferGetTargetFromFormat(buffer->allocator, dmaData->modifiers[0], dmaData->format);
 
     if (buffer->target == GL_NONE)
         goto fail;
@@ -78,7 +78,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     if (buffer->allocator->cpuBufferWriteMode == SRM_BUFFER_WRITE_MODE_GLES)
         goto glesOnly;
 
-    srmBufferSetTargetFromFormat(buffer);
+    buffer->target = srmBufferGetTargetFromFormat(buffer->allocator, buffer->dma.modifiers[0], buffer->dma.format);
 
     if (buffer->target == GL_NONE)
         goto glesOnly;
@@ -183,26 +183,27 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
 
     srmSaveContext();
     srmDeviceMakeCurrent(buffer->allocator);
-    glGenTextures(1, &texture->texture);
+    texture->texture.target = GL_TEXTURE_2D;
+    glGenTextures(1, &texture->texture.id);
 
-    if (!texture->texture)
+    if (!texture->texture.id)
     {
         free(texture);
         srmRestoreContext();
         goto fail;
     }
 
-    glBindTexture(GL_TEXTURE_2D, texture->texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(texture->texture.target, texture->texture.id);
+    glTexParameteri(texture->texture.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(texture->texture.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(texture->texture.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(texture->texture.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     srmListAppendData(buffer->textures, texture);
 
     if (pixels)
     {
         glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / buffer->pixelSize);
-        glTexImage2D(GL_TEXTURE_2D,
+        glTexImage2D(texture->texture.target,
                      0,
                      glFmt->glInternalFormat,
                      width,
@@ -215,7 +216,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
     }
     else
     {
-        glTexImage2D(GL_TEXTURE_2D,
+        glTexImage2D(texture->texture.target,
                      0,
                      glFmt->glInternalFormat,
                      width,
@@ -240,7 +241,7 @@ SRMBuffer *srmBufferCreateFromCPU(SRMCore *core, SRMDevice *allocator,
             eglGetCurrentDisplay(),
             eglGetCurrentContext(),
             EGL_GL_TEXTURE_2D_KHR,
-            (EGLClientBuffer)(UInt64)texture->texture,
+            (EGLClientBuffer)(UInt64)texture->texture.id,
             attribs);
     }
 
@@ -271,13 +272,13 @@ SRMBuffer *srmBufferCreateFromWaylandDRM(SRMCore *core, void *wlBuffer)
     }
 
     srmBufferFillParamsFromBO(buffer, buffer->bo);
-    srmBufferSetTargetFromFormat(buffer);
+    buffer->target = srmBufferGetTargetFromFormat(buffer->allocator, buffer->dma.modifiers[0], buffer->dma.format);
 
     /* Just in case DMA formats are not supported but KHR_image_pixmap is */
     if (buffer->target == GL_NONE)
         buffer->target = GL_TEXTURE_2D;
 
-    if (!srmBufferGetTextureID(buffer->allocator, buffer))
+    if (!srmBufferGetTexture(buffer->allocator, buffer).id)
         goto fail;
 
     return buffer;
@@ -288,18 +289,23 @@ fail:
     return NULL;
 }
 
-GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
+SRMTexture srmBufferGetTexture(SRMDevice *device, SRMBuffer *buffer)
 {
-    if (!device || !buffer)
+    static const SRMTexture InvalidTexture = { .id = 0, .target = GL_NONE };
+
+    if (!buffer)
     {
-        SRMError("[SRMBuffer] srmBufferGetTextureID: Invalid device or buffer.");
-        return 0;
+        SRMError("[SRMBuffer] srmBufferGetTexture: Invalid device or buffer.");
+        return InvalidTexture;
     }
+
+    if (!device)
+        device = buffer->allocator;
 
     if ((buffer->src == SRM_BUFFER_SRC_WL_DRM || buffer->src == SRM_BUFFER_SRC_GL) && device != buffer->allocator)
     {
-        SRMError("[%s] srmBufferGetTextureID: wl_drm buffers and GL wrappers can only be accessed from allocator device.", device->shortName);
-        return 0;
+        SRMError("[%s] srmBufferGetTexture: wl_drm buffers and GL wrappers can only be accessed from allocator device.", device->shortName);
+        return InvalidTexture;
     }
 
     // Check if already created
@@ -315,20 +321,14 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         }
     }
 
-    if (buffer->target == GL_TEXTURE_2D && !device->glExtensions.OES_EGL_image)
+    if (!device->glExtensions.OES_EGL_image && !device->glExtensions.OES_EGL_image_external)
     {
-        SRMError("[%s] Failed to get texture id from EGL image, OES_EGL_image extension not available.", device->shortName);
-        return 0;
-    }
-
-    if (buffer->target == GL_TEXTURE_EXTERNAL_OES && !device->glExtensions.OES_EGL_image_external)
-    {
-        SRMError("[%s] Failed to get texture id from EGL image, OES_EGL_image_external extension not available.", device->shortName);
-        return 0;
+        SRMError("[%s] Failed to get texture id from EGL image, OES_EGL_image and OES_EGL_image_external extensions not available.", device->shortName);
+        return InvalidTexture;
     }
 
     pthread_mutex_lock(&buffer->mutex);
-
+    UInt8 usingDMA = 0;
     texture = calloc(1, sizeof(struct SRMBufferTexture));
     texture->device = device;
     texture->image = EGL_NO_IMAGE;
@@ -347,7 +347,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         if (texture->image != EGL_NO_IMAGE)
             goto skipDMA;
     }
-    
+
     if (buffer->dma.fds[0] == -1 && buffer->bo)
     {
         buffer->dma.fds[0] = srmBufferGetDMAFDFromBO(buffer->allocator, buffer->bo);
@@ -360,32 +360,55 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
         goto skipDMA;
 
     texture->image = srmEGLCreateImageFromDMA(device, &buffer->dma);
+    usingDMA = 1;
 
-    skipDMA:
+skipDMA:
 
     if (texture->image == EGL_NO_IMAGE)
     {
-        SRMError("srmBufferGetTextureID error. Failed to create EGL image.");
+        SRMError("[SRMBuffer] srmBufferGetTexture error. Failed to create EGL image.");
         free(texture);
         pthread_mutex_unlock(&buffer->mutex);
-        return 0;
+        return InvalidTexture;
     }
+
+    if (usingDMA)
+    {
+        texture->texture.target = srmBufferGetTargetFromFormat(device, buffer->dma.modifiers[0], buffer->dma.format);
+
+        if (texture->texture.target == GL_NONE ||
+            (texture->texture.target == GL_TEXTURE_2D && !device->glExtensions.OES_EGL_image) ||
+            (texture->texture.target == GL_TEXTURE_EXTERNAL_OES && !device->glExtensions.OES_EGL_image_external))
+        {
+            SRMError("[srmBufferGetTexture] Unsupported GL_TEXTURE target.");
+            free(texture);
+            pthread_mutex_unlock(&buffer->mutex);
+            return InvalidTexture;
+        }
+    }
+    else
+        texture->texture.target = buffer->target;
 
     srmSaveContext();
     srmDeviceMakeCurrent(device);
-    glGenTextures(1, &texture->texture);
-    glBindTexture(buffer->target, texture->texture);
-    device->eglFunctions.glEGLImageTargetTexture2DOES(buffer->target, texture->image);
+    glGenTextures(1, &texture->texture.id);
+    glBindTexture(texture->texture.target, texture->texture.id);
+    device->eglFunctions.glEGLImageTargetTexture2DOES(texture->texture.target, texture->image);
 
-    glTexParameteri(buffer->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(buffer->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(buffer->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(buffer->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(texture->texture.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(texture->texture.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(texture->texture.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(texture->texture.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     srmRestoreContext();
     srmListAppendData(buffer->textures, texture);
     pthread_mutex_unlock(&buffer->mutex);
     return texture->texture;
+}
+
+GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer)
+{
+    return srmBufferGetTexture(device, buffer).id;
 }
 
 void srmBufferDestroy(SRMBuffer *buffer)
@@ -422,8 +445,8 @@ void srmBufferDestroy(SRMBuffer *buffer)
 
             srmDeviceMakeCurrent(texture->device);
 
-            if (!buffer->keepTexturesAlive && texture->texture != 0)
-                glDeleteTextures(1, &texture->texture);
+            if (!buffer->keepTexturesAlive && texture->texture.id != 0)
+                glDeleteTextures(1, &texture->texture.id);
 
             if (texture->image != EGL_NO_IMAGE)
                 eglDestroyImage(texture->device->eglDisplay, texture->image);
@@ -557,7 +580,8 @@ UInt8 srmBufferWrite(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt32 dstY,
             buffer->fence = EGL_NO_SYNC_KHR;
         }
 
-        glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(buffer->allocator, buffer));
+        SRMTexture tex = srmBufferGetTexture(buffer->allocator, buffer);
+        glBindTexture(GL_TEXTURE_2D, tex.id);
         glPixelStorei(GL_UNPACK_ALIGNMENT, buffer->pixelSize);
         glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / buffer->pixelSize);
         glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
@@ -691,7 +715,8 @@ UInt8 srmBufferWrite2Update(SRMBuffer *buffer, UInt32 stride, UInt32 dstX, UInt3
     }
     else if (buffer->writeMode == SRM_BUFFER_WRITE_MODE_GLES)
     {
-        glBindTexture(GL_TEXTURE_2D, srmBufferGetTextureID(buffer->allocator, buffer));
+        SRMTexture tex = srmBufferGetTexture(buffer->allocator, buffer);
+        glBindTexture(GL_TEXTURE_2D, tex.id);
         glPixelStorei(GL_UNPACK_ALIGNMENT, buffer->pixelSize);
         glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / buffer->pixelSize);
         glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
@@ -774,7 +799,7 @@ SRMBuffer *srmBufferCreateFromGBM(SRMCore *core, struct gbm_bo *bo)
     buffer->src = SRM_BUFFER_SRC_GBM;
     srmBufferFillParamsFromBO(buffer, bo);
     buffer->bo = bo;
-    srmBufferSetTargetFromFormat(buffer);
+    buffer->target = srmBufferGetTargetFromFormat(buffer->allocator, buffer->dma.modifiers[0], buffer->dma.format);
 
     /* Just in case DMA formats are not supported but KHR_image_pixmap is */
     if (buffer->target == GL_NONE)
@@ -860,7 +885,7 @@ GLenum srmBufferGetTextureTarget(SRMBuffer *buffer)
 
 EGLImage srmBufferGetEGLImage(SRMDevice *device, SRMBuffer *buffer)
 {
-    if (!srmBufferGetTextureID(device, buffer))
+    if (!srmBufferGetTexture(device, buffer).id)
         return EGL_NO_IMAGE;
 
     struct SRMBufferTexture *texture;
@@ -931,11 +956,12 @@ SRMBuffer *srmBufferCreateGLTextureWrapper(SRMDevice *device, GLuint id, GLenum 
 
     struct SRMBufferTexture *texture = calloc(1, sizeof(struct SRMBufferTexture));
     texture->device = buffer->allocator;
-    texture->texture = id;
+    texture->texture.id = id;
+    texture->texture.target = target;
     texture->image = EGL_NO_IMAGE;
     srmListAppendData(buffer->textures, texture);
 
-    /* Only allow ths if ownership is tranferred since it can mess fb attachments */
+    /* Only allow this if ownership is tranferred since it can mess fb attachments */
     if (transferOwnership && buffer->allocator->eglExtensions.KHR_gl_texture_2D_image)
     {
         static const EGLint attribs[3] =
@@ -953,7 +979,7 @@ SRMBuffer *srmBufferCreateGLTextureWrapper(SRMDevice *device, GLuint id, GLenum 
             eglGetCurrentDisplay(),
             eglGetCurrentContext(),
             EGL_GL_TEXTURE_2D_KHR,
-            (EGLClientBuffer)(UInt64)texture->texture,
+            (EGLClientBuffer)(UInt64)texture->texture.id,
             attribs);
 
         srmRestoreContext();

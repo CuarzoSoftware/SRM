@@ -183,37 +183,30 @@ void srmBufferFillParamsFromBO(SRMBuffer *buffer, struct gbm_bo *bo)
     }
 }
 
-void srmBufferSetTargetFromFormat(SRMBuffer *buffer)
+GLenum srmBufferGetTargetFromFormat(SRMDevice *device, UInt64 mod, UInt32 fmt)
 {
-    if (srmFormatIsInList(buffer->allocator->dmaExternalFormats, buffer->dma.format, buffer->dma.modifiers[0]))
+    if (srmFormatIsInList(device->dmaExternalFormats, fmt, mod))
     {
-        if (!buffer->allocator->glExtensions.OES_EGL_image_external)
+        if (!device->glExtensions.OES_EGL_image_external)
         {
             SRMError("Buffer has GL_TEXTURE_EXTERNAL_OES target but OES_EGL_image_external is not available.");
-            goto fail;
+            return GL_NONE;
         }
 
-        buffer->target = GL_TEXTURE_EXTERNAL_OES;
+        return GL_TEXTURE_EXTERNAL_OES;
     }
-    else if (srmFormatIsInList(buffer->allocator->dmaTextureFormats, buffer->dma.format, buffer->dma.modifiers[0]))
+    else if (srmFormatIsInList(device->dmaTextureFormats, fmt, mod))
     {
-        if (!buffer->allocator->glExtensions.OES_EGL_image)
+        if (!device->glExtensions.OES_EGL_image)
         {
             SRMError("Buffer has GL_TEXTURE_2D target but OES_EGL_image is not available.");
-            goto fail;
+            return GL_NONE;
         }
 
-        buffer->target = GL_TEXTURE_2D;
-    }
-    else
-    {
-        SRMError("Buffer has GL_TEXTURE_2D target but OES_EGL_image is not available.");
-        goto fail;
+        return GL_TEXTURE_2D;
     }
 
-    return;
-fail:
-    buffer->target = GL_NONE;
+    return GL_NONE;
 }
 
 // A valid EGLDisplay and EGLContext must be current before calling this function

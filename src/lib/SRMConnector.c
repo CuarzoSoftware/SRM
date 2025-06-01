@@ -787,7 +787,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         return 0;
     }
 
-    if (srmBufferGetTextureID(connector->device, buffer) == 0)
+    if (srmBufferGetTexture(connector->device, buffer).id == 0)
     {
         SRMError("[%s] [%s] Failed to set custom scanout buffer. The buffer is not supported by the connector's device.",
                  connector->device->shortName,

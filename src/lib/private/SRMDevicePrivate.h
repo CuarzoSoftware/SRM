@@ -61,8 +61,11 @@ struct SRMDeviceStruct
     EGLConfig eglConfigTest;
     GLuint vertexShaderTest;
     GLuint fragmentShaderTest;
+    GLuint fragmentShaderTestExternal;
     GLuint programTest;
+    GLuint programTestExternal;
     GLuint textureUniformTest;
+    GLuint textureUniformTestExternal;
 
     EGLint eglSharedContextAttribs[7];
     SRMEGLDeviceExtensions eglExtensions;

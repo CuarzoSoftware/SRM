@@ -10,6 +10,13 @@
 extern "C" {
 #endif
 
+#if DOXYGEN
+#define DEPRECATED_WARN
+#else
+#define DEPRECATED_WARN __attribute__((deprecated))
+#endif
+
+
 /**
  * @defgroup SRMBuffer SRMBuffer
  * 
@@ -271,7 +278,7 @@ SRMTexture srmBufferGetTexture(SRMDevice *device, SRMBuffer *buffer);
 /**
  * @brief Retrieves an OpenGL texture ID associated with an @ref SRMBuffer for a specific device (GPU).
  *
- * @warning This function is deprecated. Use srmBufferGetTexture() instead.
+ * @deprecated This function is deprecated. Use srmBufferGetTexture() instead.
  *
  * This function retrieves the OpenGL texture ID that corresponds to the given @ref SRMBuffer
  * for the specified device (GPU).
@@ -283,13 +290,12 @@ SRMTexture srmBufferGetTexture(SRMDevice *device, SRMBuffer *buffer);
  * @param buffer Pointer to the @ref SRMBuffer for which the texture ID is requested.
  * @return The OpenGL texture ID associated with the @ref SRMBuffer and device, or 0 on failure.
  */
-__attribute__((deprecated))
-GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
+DEPRECATED_WARN GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
 
 /**
  * @brief Gets the OpenGL texture target associated with an @ref SRMBuffer.
  *
- * @warning This function is deprecated. Use srmBufferGetTexture() instead.
+ * @deprecated This function is deprecated and only returns the target for the allocator device. Use srmBufferGetTexture() instead.
  *
  * This function retrieves the OpenGL texture target associated with the provided @ref SRMBuffer.
  * 
@@ -312,8 +318,7 @@ GLuint srmBufferGetTextureID(SRMDevice *device, SRMBuffer *buffer);
  * @param buffer Pointer to the @ref SRMBuffer the texture belongs to.
  * @return The associated OpenGL texture target, which can be either `GL_TEXTURE_2D` or `GL_TEXTURE_EXTERNAL_OES`.
  */
-__attribute__((deprecated))
-GLenum srmBufferGetTextureTarget(SRMBuffer *buffer);
+DEPRECATED_WARN GLenum srmBufferGetTextureTarget(SRMBuffer *buffer);
 
 /**
  * @brief Gets an `EGLImage` associated with a specific device.

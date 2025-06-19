@@ -771,11 +771,10 @@ void srmRenderModeCommonPauseRendering(SRMConnector *connector)
     }
 }
 
-void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
+UInt8 srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
 {
-    Int32 ret;
+    Int32 ret = -1;
     connector->lastFb = fb;
-    connector->pendingResume = 0;
     srmRenderModeCommonSyncState(connector);
 
     if (connector->device->clientCapAtomic)
@@ -871,7 +870,6 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
         UInt32 prevCursorIndex = connector->cursorIndex;
         srmRenderModeCommitAtomicChanges(connector, req, 0);
 
-        // Commit
         ret = srmRenderModeAtomicCommit(connector->device->fd,
                                         req,
                                         DRM_MODE_ATOMIC_ALLOW_MODESET,
@@ -883,12 +881,16 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
         {
             if (connector->currentCursorPlane)
                 connector->cursorIndex = prevCursorIndex;
+
             SRMError("[%s] [%s] Failed to restore CRTC mode. DRM Error: %d.",
                      connector->device->shortName,
                      connector->name, ret);
         }
         else
+        {
             connector->atomicChanges = 0;
+            connector->pendingModeSetting = 0;
+        }
     }
     else
     {
@@ -907,7 +909,11 @@ void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb)
                      connector->device->shortName,
                      connector->name, ret);
         }
+        else
+            connector->pendingModeSetting = 0;
     }
+
+    return ret == 0;
 }
 
 
@@ -1430,6 +1436,8 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
     if (!connector->device->clientCapAtomic || !connector->device->capAddFb2Modifiers || !connector->allowModifiers)
         return;
 
+    UInt8 hasLinear = srmFormatIsInList(srmDeviceGetDMARenderFormats(connector->device), DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR);
+
     SRMListForeach(it, connector->currentPrimaryPlane->inFormats)
     {
         SRMFormat *fmt = srmListItemGetData(it);
@@ -1446,6 +1454,16 @@ void srmRenderModeCommonSearchNonLinearModifier(SRMConnector *connector)
             connector->currentFormat.modifier = fmt->modifier;
             break;
         }
+    }
+
+    if (connector->currentFormat.modifier == DRM_FORMAT_MOD_INVALID && hasLinear)
+    {
+        connector->currentFormat.modifier = DRM_FORMAT_MOD_LINEAR;
+        SRMDebug("[%s] [%s] Using format: %s - %s.",
+                 connector->device->shortName,
+                 connector->name,
+                 drmGetFormatName(connector->currentFormat.format),
+                 drmGetFormatModifierName(connector->currentFormat.modifier));
     }
 }
 

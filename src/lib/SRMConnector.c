@@ -9,6 +9,7 @@
 #include <SRMConnectorMode.h>
 #include <SRMList.h>
 #include <SRMLog.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <xf86drmMode.h>
@@ -748,7 +749,7 @@ SRM_CONNECTOR_CONTENT_TYPE srmConnectorGetContentType(SRMConnector *connector)
 
 UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buffer)
 {
-    if (!connector->inPaintGL || connector->device->core->customBufferScanoutIsDisabled)
+    if (!connector->inPaintGL || connector->device->core->customBufferScanoutIsDisabled || connector->pendingModeSetting)
         return 0;
 
     if (buffer == connector->userScanoutBufferRef[0])
@@ -802,10 +803,30 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
         if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier)
             || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier))
         {
-            SRMError("[%s] [%s] Failed to set custom scanout buffer. Format not supported by the primary plane.",
-                     connector->device->shortName,
-                     connector->name);
-            return 0;
+            if (buffer->scanout.usingAlphaSubstitute)
+            {
+                SRMError("[%s] [%s] Failed to set custom scanout buffer. Format not supported by the primary plane.",
+                         connector->device->shortName,
+                         connector->name);
+
+                return 0;
+            }
+            else
+            {
+                buffer->scanout.fmt.format = srmFormatGetAlphaSubstitute(buffer->scanout.fmt.format);
+                buffer->scanout.usingAlphaSubstitute = 1;
+
+                if (!srmFormatIsInList(connector->currentPrimaryPlane->inFormats, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier)
+                    || srmFormatIsInList(connector->currentPrimaryPlane->inFormatsBlacklist, buffer->scanout.fmt.format, buffer->scanout.fmt.modifier))
+                {
+                    SRMError("[%s] [%s] Failed to set custom scanout buffer. Unsupported format/modifier: %s - %s.",
+                             connector->device->shortName,
+                             connector->name,
+                             drmGetFormatName(buffer->scanout.fmt.format),
+                             drmGetFormatModifierName(buffer->scanout.fmt.modifier));
+                    return 0;
+                }
+            }
         }
 
         connector->userScanoutBufferRef[0] = srmBufferGetRef(buffer);
@@ -867,6 +888,7 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
     {
         UInt32 oldFmt = buffer->scanout.fmt.format;
         buffer->scanout.fmt.format = srmFormatGetAlphaSubstitute(buffer->scanout.fmt.format);
+        buffer->scanout.usingAlphaSubstitute = 1;
 
         SRMError("[%s] [%s] Failed to set custom scanout buffer. Format %s not supported by primary plane. Trying alpha substitute format %s",
                  connector->device->shortName,

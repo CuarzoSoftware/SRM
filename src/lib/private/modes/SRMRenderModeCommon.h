@@ -44,7 +44,7 @@ Int32 srmRenderModeAtomicResetConnectorProps(SRMConnector *connector);
 Int32 srmRenderModeAtomicCommit(Int32 fd, drmModeAtomicReqPtr req, UInt32 flags, void *data, UInt8 forceRetry);
 Int32 srmRenderModeCommonInitCrtc(SRMConnector *connector, UInt32 fb);
 void srmRenderModeCommonPauseRendering(SRMConnector *connector);
-void srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb);
+UInt8 srmRenderModeCommonResumeRendering(SRMConnector *connector, UInt32 fb);
 void srmRenderModeCommonSyncState(SRMConnector *connector);
 void srmRenderModeCommonUninitialize(SRMConnector *connector);
 Int32 srmRenderModeCommonUpdateMode(SRMConnector *connector, UInt32 fb);

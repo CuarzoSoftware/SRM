@@ -57,6 +57,7 @@ struct SRMBufferStruct
         UInt32 fb; // DRM
         struct gbm_bo *bo; // Can be NULL
         SRMFormat fmt; // For alpha substitute cases
+        UInt8 usingAlphaSubstitute;
     } scanout;
 
     // GL

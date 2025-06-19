@@ -96,7 +96,7 @@ struct SRMConnectorStruct
     drmEventContext drmEventCtx;
     UInt8 pendingPageFlip;
     UInt8 firstPageFlip;
-    UInt8 pendingResume;
+    UInt8 pendingModeSetting;
     UInt32 bufferAgeFrame;
 
     // Sync

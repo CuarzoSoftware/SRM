@@ -599,8 +599,11 @@ static UInt8 flipPage(SRMConnector *connector)
         }
     }
 
-    if (connector->pendingResume)
-        srmRenderModeCommonResumeRendering(connector, data->c.drmFBs[data->c.currentBufferIndex]);
+    if (connector->pendingModeSetting)
+    {
+        if (!srmRenderModeCommonResumeRendering(connector, data->c.drmFBs[data->c.currentBufferIndex]))
+            return 0;
+    }
 
     srmRenderModeCommonPageFlip(connector, data->c.drmFBs[data->c.currentBufferIndex]);
     data->c.currentBufferIndex = nextBufferIndex(connector);
@@ -716,7 +719,8 @@ static void pauseRendering(SRMConnector *connector)
 static void resumeRendering(SRMConnector *connector)
 {
     // This is now handled in flipPage
-    connector->pendingResume = 1;
+    srmConnectorReleaseUserScanoutBuffer(connector, 0);
+    connector->pendingModeSetting = 1;
 }
 
 static UInt32 getFramebufferID(SRMConnector *connector)

@@ -1,0 +1,345 @@
+#include <CZ/SRM/SRMCrtc.h>
+#include <CZ/SRM/SRMPlane.h>
+#include <CZ/SRM/SRMEncoder.h>
+#include <CZ/SRM/SRMLog.h>
+#include <CZ/SRM/SRMDevice.h>
+#include <CZ/SRM/SRMCore.h>
+#include <CZ/SRM/SRMConnector.h>
+
+#include <CZ/Utils/CZStringUtils.h>
+#include <CZ/Utils/CZVectorUtils.h>
+
+#include <cstring>
+#include <fcntl.h>
+#include <memory>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+
+using namespace CZ;
+
+static bool DeviceInBlacklist(const char *nodePath)
+{
+    const char *blacklist { getenv("SRM_DEVICES_BLACKLIST") };
+
+    if (!blacklist)
+        return false;
+
+    const size_t extlen { strlen(nodePath) };
+    const char *end { blacklist + strlen(blacklist) };
+
+    while (blacklist < end)
+    {
+        if (*blacklist == ':')
+        {
+            blacklist++;
+            continue;
+        }
+
+        const size_t n { strcspn(blacklist, ":") };
+
+        if (n == extlen && strncmp(nodePath, blacklist, n) == 0)
+            return true;
+
+        blacklist += n;
+    }
+
+    return false;
+}
+
+SRMDevice *SRMDevice::Make(SRMCore *core, const char *nodePath, bool isBootVGA) noexcept
+{
+    if (DeviceInBlacklist(nodePath))
+    {
+        SRMWarning("SRMDevice %s blacklisted. Ignoring it.", nodePath);
+        return {};
+    }
+
+    std::unique_ptr<SRMDevice> obj { new SRMDevice(core, nodePath, isBootVGA) };
+
+    if (obj->init())
+        return obj.release();
+
+    return {};
+}
+
+SRMDevice::SRMDevice(SRMCore *core, const char *nodePath, bool isBootVGA) noexcept :
+    m_nodePath(nodePath), m_core(core)
+{
+    m_pf.setFlag(pIsBootVGA, isBootVGA);
+    m_nodeName = CZStringUtils::SubStrAfterLastOf(m_nodePath, "/");
+    if (m_nodeName.empty())
+        m_nodeName = "Unknown";
+
+    SRMDebug("[%s] Is Boot VGA: %s.", nodeName().c_str(), m_pf.has(pIsBootVGA) ?  "YES" : "NO");
+}
+
+SRMDevice::~SRMDevice() noexcept
+{
+    CZVectorUtils::DeleteAndPopBackAll(m_connectors);
+    CZVectorUtils::DeleteAndPopBackAll(m_planes);
+    CZVectorUtils::DeleteAndPopBackAll(m_encoders);
+    CZVectorUtils::DeleteAndPopBackAll(m_crtcs);
+
+    if (fd() >= 0)
+    {
+        core()->m_iface->closeRestricted(fd(), core()->m_ifaceData);
+        m_fd = -1;
+    }
+}
+
+bool SRMDevice::init() noexcept
+{
+    m_fd = core()->m_iface->openRestricted(m_nodePath.c_str(), O_RDWR | O_CLOEXEC, core()->m_ifaceData);
+
+    if (fd() < 0)
+    {
+        SRMError(CZLN, "[%s] Failed to open DRM device.", nodeName().c_str());
+        return false;
+    }
+
+    SRMDebug("[%s] Is DRM Master: %s.", nodeName().c_str(), drmIsMaster(fd()) ?  "YES" : "NO");
+
+    drmVersion *version { drmGetVersion(fd()) };
+
+    if (version)
+    {
+        SRMDebug("[%s] DRM Driver: %s.", nodeName().c_str(), version->name);
+
+        if (strcmp(version->name, "i915") == 0)
+            m_driver = PDriver::i915;
+        else if (strcmp(version->name, "nouveau") == 0)
+            m_driver = PDriver::nouveau;
+        else if (strcmp(version->name, "lima") == 0)
+            m_driver = PDriver::lima;
+        else if (strcmp(version->name, "nvidia-drm") == 0)
+            m_driver = PDriver::nvidia;
+        else if (strcmp(version->name, "nvidia") == 0)
+            m_driver = PDriver::nvidia;
+
+        drmFreeVersion(version);
+    }
+
+    initClientCaps();
+    initCaps();
+
+    drmModeResPtr res { drmModeGetResources(fd()) };
+
+    if (!res)
+    {
+        SRMError(CZLN, "[%s] Faild get DRM resources.", nodeName().c_str());
+        return false;
+    }
+
+    const bool ret {
+        initCrtcs(res) &&
+        initEncoders(res) &&
+        initPlanes() &&
+        initCrtcs(res) };
+
+    drmModeFreeResources(res);
+    return ret;
+}
+
+bool SRMDevice::initClientCaps() noexcept
+{
+    const char *envStereo3D { getenv("SRM_ENABLE_STEREO_3D") };
+
+    if (envStereo3D && atoi(envStereo3D))
+        m_clientCaps.Stereo3D = drmSetClientCap(fd(), DRM_CLIENT_CAP_STEREO_3D, 1) == 0;
+
+    const char *envForceLegacyAPI { getenv("SRM_FORCE_LEGACY_API") };
+
+    if (!envForceLegacyAPI || atoi(envForceLegacyAPI) != 1)
+        m_clientCaps.Atomic = drmSetClientCap(fd(), DRM_CLIENT_CAP_ATOMIC, 1) == 0;
+
+    if (m_clientCaps.Atomic)
+    {
+        // Enabled implicitly by atomic
+        m_clientCaps.AspectRatio = true;
+        m_clientCaps.UniversalPlanes = true;
+
+        const char *envWriteback { getenv("SRM_ENABLE_WRITEBACK_CONNECTORS") };
+
+        if (envWriteback && atoi(envWriteback) == 1)
+            m_clientCaps.WritebackConnectors = drmSetClientCap(fd(), DRM_CLIENT_CAP_WRITEBACK_CONNECTORS, 1) == 0;
+    }
+    else
+    {
+        m_clientCaps.AspectRatio = drmSetClientCap(fd(), DRM_CLIENT_CAP_ASPECT_RATIO, 1) == 0;
+        m_clientCaps.UniversalPlanes = drmSetClientCap(fd(), DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1) == 0;
+    }
+
+    return true;
+}
+
+bool SRMDevice::initCaps() noexcept
+{
+    UInt64 value { 0 };
+    drmGetCap(fd(), DRM_CAP_DUMB_BUFFER, &value);
+    m_caps.DumbBuffer = value == 1;
+
+    value = 0;
+    drmGetCap(fd(), DRM_CAP_PRIME, &value);
+    m_caps.PrimeImport = value & DRM_PRIME_CAP_IMPORT;
+    m_caps.PrimeExport = value & DRM_PRIME_CAP_EXPORT;
+
+    value = 0;
+    drmGetCap(fd(), DRM_CAP_ADDFB2_MODIFIERS, &value);
+    m_caps.AddFb2Modifiers = value == 1;
+
+    value = 0;
+    drmGetCap(fd(), DRM_CAP_TIMESTAMP_MONOTONIC, &value);
+    m_caps.TimestampMonotonic = value == 1;
+    m_clock = m_caps.TimestampMonotonic ? CLOCK_MONOTONIC : CLOCK_REALTIME;
+
+    value = 0;
+    drmGetCap(fd(), DRM_CAP_ASYNC_PAGE_FLIP, &value);
+    m_caps.AsyncPageFlip = value == 1;
+
+#ifdef DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP
+    value = 0;
+    drmGetCap(fd(), DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP, &value);
+    m_caps.AtomicAsyncPageFlip = value == 1;
+#endif
+
+    return true;
+}
+
+bool SRMDevice::initCrtcs(drmModeResPtr res) noexcept
+{
+    SRMCrtc *crtc;
+
+    for (int i = 0; i < res->count_crtcs; i++)
+    {
+        crtc = SRMCrtc::Make(res->crtcs[i], this);
+
+        if (!crtc) // All crtcs must exist
+            return false;
+
+        m_crtcs.emplace_back(crtc);
+    }
+
+    return true;
+}
+
+bool SRMDevice::initEncoders(drmModeResPtr res) noexcept
+{
+    SRMEncoder *encoder;
+
+    for (int i = 0; i < res->count_encoders; i++)
+    {
+        encoder = SRMEncoder::Make(res->encoders[i], this);
+
+        if (encoder)
+            m_encoders.emplace_back(encoder);
+    }
+
+    return true;
+}
+
+bool SRMDevice::initPlanes() noexcept
+{
+    drmModePlaneResPtr res { drmModeGetPlaneResources(fd()) };
+
+    if (!res)
+    {
+        SRMError(CZLN, "[%s] Failed to get DRM planes.", nodeName().c_str());
+        return false;
+    }
+
+    SRMPlane *plane;
+
+    for (UInt32 i = 0; i < res->count_planes; i++)
+    {
+        plane = SRMPlane::Make(res->planes[i], this);
+
+        if (plane)
+            m_planes.emplace_back(plane);
+    }
+
+    drmModeFreePlaneResources(res);
+    return true;
+}
+
+bool SRMDevice::initConnectors(drmModeResPtr res) noexcept
+{
+    SRMConnector *connector;
+
+    for (int i = 0; i < res->count_connectors; i++)
+    {
+        connector = SRMConnector::Make(res->connectors[i], this);
+
+        if (connector)
+            m_connectors.emplace_back(connector);
+    }
+
+    return true;
+}
+
+bool SRMDevice::dispatchHotplugEvents() noexcept
+{
+    if (drmIsMaster(fd()) != 1)
+    {
+        m_pf.add(pPendingUdevEvents);
+        SRMWarning(CZLN, "[%s] Can not handle hotplug events. Device is not master.", nodeName().c_str());
+        return false;
+    }
+
+    // TODO: Check if the kernel registered/unregistered connectors
+
+    m_pf.remove(pPendingUdevEvents);
+
+    for (auto *conn : connectors())
+    {
+        drmModeConnectorPtr res { drmModeGetConnector(fd(), conn->id()) };
+
+        if (!res)
+        {
+            SRMError(CZLN, "[%s] Failed to get drmModeConnectorPtr for SRMConnector %d.", nodeName().c_str(), conn->id());
+            continue;
+        }
+
+        const bool isConnected { res->connection ==  DRM_MODE_CONNECTED };
+
+        if (conn->isConnected() != isConnected)
+        {
+            if (isConnected)
+            {
+                conn->updateProperties(res);
+                conn->updateNames(res);
+                conn->updateEncoders(res);
+                conn->updateModes(res);
+
+                SRMDebug("[%s] Connector (%d) %s, %s, %s plugged.",
+                         nodeName().c_str(),
+                         conn->id(),
+                         conn->name().c_str(),
+                         conn->model().c_str(),
+                         conn->make().c_str());
+
+                core()->onConnectorPlugged.notify(conn);
+            }
+            else
+            {
+                SRMDebug("[%s] Connector (%d) %s, %s, %s unplugged.",
+                         nodeName().c_str(),
+                         conn->id(),
+                         conn->name().c_str(),
+                         conn->model().c_str(),
+                         conn->make().c_str());
+
+                core()->onConnectorUnplugged.notify(conn);
+
+                conn->uninitialize();
+                conn->updateProperties(res);
+                conn->updateNames(res);
+                conn->updateEncoders(res);
+                conn->updateModes(res);
+            }
+        }
+
+        drmModeFreeConnector(res);
+    }
+
+    return true;
+}

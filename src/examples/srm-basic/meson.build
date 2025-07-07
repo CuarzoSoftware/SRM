@@ -1,10 +1,10 @@
 executable(
     'srm-basic',
-    sources : ['main.c'],
+    sources : ['main.cpp'],
     dependencies : [
         drm_headers_dep,
-        srm_dep,
+        cz_srm_dep,
         glesv2_dep,
-        m_dep
+        dependency('libseat', version: '>= 0.6.4')
     ],
     install : true)

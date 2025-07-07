@@ -5,7 +5,7 @@
     <img src="https://img.shields.io/badge/license-LGPLv2.1-blue.svg" alt="SRM is released under the LGPLv2.1 license." />
   </a>
   <a href="https://github.com/CuarzoSoftware/SRM">
-    <img src="https://img.shields.io/badge/version-0.13.0-brightgreen" alt="Current SRM version." />
+    <img src="https://img.shields.io/badge/version-1.0.0-brightgreen" alt="Current SRM version." />
   </a>
 </p>
 
@@ -17,12 +17,12 @@ It also ensures textures can be rendered across all screens, even if they are at
 
 ### Links
 
-* [📖 C API Documentation](https://cuarzosoftware.github.io/SRM/topics.html)
-* [🎓 Tutorial](https://cuarzosoftware.github.io/SRM/tutorial_page.html)
-* [🕹️ Examples](https://cuarzosoftware.github.io/SRM/examples_page.html)
-* [📦 Downloads](https://cuarzosoftware.github.io/SRM/downloads_page.html)
-* [⚙️ Environment](https://cuarzosoftware.github.io/SRM/envs_page.html)
-* [💬 Contact](https://cuarzosoftware.github.io/SRM/contact_page.html)
+- [📖 C API Documentation](https://cuarzosoftware.github.io/SRM/topics.html)
+- [🎓 Tutorial](https://cuarzosoftware.github.io/SRM/tutorial_page.html)
+- [🕹️ Examples](https://cuarzosoftware.github.io/SRM/examples_page.html)
+- [📦 Downloads](https://cuarzosoftware.github.io/SRM/downloads_page.html)
+- [⚙️ Environment](https://cuarzosoftware.github.io/SRM/envs_page.html)
+- [💬 Contact](https://cuarzosoftware.github.io/SRM/contact_page.html)
 
 ### Used By
 
@@ -32,25 +32,25 @@ SRM is the main graphic backend used by the [Louvre C++ Wayland Library](https:/
 
 ### Features
 
-* Support for multi-GPU setups
-* Automatic configuration of GPUs and connectors
-* Texture allocation from main memory, DMA Buffers, GBM BOs and Wayland DRM Buffers
-* Multi-session capability (e.g. can use [libseat](https://github.com/kennylevinsen/seatd) to open DRM devices)
-* Listener for connectors hot-plugging events
-* Simple cursor planes control
-* V-Sync control (support for the atomic DRM API requires Linux >= 6.8)
-* Framebuffer damage (enhances performance in multi-GPU setups where DMA support is lacking)
-* Access to screen framebuffers as textures
-* Direct Scanout (primary plane)
-* Support for double and triple buffering
-* Gamma correction
+- Support for multi-GPU setups
+- Automatic configuration of GPUs and connectors
+- Texture allocation from main memory, DMA Buffers, GBM BOs and Wayland DRM Buffers
+- Multi-session capability (e.g. can use [libseat](https://github.com/kennylevinsen/seatd) to open DRM devices)
+- Listener for connectors hot-plugging events
+- Simple cursor planes control
+- V-Sync control (support for the atomic DRM API requires Linux >= 6.8)
+- Framebuffer damage (enhances performance in multi-GPU setups where DMA support is lacking)
+- Access to screen framebuffers as textures
+- Direct Scanout (primary plane)
+- Support for double and triple buffering
+- Gamma correction
 
 ### Tested on
 
-* Intel GPUs (i915 driver)
-* NVIDIA GPUs (Nouveau & proprietary)
-* AMD GPUs (AMDGPU driver)
-* Mali GPUs (Lima driver)
+- Intel GPUs (i915 driver)
+- NVIDIA GPUs (Nouveau & proprietary)
+- AMD GPUs (AMDGPU driver)
+- Mali GPUs (Lima driver)
 
 ### Rendering Modes
 
@@ -117,9 +117,9 @@ static void initializeGL(SRMConnector *connector, void *userData)
 
     SRMConnectorMode *mode = srmConnectorGetCurrentMode(connector);
 
-    glViewport(0, 
-               0, 
-               srmConnectorModeGetWidth(mode), 
+    glViewport(0,
+               0,
+               srmConnectorModeGetWidth(mode),
                srmConnectorModeGetHeight(mode));
 
     // Schedule a repaint (this eventually calls paintGL() later, not directly)

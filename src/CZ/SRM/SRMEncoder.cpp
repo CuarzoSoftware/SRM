@@ -12,7 +12,7 @@ SRMEncoder *SRMEncoder::Make(UInt32 id, SRMDevice *device) noexcept
 
     if (!res)
     {
-        SRMError(CZLN, "[%s] Failed to get drmModeEncoderPtr for SRMEncoder %d.", device->nodeName().c_str(), id);
+        device->log(CZError, CZLN, "Failed to get drmModeEncoderPtr for SRMEncoder {}", id);
         return {};
     }
 
@@ -25,7 +25,7 @@ SRMEncoder *SRMEncoder::Make(UInt32 id, SRMDevice *device) noexcept
     }
 
     drmModeFreeEncoder(res);
-    SRMError(CZLN, "[%s] Failed to create SRMEncoder %d.", device->nodeName().c_str(), id);
+    device->log(CZError, CZLN, "[%s] Failed to create SRMEncoder {}", id);
     return {};
 }
 

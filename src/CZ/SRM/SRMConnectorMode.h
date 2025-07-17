@@ -61,6 +61,7 @@ public:
     const drmModeModeInfo &info() const noexcept { return m_info; }
 private:
     friend class SRMConnector;
+    friend class SRMRenderer;
     SRMConnector *m_connector { nullptr };
     drmModeModeInfo m_info {};
 };

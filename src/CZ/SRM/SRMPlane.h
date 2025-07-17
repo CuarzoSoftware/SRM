@@ -89,6 +89,9 @@ public:
     const std::unordered_map<RFormat, std::unordered_set<RModifier>> &formats() const noexcept { return m_formats; }
 private:
     friend class SRMDevice;
+    friend class SRMConnector;
+    friend class SRMRenderer;
+
     static SRMPlane *Make(UInt32 id, SRMDevice *device) noexcept;
     SRMPlane(UInt32 id, SRMDevice *device) noexcept :
         m_id(id),
@@ -103,7 +106,7 @@ private:
     SRMDevice *m_device { nullptr };
     CZWeak<SRMConnector> m_currentConnector;
     std::vector<SRMCrtc*> m_crtcs;
-    std::unordered_map<RFormat, std::unordered_set<RModifier>> m_formats, m_formatsBlacklist;
+    std::unordered_map<RFormat, std::unordered_set<RModifier>> m_formats;
     Type m_type;
 
     struct PropIDs

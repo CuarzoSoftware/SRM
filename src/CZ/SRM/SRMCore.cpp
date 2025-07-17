@@ -14,11 +14,9 @@ using namespace CZ;
 
 std::shared_ptr<SRMCore> SRMCore::Make(const SRMInterface *iface, void *data) noexcept
 {
-    SRMLogInit();
-
     if (!iface || !iface->closeRestricted || !iface->openRestricted)
     {
-        SRMFatal(CZLN, "Invalid interface.");
+        SRMLog(CZFatal, CZLN, "Invalid interface.");
         return {};
     }
 
@@ -35,7 +33,7 @@ std::shared_ptr<SRMCore> SRMCore::Make(const SRMInterface *iface, void *data) no
     setenv("SRM_DISABLE_CURSOR",                "0", 0);
     setenv("SRM_NVIDIA_CURSOR",                 "1", 0);
 
-    SRMDebug("SRM version %d.%d.%d-%d.",
+    SRMLog(CZInfo, "SRM version {}.{}.{}-{}.",
              SRM_VERSION_MAJOR,
              SRM_VERSION_MINOR,
              SRM_VERSION_PATCH,
@@ -43,7 +41,7 @@ std::shared_ptr<SRMCore> SRMCore::Make(const SRMInterface *iface, void *data) no
 
     if (RCore::Get())
     {
-        SRMFatal(CZLN, "The RCore instance must be created by SRM.");
+        SRMLog(CZFatal, CZLN, "The RCore instance must be created by SRM.");
         return {};
     }
 
@@ -89,15 +87,15 @@ bool SRMCore::init() noexcept
 {
     const char *env { getenv("SRM_DISABLE_CUSTOM_SCANOUT") };
     m_pf.setFlag(pDisableScanout, env && atoi(env) == 1);
-    SRMDebug("Custom Scanout Enabled: %s.", m_pf.has(pDisableScanout) ? "NO" : "YES");
+    SRMLog(CZInfo, "Direct Scanout Enabled: {}.", !m_pf.has(pDisableScanout));
 
     env = getenv("SRM_DISABLE_CURSOR");
     m_pf.setFlag(pDisableCursor, env && atoi(env) == 1);
-    SRMDebug("Cursor Planes Enabled: %s.", m_pf.has(pDisableCursor) ? "NO" : "YES");
+    SRMLog(CZInfo, "Cursor Planes Enabled: {}.", !m_pf.has(pDisableCursor));
 
     env = getenv("SRM_FORCE_LEGACY_CURSOR");
     m_pf.setFlag(pForceLegacyCursor, env && atoi(env) == 1);
-    SRMDebug("Force Legacy Cursor IOCTLs: %s.", m_pf.has(pForceLegacyCursor) ? "YES" : "NO");
+    SRMLog(CZInfo, "Forcing Legacy Cursor IOCTLs: {}.", m_pf.has(pForceLegacyCursor));
 
     const bool ret {
         initUdev() &&
@@ -115,7 +113,7 @@ bool SRMCore::initUdev() noexcept
 
     if(!m_udev)
     {
-        SRMFatal(CZLN, "Failed to create udev context.");
+        SRMLog(CZFatal, CZLN, "Failed to create udev context.");
         return false;
     }
 
@@ -136,7 +134,7 @@ bool SRMCore::initDevices() noexcept
 
     if (!enumerate)
     {
-        SRMFatal(CZLN, "Failed to create udev_enumerate.");
+        SRMLog(CZFatal, CZLN, "Failed to create udev_enumerate.");
         return false;
     }
 
@@ -174,25 +172,25 @@ bool SRMCore::initMonitor() noexcept
 
     if (!m_monitor)
     {
-        SRMFatal(CZLN, "Failed to create udev_monitor.");
+        SRMLog(CZFatal, CZLN, "Failed to create udev_monitor.");
         return false;
     }
 
     if (udev_monitor_filter_add_match_subsystem_devtype(m_monitor, "drm", "drm_minor") < 0)
     {
-        SRMFatal(CZLN, "Failed to add udev monitor filter.");
+        SRMLog(CZFatal, CZLN, "Failed to add udev monitor filter.");
         return false;
     }
 
     if (udev_monitor_enable_receiving(m_monitor) < 0)
     {
-        SRMFatal(CZLN, "Failed to enable udev monitor receiving.");
+        SRMLog(CZFatal, CZLN, "Failed to enable udev monitor receiving.");
         return false;
     }
 
     if (udev_monitor_get_fd(m_monitor) < 0)
     {
-        SRMFatal(CZLN, "Failed to get udev monitor fd.");
+        SRMLog(CZFatal, CZLN, "Failed to get udev monitor fd.");
         return false;
     }
 
@@ -200,7 +198,7 @@ bool SRMCore::initMonitor() noexcept
 
     if (m_fd < 0)
     {
-        SRMFatal(CZLN, "Failed to create epoll fd.");
+        SRMLog(CZFatal, CZLN, "Failed to create epoll fd.");
         return false;
     }
 
@@ -210,7 +208,7 @@ bool SRMCore::initMonitor() noexcept
 
     if (epoll_ctl(m_fd, EPOLL_CTL_ADD, event.data.fd, &event) != 0)
     {
-        SRMFatal(CZLN, "Failed to add udev monitor fd to epoll fd.");
+        SRMLog(CZFatal, CZLN, "Failed to add udev monitor fd to epoll fd.");
         return false;
     }
 
@@ -228,7 +226,7 @@ bool SRMCore::initReam() noexcept
 
     if (!platformHandle)
     {
-        SRMFatal(CZLN, "Failed to create RDRMPlatformHandle.");
+        SRMLog(CZFatal, CZLN, "Failed to create RDRMPlatformHandle.");
         return false;
     }
 
@@ -236,7 +234,7 @@ bool SRMCore::initReam() noexcept
 
     if (!m_ream)
     {
-        SRMFatal(CZLN, "Failed to create RCore.");
+        SRMLog(CZFatal, CZLN, "Failed to create RCore.");
         return false;
     }
 
@@ -266,7 +264,7 @@ bool SRMCore::suspend() noexcept
 {
     if (isSuspended())
     {
-        SRMWarning(CZLN, "Already suspended.");
+        SRMLog(CZWarning, CZLN, "Already suspended.");
         return false;
     }
 
@@ -276,7 +274,7 @@ bool SRMCore::suspend() noexcept
 
     if (epoll_ctl(m_fd, EPOLL_CTL_DEL, udev_monitor_get_fd(m_monitor), NULL) != 0)
     {
-        SRMError(CZLN, "Failed to remove udev monitor fd from epoll.");
+        SRMLog(CZError, CZLN, "Failed to remove udev monitor fd from epoll.");
         return false;
     }
 
@@ -288,7 +286,7 @@ bool SRMCore::resume() noexcept
 {
     if (!isSuspended())
     {
-        SRMWarning(CZLN, "Not suspended.");
+        SRMLog(CZWarning, CZLN, "Not suspended.");
         return false;
     }
 
@@ -302,7 +300,7 @@ bool SRMCore::resume() noexcept
 
     if (epoll_ctl(m_fd, EPOLL_CTL_ADD, event.data.fd, &event) != 0)
     {
-        SRMError(CZLN, "Failed to add udev monitor fd to epoll.");
+        SRMLog(CZError, CZLN, "Failed to add udev monitor fd to epoll.");
         return false;
     }
 

@@ -1,8 +1,9 @@
 #ifndef SRMDEVICE_H
 #define SRMDEVICE_H
 
-#include <CZ/Ream/RDevice.h>
 #include <CZ/SRM/SRMObject.h>
+#include <CZ/SRM/SRMLog.h>
+#include <CZ/Ream/RDevice.h>
 #include <CZ/CZBitset.h>
 #include <mutex>
 #include <string>
@@ -187,8 +188,12 @@ public:
 
     ~SRMDevice() noexcept;
 
+    CZLogger log { SRMLog };
+
 private:
     friend class SRMCore;
+    friend class SRMRenderer;
+    friend class SRMConnector;
     static SRMDevice *Make(SRMCore *core, const char *nodePath, bool isBootVGA) noexcept;
     SRMDevice(SRMCore *core, const char *nodePath, bool isBootVGA) noexcept;
     bool init() noexcept;

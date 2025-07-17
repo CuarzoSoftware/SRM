@@ -1,81 +1,23 @@
 #ifndef SRMCONNECTOR_H
 #define SRMCONNECTOR_H
 
-#include <CZ/skia/core/SkRegion.h>
+#include <CZ/SRM/SRMRenderer.h>
 #include <CZ/SRM/SRMObject.h>
+#include <CZ/SRM/SRMLog.h>
+
 #include <CZ/Ream/Ream.h>
 #include <CZ/Ream/RSubPixel.h>
 #include <CZ/Ream/RContentType.h>
 #include <CZ/Ream/RPresentationTime.h>
+
+#include <CZ/skia/core/SkRegion.h>
+
 #include <CZ/CZWeak.h>
-#include <condition_variable>
+
 #include <memory>
 #include <string>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
-
-namespace CZ
-{
-    /**
-     * @brief Interface for OpenGL events handling.
-     *
-     * The @ref SRMConnectorInterface defines a set of functions for managing various OpenGL events,
-     * including initialization, rendering, page flipping, resizing, and uninitialization.
-     * This interface is used in the srmConnectorInitialize() function.
-     */
-    struct SRMConnectorInterface
-    {
-        /**
-         * @brief Notifies that the connector has been initialized.
-         *
-         * In this event, you should set up shaders, load textures, and perform any necessary setup.
-         *
-         * @param connector Pointer to the @ref SRMConnector.
-         * @param data User data passed in srmConnectorInitialize().
-         */
-        void (*initializeGL)(SRMConnector *connector, void *data);
-
-        /**
-         * @brief Render event.
-         *
-         * During this event, you should handle all rendering for the current frame.
-         *
-         * @param connector Pointer to the @ref SRMConnector.
-         * @param data User data passed in srmConnectorInitialize().
-         */
-        void (*paintGL)(SRMConnector *connector, void *data);
-
-        /**
-         * @brief Notifies a page flip.
-         *
-         * This event is triggered when the framebuffer being displayed on the screen changes.
-         *
-         * @param connector Pointer to the @ref SRMConnector.
-         * @param data User data passed in srmConnectorInitialize().
-         */
-        void (*pageFlipped)(SRMConnector *connector, void *data);
-
-        /**
-         * @brief Notifies a change in the framebuffer's dimensions.
-         *
-         * This event is invoked when the current connector mode changes.
-         *
-         * @param connector Pointer to the @ref SRMConnector.
-         * @param data User data passed in srmConnectorInitialize().
-         */
-        void (*resizeGL)(SRMConnector *connector, void *data);
-
-        /**
-         * @brief Notifies the connector's uninitialization.
-         *
-         * In this method, you should release resources created during initialization.
-         *
-         * @param connector Pointer to the @ref SRMConnector.
-         * @param data User data passed in srmConnectorInitialize().
-         */
-        void (*uninitializeGL)(SRMConnector *connector, void *data);
-    };
-};
 
 /**
  * @brief Display with associated rendering capabilities and modes.
@@ -132,6 +74,8 @@ public:
      */
     State state() const noexcept { return m_state; }
 
+    static std::string_view StateString(State state) noexcept;
+
     /**
      * @brief Check if the connector is connected.
      *
@@ -142,7 +86,7 @@ public:
      * @param connector Pointer to the @ref SRMConnector to check for connection.
      * @return 1 if the connector is connected, 0 otherwise.
      */
-    bool isConnected() const noexcept { return m_pf.has(pConnected); }
+    bool isConnected() const noexcept { return m_isConnected; }
 
     /**
      * @brief Get the physical width of the connector in millimeters.
@@ -245,7 +189,7 @@ public:
      * @param connector Pointer to the @ref SRMConnector for which to retrieve the current encoder.
      * @return The currently used @ref SRMEncoder for the connector.
      */
-    SRMEncoder *currentEncoder() const noexcept { return m_currentEncoder; }
+    SRMEncoder *currentEncoder() const noexcept;
 
     /**
      * @brief Get a list of available connector modes.
@@ -302,7 +246,7 @@ public:
      * @param connector Pointer to the @ref SRMConnector for which to retrieve the current CRTC.
      * @return The currently used @ref SRMCrtc for the connector.
      */
-    SRMCrtc *currentCrtc() const noexcept { return m_currentCrtc; }
+    SRMCrtc *currentCrtc() const noexcept;
 
     /**
      * @brief Get the currently used primary plane for the connector.
@@ -312,7 +256,7 @@ public:
      * @param connector Pointer to the @ref SRMConnector for which to retrieve the current primary plane.
      * @return The currently used @ref SRMPlane for the primary display.
      */
-    SRMPlane *currentPrimaryPlane() const noexcept { return m_currentPrimaryPlane; }
+    SRMPlane *currentPrimaryPlane() const noexcept;
 
     /**
      * @brief Get the currently used cursor plane for the connector.
@@ -322,7 +266,7 @@ public:
      * @param connector Pointer to the @ref SRMConnector for which to retrieve the current cursor plane.
      * @return The currently used @ref SRMPlane for the cursor display or NULL if not assigned.
      */
-    SRMPlane *currentCursorPlane() const noexcept { return m_currentCursorPlane; }
+    SRMPlane *currentCursorPlane() const noexcept;
 
     /**
      * @brief Check if there is an available cursor plane for hardware cursor compositing.
@@ -373,7 +317,7 @@ public:
      *
      * @warning Make sure to correctly set up the @ref SRMConnectorInterface to handle all its events, otherwise, it may crash.
      */
-    bool initialize(SRMConnectorInterface *iface, void *data) noexcept;
+    bool initialize(const SRMConnectorInterface *iface, void *data) noexcept;
 
     /**
      * @brief Schedules a new rendering frame.
@@ -457,6 +401,8 @@ public:
      * extension specification.
      */
     UInt32 imageAge() const noexcept;
+
+    std::shared_ptr<RImage> currentImage() const noexcept;
 
     /**
      * @brief Checks if the connector benefits from providing it damage information generated during the last `paintGL()` call.
@@ -704,8 +650,12 @@ public:
      * @return          A value of 1 indicates the current buffer is locked, 0 indicates it is unlocked.
      */
     bool isCurrentBufferLocked() const noexcept;
+
+    CZLogger log { SRMLog };
+
 private:
     friend class SRMDevice;
+    friend class SRMRenderer;
     static SRMConnector *Make(UInt32 id, SRMDevice *device) noexcept;
     SRMConnector(UInt32 id, SRMDevice *device) noexcept :
         m_id(id),
@@ -717,29 +667,17 @@ private:
     bool updateEncoders(drmModeConnectorPtr res) noexcept;
     bool updateModes(drmModeConnectorPtr res) noexcept;
 
+    void setState(State state) noexcept;
+    bool unlockRenderer(bool repaint) noexcept;
+
     SRMConnectorMode *findPreferredMode() const noexcept;
 
+    // Could succeed even if besCursorPlane is nullptr
+    bool findConfiguration(SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane) noexcept;
     void destroyModes() noexcept;
 
-    enum PF
-    {
-        pNonDesktop          = 1 << 0,
-        pConnected           = 1 << 1,
-        pCursorVisible       = 1 << 2,
-        pVSync               = 1 << 3,
-        pPendingVSync        = 1 << 4,
-        pPendingModeset      = 1 << 4,
-        pPendingPageFlip     = 1 << 4,
-        pFirstPageFlip       = 1 << 4,
-        pLockCurrentBuffer   = 1 << 10,
-        pRepaintRequested    = 1 << 12,
-        pAllowModifiers      = 1 << 14,
-        pInPaintGL           = 1 << 18
-    };
-
-    CZBitset<PF> m_pf { pPendingVSync };
-    const SRMConnectorInterface *m_iface {};
-    void *m_ifaceData {};
+    std::unique_ptr<SRMRenderer> m_rend;
+    std::recursive_mutex m_stateMutex;
 
     UInt32 m_id {};
     UInt32 m_nameId {}; // Used to name the connector e.g HDMI-A-<0>
@@ -751,43 +689,21 @@ private:
     RContentType m_contentType { RContentType::Graphics };
     SkISize m_mmSize {};
 
-    struct AtomicCursor
-    {
-        gbm_bo *bo {};
-        UInt32 fb {};
-    } m_cursor[2] {};
-
-    Int32 m_cursorIndex;
-    SkIPoint m_cursorPos {};
-    UInt32 m_atomicChanges;
+    bool m_isConnected {};
+    bool m_nonDesktop {};
 
     UInt32 m_currentModeBlobId {};
     CZWeak<SRMConnectorMode> m_currentMode;
     CZWeak<SRMConnectorMode> m_preferredMode;
     CZWeak<SRMConnectorMode> m_targetMode; // Used while changing mode
     std::vector<SRMConnectorMode*> m_modes;
-
-    SRMCrtc *m_currentCrtc {};
     std::vector<SRMCrtc*> m_crtcs;
-
-    SRMEncoder *m_currentEncoder {};
     std::vector<SRMEncoder*> m_encoders;
-
-    SRMPlane *m_currentPrimaryPlane {};
-    SRMPlane *m_currentCursorPlane {};
-
-    struct drm_color_lut *m_gamma {};
-    UInt32 m_gammaBlobId {};
 
     std::string m_name;
     std::string m_make;
     std::string m_model;
     std::string m_serial;
-
-    drmEventContext m_drmEventCtx {};
-    UInt32 m_lastFb {};
-    UInt32 m_bufferAgeFrame {};
-    int m_fenceFd { -1 };
 
     struct PropIDs
     {
@@ -803,21 +719,6 @@ private:
             subconnector,
             vrr_capable;
     } m_propIDs {};
-
-    Int8 m_renderInitResult {};
-
-    std::condition_variable m_repaintCond;
-    std::mutex m_repaintMutex;
-    std::mutex m_stateMutex;
-    std::mutex m_propsMutex; // Protect stuff like cursor and gamma updates
-    std::unique_ptr<SkRegion> m_damage;
-
-    RFormat m_currentFormat {};
-    RPresentationTime m_presentationTime {};
-    Int32 m_maxNonVSyncRefresh { -1 };
-    std::shared_ptr<RImage> m_userScanoutBuffers[2] {};
-
-
 
 };
 

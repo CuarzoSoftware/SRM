@@ -1,3 +1,6 @@
+#include "CZ/SRM/SRMCore.h"
+#include "CZ/SRM/SRMCrtc.h"
+#include "CZ/SRM/SRMPlane.h"
 #include <CZ/SRM/SRMEncoder.h>
 #include <CZ/SRM/SRMDevice.h>
 #include <CZ/SRM/SRMLog.h>
@@ -21,11 +24,13 @@ SRMConnector *SRMConnector::Make(UInt32 id, SRMDevice *device) noexcept
 
     if (!res)
     {
-        SRMError(CZLN, "[%s] Failed to get drmModeConnectorPtr for SRMConnector %d.", device->nodeName().c_str(), id);
+        device->log(CZError, CZLN, "Failed to get drmModeConnectorPtr for SRMConnector {}", id);
         return {};
     }
 
     std::unique_ptr<SRMConnector> obj { new SRMConnector(id, device) };
+    obj->m_name = std::format("{}-{}", TypeString(res->connector_type), res->connector_type_id);
+    obj->log = device->log.newWithContext(obj->name());
 
     obj->updateProperties(res);
     obj->updateNames(res);
@@ -36,7 +41,7 @@ SRMConnector *SRMConnector::Make(UInt32 id, SRMDevice *device) noexcept
     return obj.release();
 
     drmModeFreeConnector(res);
-    SRMError(CZLN, "[%s] Failed to create SRMConnector %d.", device->nodeName().c_str(), id);
+    device->log(CZError, CZLN, "Failed to create SRMConnector {}", id);
     return {};
 }
 
@@ -44,7 +49,7 @@ bool SRMConnector::updateProperties(drmModeConnectorPtr res) noexcept
 {
     m_subPixel = (RSubPixel)res->subpixel;
     m_mmSize.set(res->mmWidth, res->mmHeight);
-    m_pf.setFlag(pConnected, res->connection == DRM_MODE_CONNECTED);
+    m_isConnected = res->connection == DRM_MODE_CONNECTED;
     m_type = res->connector_type;
     m_nameId = res->connector_type_id;
 
@@ -57,7 +62,7 @@ bool SRMConnector::updateProperties(drmModeConnectorPtr res) noexcept
 
     if (!props)
     {
-        SRMError(CZLN, "[%s] Failed to get drmModeObjectPropertiesPtr for SRMConnector %d.", device()->nodeName().c_str(), id());
+        log(CZError, CZLN, "Failed to get drmModeObjectPropertiesPtr");
         return false;
     }
 
@@ -67,7 +72,7 @@ bool SRMConnector::updateProperties(drmModeConnectorPtr res) noexcept
 
         if (!prop)
         {
-            SRMWarning(CZLN, "[%s] Failed to get property %d for SRMConnector %d.", device()->nodeName().c_str(), props->props[i], id());
+            log(CZWarning, CZLN, "Failed to get drmModePropertyPtr {}", props->props[i]);
             continue;
         }
 
@@ -84,7 +89,7 @@ bool SRMConnector::updateProperties(drmModeConnectorPtr res) noexcept
         else if (strcmp(prop->name, "non-desktop") == 0)
         {
             m_propIDs.non_desktop = prop->prop_id;
-            m_pf.setFlag(pNonDesktop, props->prop_values[i] == 1);
+            m_nonDesktop = props->prop_values[i] == 1;
         }
         else if (strcmp(prop->name, "content type") == 0)
             m_propIDs.content_type = prop->prop_id;
@@ -107,7 +112,6 @@ bool SRMConnector::updateNames(drmModeConnectorPtr res) noexcept
 {
     m_serial.clear();
     m_make = m_model = "Unknown";
-    m_name = std::format("{}-{}", TypeString(type()), m_nameId);
 
     if (!isConnected())
         return false;
@@ -133,7 +137,7 @@ bool SRMConnector::updateNames(drmModeConnectorPtr res) noexcept
 
     if (!blob)
     {
-        SRMWarning(CZLN, "[%s] Could not get EDID property blob of SRMConnector %d: %s", device()->nodeName().c_str(), id(), strerror(errno));
+        log(CZWarning, CZLN, "Could not get EDID property blob: {}", strerror(errno));
         return false;
     }
 
@@ -141,7 +145,7 @@ bool SRMConnector::updateNames(drmModeConnectorPtr res) noexcept
 
     if (!info)
     {
-        SRMWarning(CZLN, "[%s] Could not parse EDID of SRMConnector %d: %s", device()->nodeName().c_str(), id(), strerror(errno));
+        log(CZWarning, CZLN, "[%s] Could not parse EDID info: {}", strerror(errno));
         drmModeFreePropertyBlob(blob);
         return false;
     }
@@ -178,7 +182,6 @@ bool SRMConnector::updateNames(drmModeConnectorPtr res) noexcept
 bool SRMConnector::updateEncoders(drmModeConnectorPtr res) noexcept
 {
     m_encoders.clear();
-    m_currentEncoder = nullptr;
 
     if (!isConnected())
         return false;
@@ -212,6 +215,27 @@ bool SRMConnector::updateModes(drmModeConnectorPtr res) noexcept
     return true;
 }
 
+void SRMConnector::setState(State state) noexcept
+{
+    const std::lock_guard<std::recursive_mutex> lock { m_stateMutex };
+
+    if (state == m_state)
+        return;
+
+    m_state = state;
+    log(CZDebug, "Changed state: {}", StateString(state));
+}
+
+bool SRMConnector::unlockRenderer(bool repaint) noexcept
+{
+    if (!m_rend)
+        return false;
+
+    m_rend->pendingRepaint = repaint;
+    m_rend->semaphore.release();
+    return true;
+}
+
 SRMConnectorMode *SRMConnector::findPreferredMode() const noexcept
 {
     SRMConnectorMode *preferredMode {};
@@ -240,6 +264,73 @@ SRMConnectorMode *SRMConnector::findPreferredMode() const noexcept
     return preferredMode;
 }
 
+bool SRMConnector::findConfiguration(SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane) noexcept
+{
+    int bestScore { 0 };
+    *bestEncoder = nullptr;
+    *bestCrtc = nullptr;
+    *bestPrimaryPlane = nullptr;
+    *bestCursorPlane = nullptr;
+
+    for (auto *encoder : encoders())
+    {
+        for (auto *crtc : encoder->crtcs())
+        {
+            if (crtc->currentConnector())
+                continue;
+
+            int score { 0 };
+            SRMPlane *primaryPlane { nullptr };
+            SRMPlane *cursorPlane { nullptr };
+
+            for (auto *plane : device()->planes())
+            {
+                if (plane->type() == SRMPlane::Overlay)
+                    continue;
+
+                for (auto *planeCrtc : plane->crtcs())
+                {
+                    if (planeCrtc->currentConnector())
+                        continue;
+
+                    if (planeCrtc->id() == crtc->id())
+                    {
+                        if (plane->type() == SRMPlane::Primary)
+                        {
+                            primaryPlane = plane;
+                            break;
+                        }
+                        else if (plane->type() == SRMPlane::Cursor)
+                        {
+                            cursorPlane = plane;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!primaryPlane)
+                continue;
+
+            score += 100;
+
+            if (cursorPlane)
+                score += 50;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                *bestEncoder = encoder;
+                *bestCrtc = crtc;
+                *bestPrimaryPlane = primaryPlane;
+                *bestCursorPlane = cursorPlane;
+            }
+        }
+    }
+
+    return *bestEncoder && *bestCrtc && *bestPrimaryPlane;
+}
+
 void SRMConnector::destroyModes() noexcept
 {
     CZVectorUtils::DeleteAndPopBackAll(m_modes);
@@ -250,6 +341,36 @@ SRMConnector::~SRMConnector() noexcept
 {
     uninitialize();
     destroyModes();
+}
+
+enum State : UInt8
+{
+    Uninitialized,  ///< The connector is uninitialized.
+    Initialized,    ///< The connector is initialized.
+    Uninitializing, ///< The connector is in the process of uninitializing.
+    Initializing,   ///< The connector is in the process of initializing.
+    ChangingMode,  ///< The connector is changing display mode.
+    RevertingMode, ///< Special case when changing mode fails and reverts to its previous mode.
+    Suspending,     ///< The connector state is changing from initialized to suspended.
+    Suspended,      ///< The connector is suspended.
+    Resuming,        ///< The connector state is changing from suspended to initialized.
+    StateLast
+};
+
+std::string_view SRMConnector::StateString(State state) noexcept
+{
+    static constexpr const std::array<std::string_view, StateLast> strings {
+        "Uninitialized",
+        "Initialized",
+        "Uninitializing",
+        "Initializing",
+        "ChangingMode",
+        "RevertingMode",
+        "Suspending",
+        "Suspended",
+        "Resuming"
+    };
+    return strings[state];
 }
 
 std::string_view SRMConnector::TypeString(UInt32 type) noexcept
@@ -284,34 +405,75 @@ SRMDevice *SRMConnector::rendererDevice() const noexcept
     return device()->rendererDevice();
 }
 
+SRMEncoder *SRMConnector::currentEncoder() const noexcept
+{
+    return m_rend ? m_rend->encoder : nullptr;
+}
+
 bool SRMConnector::setMode(SRMConnectorMode *mode) noexcept
 {
+    // TODO
+    return false;
+}
 
+SRMCrtc *SRMConnector::currentCrtc() const noexcept
+{
+    return m_rend ? m_rend->crtc : nullptr;
+}
+
+SRMPlane *SRMConnector::currentPrimaryPlane() const noexcept
+{
+    return m_rend ? m_rend->primaryPlane : nullptr;
+}
+
+SRMPlane *SRMConnector::currentCursorPlane() const noexcept
+{
+    return m_rend ? m_rend->cursorPlane : nullptr;
 }
 
 bool SRMConnector::hasCursor() const noexcept
 {
-    return m_cursor[0].bo != nullptr;
+    // TODO
+    return false;
 }
 
 bool SRMConnector::setCursor(UInt8 *pixels) noexcept
 {
-
+    // TODO
+    return false;
 }
 
 bool SRMConnector::setCursorPos(SkIPoint pos) noexcept
 {
-
+    // TODO
+    return false;
 }
 
-bool SRMConnector::initialize(SRMConnectorInterface *iface, void *data) noexcept
+bool SRMConnector::initialize(const SRMConnectorInterface *iface, void *data) noexcept
 {
+    if (state() != State::Uninitialized || !isConnected())
+        return false;
 
+    m_rend = SRMRenderer::Make(this, iface, data);
+
+    if (!m_rend)
+        return false;
+
+    return m_rend->initRenderThread();
 }
 
 bool SRMConnector::repaint() noexcept
 {
+    if (m_rend &&
+        (state() == Initialized ||
+         state() == Initializing ||
+         state() == ChangingMode))
+    {
+        unlockRenderer(true);
+        return true;
+    }
 
+    return false;
 }
 
 void SRMConnector::uninitialize() noexcept
@@ -327,6 +489,27 @@ bool SRMConnector::suspend() noexcept
 bool SRMConnector::resume() noexcept
 {
 
+}
+
+const std::vector<std::shared_ptr<RImage>> &SRMConnector::images() const noexcept
+{
+    static const std::vector<std::shared_ptr<RImage>> dummy;
+    return m_rend ? m_rend->images : dummy;
+}
+
+UInt32 SRMConnector::imageIndex() const noexcept
+{
+    return m_rend ? m_rend->imageI : 0;
+}
+
+UInt32 SRMConnector::imageAge() const noexcept
+{
+    return m_rend ? m_rend->imageAge : 0;
+}
+
+std::shared_ptr<RImage> SRMConnector::currentImage() const noexcept
+{
+    return m_rend ? m_rend->images[m_rend->imageI] : nullptr;
 }
 
 void SRMConnector::setContentType(RContentType type) noexcept

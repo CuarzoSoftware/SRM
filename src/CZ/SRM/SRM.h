@@ -33,7 +33,7 @@ namespace CZ
     /**
      * @brief Get a string representation of a rendering mode.
      */
-    const std::string_view &SRMModeString(SRMMode type) noexcept;
+    std::string_view SRMModeString(SRMMode type) noexcept;
 
     class SRMObject;
     class SRMCore;
@@ -43,6 +43,67 @@ namespace CZ
     class SRMConnector;
     class SRMConnectorMode;
     class SRMPlane;
+    class SRMRenderer;
+
+    /**
+     * @brief Interface for OpenGL events handling.
+     *
+     * The @ref SRMConnectorInterface defines a set of functions for managing various OpenGL events,
+     * including initialization, rendering, page flipping, resizing, and uninitialization.
+     * This interface is used in the srmConnectorInitialize() function.
+     */
+    struct SRMConnectorInterface
+    {
+        /**
+         * @brief Notifies that the connector has been initialized.
+         *
+         * In this event, you should set up shaders, load textures, and perform any necessary setup.
+         *
+         * @param connector Pointer to the @ref SRMConnector.
+         * @param data User data passed in srmConnectorInitialize().
+         */
+        void (*initializeGL)(SRMConnector *connector, void *data);
+
+        /**
+         * @brief Render event.
+         *
+         * During this event, you should handle all rendering for the current frame.
+         *
+         * @param connector Pointer to the @ref SRMConnector.
+         * @param data User data passed in srmConnectorInitialize().
+         */
+        void (*paintGL)(SRMConnector *connector, void *data);
+
+        /**
+         * @brief Notifies a page flip.
+         *
+         * This event is triggered when the framebuffer being displayed on the screen changes.
+         *
+         * @param connector Pointer to the @ref SRMConnector.
+         * @param data User data passed in srmConnectorInitialize().
+         */
+        void (*pageFlipped)(SRMConnector *connector, void *data);
+
+        /**
+         * @brief Notifies a change in the framebuffer's dimensions.
+         *
+         * This event is invoked when the current connector mode changes.
+         *
+         * @param connector Pointer to the @ref SRMConnector.
+         * @param data User data passed in srmConnectorInitialize().
+         */
+        void (*resizeGL)(SRMConnector *connector, void *data);
+
+        /**
+         * @brief Notifies the connector's uninitialization.
+         *
+         * In this method, you should release resources created during initialization.
+         *
+         * @param connector Pointer to the @ref SRMConnector.
+         * @param data User data passed in srmConnectorInitialize().
+         */
+        void (*uninitializeGL)(SRMConnector *connector, void *data);
+    };
 };
 
 #endif // SRMTYPES_H

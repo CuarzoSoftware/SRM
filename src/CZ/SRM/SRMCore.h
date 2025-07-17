@@ -150,6 +150,8 @@ public:
 
 private:
     friend class SRMDevice;
+    friend class SRMConnector;
+    friend class SRMRenderer;
     SRMCore(const SRMInterface *iface, void *userData) noexcept :
         m_iface(iface), m_ifaceData(userData) {}
 

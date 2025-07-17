@@ -15,7 +15,7 @@ SRMPlane *SRMPlane::Make(UInt32 id, SRMDevice *device) noexcept
 
     if (!res)
     {
-        SRMError(CZLN, "[%s] Failed to get drmModePlanePtr for SRMPlane %d.", device->nodeName().c_str(), id);
+        device->log(CZError, CZLN, "Failed to get drmModePlanePtr for SRMPlane {}", id);
         return {};
     }
 
@@ -30,7 +30,7 @@ SRMPlane *SRMPlane::Make(UInt32 id, SRMDevice *device) noexcept
     }
 
     drmModeFreePlane(res);
-    SRMError(CZLN, "[%s] Failed to create SRMPlane %d.", device->nodeName().c_str(), id);
+    device->log(CZError, CZLN, "Failed to create SRMPlane {}", id);
     return {};
 }
 
@@ -40,7 +40,7 @@ bool SRMPlane::initPropIds() noexcept
 
     if (!props)
     {
-        SRMError(CZLN, "[%s] Failed to get properties for SRMPlane %d.", device()->nodeName().c_str(), id());
+        device()->log(CZError, CZLN, "Failed to get properties for SRMPlane {}", id());
         return false;
     }
 
@@ -52,7 +52,7 @@ bool SRMPlane::initPropIds() noexcept
 
         if (!prop)
         {
-            SRMWarning(CZLN, "[%s] Failed to get property %d for SRMPlane %d.", device()->nodeName().c_str(), props->props[i], id());
+            device()->log(CZWarning, CZLN, "Failed to get property {} for SRMPlane {}", props->props[i], id());
             continue;
         }
 
@@ -101,7 +101,7 @@ bool SRMPlane::initPropIds() noexcept
 
     if (!hasType)
     {
-        SRMError(CZLN, "[%s] Failed to get SRMPlane %d type.", device()->nodeName().c_str(), id());
+        device()->log(CZError, CZLN, "Failed to get SRMPlane {} type", id());
         return false;
     }
 

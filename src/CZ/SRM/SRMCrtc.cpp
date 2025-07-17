@@ -13,7 +13,7 @@ SRMCrtc *SRMCrtc::Make(UInt32 id, SRMDevice *device) noexcept
 
     if (!res)
     {
-        SRMError(CZLN, "[%s] Failed to get drmModeCrtcPtr for SRMCrtc %d.", device->nodeName().c_str(), id);
+        device->log(CZError, CZLN, "Failed to get drmModeCrtcPtr for SRMCrtc {}", id);
         return {};
     }
 
@@ -26,7 +26,7 @@ SRMCrtc *SRMCrtc::Make(UInt32 id, SRMDevice *device) noexcept
     }
 
     drmModeFreeCrtc(res);
-    SRMError(CZLN, "[%s] Failed to create SRMCrtc %d.", device->nodeName().c_str(), id);
+    device->log(CZError, CZLN, "Failed to create SRMCrtc {}", id);
     return {};
 }
 
@@ -36,7 +36,7 @@ bool SRMCrtc::initPropIds() noexcept
 
     if (!props)
     {
-        SRMError(CZLN, "[%s] Failed to get drmModeObjectPropertiesPtr for SRMCrtc %d.", device()->nodeName().c_str(), id());
+        device()->log(CZError, CZLN, "Failed to get drmModeObjectPropertiesPtr for SRMCrtc {}", id());
         return false;
     }
 
@@ -46,7 +46,7 @@ bool SRMCrtc::initPropIds() noexcept
 
         if (!prop)
         {
-            SRMWarning(CZLN, "[%s] Could not get property %d for SRMCrtc %d.", device()->nodeName().c_str(), props->props[i], id());
+            device()->log(CZWarning, CZLN, "Could not get property {} for SRMCrtc {}", props->props[i], id());
             continue;
         }
 

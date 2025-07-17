@@ -50,7 +50,7 @@ SRMDevice *SRMDevice::Make(SRMCore *core, const char *nodePath, bool isBootVGA) 
 {
     if (DeviceInBlacklist(nodePath))
     {
-        SRMWarning("SRMDevice %s blacklisted. Ignoring it.", nodePath);
+        SRMLog(CZWarning, "SRMDevice {} is blacklisted. Ignoring it...", nodePath);
         return {};
     }
 
@@ -68,9 +68,10 @@ SRMDevice::SRMDevice(SRMCore *core, const char *nodePath, bool isBootVGA) noexce
     m_pf.setFlag(pIsBootVGA, isBootVGA);
     m_nodeName = CZStringUtils::SubStrAfterLastOf(m_nodePath, "/");
     if (m_nodeName.empty())
-        m_nodeName = "Unknown";
+        m_nodeName = "Unknown Device";
 
-    SRMDebug("[%s] Is Boot VGA: %s.", nodeName().c_str(), m_pf.has(pIsBootVGA) ?  "YES" : "NO");
+    log = SRMLog.newWithContext(m_nodeName);
+    log(CZInfo, "Is Boot VGA: {}", m_pf.has(pIsBootVGA));
 }
 
 SRMDevice::~SRMDevice() noexcept
@@ -93,17 +94,17 @@ bool SRMDevice::init() noexcept
 
     if (fd() < 0)
     {
-        SRMError(CZLN, "[%s] Failed to open DRM device.", nodeName().c_str());
+        log(CZError, CZLN, "Failed to open DRM device");
         return false;
     }
 
-    SRMDebug("[%s] Is DRM Master: %s.", nodeName().c_str(), drmIsMaster(fd()) ?  "YES" : "NO");
+    log(CZInfo, "Is DRM Master: {}", drmIsMaster(fd()) != 0);
 
     drmVersion *version { drmGetVersion(fd()) };
 
     if (version)
     {
-        SRMDebug("[%s] DRM Driver: %s.", nodeName().c_str(), version->name);
+        log(CZInfo, "DRM Driver: {}", version->name);
 
         if (strcmp(version->name, "i915") == 0)
             m_driver = PDriver::i915;
@@ -126,7 +127,7 @@ bool SRMDevice::init() noexcept
 
     if (!res)
     {
-        SRMError(CZLN, "[%s] Faild get DRM resources.", nodeName().c_str());
+        log(CZError, CZLN, "Failed to get DRM resources");
         return false;
     }
 
@@ -134,7 +135,9 @@ bool SRMDevice::init() noexcept
         initCrtcs(res) &&
         initEncoders(res) &&
         initPlanes() &&
-        initCrtcs(res) };
+        initCrtcs(res) &&
+        initConnectors(res)
+    };
 
     drmModeFreeResources(res);
     return ret;
@@ -243,7 +246,7 @@ bool SRMDevice::initPlanes() noexcept
 
     if (!res)
     {
-        SRMError(CZLN, "[%s] Failed to get DRM planes.", nodeName().c_str());
+        log(CZError, CZLN, "Failed to get DRM planes");
         return false;
     }
 
@@ -278,10 +281,10 @@ bool SRMDevice::initConnectors(drmModeResPtr res) noexcept
 
 bool SRMDevice::dispatchHotplugEvents() noexcept
 {
-    if (drmIsMaster(fd()) != 1)
+    if (drmIsMaster(fd()) == 0)
     {
         m_pf.add(pPendingUdevEvents);
-        SRMWarning(CZLN, "[%s] Can not handle hotplug events. Device is not master.", nodeName().c_str());
+        log(CZWarning, CZLN, "Hotplug event dispatching delayed. Device is not master");
         return false;
     }
 
@@ -295,7 +298,7 @@ bool SRMDevice::dispatchHotplugEvents() noexcept
 
         if (!res)
         {
-            SRMError(CZLN, "[%s] Failed to get drmModeConnectorPtr for SRMConnector %d.", nodeName().c_str(), conn->id());
+            log(CZError, CZLN, "Failed to get drmModeConnectorPtr for SRMConnector {}", conn->id());
             continue;
         }
 
@@ -310,8 +313,7 @@ bool SRMDevice::dispatchHotplugEvents() noexcept
                 conn->updateEncoders(res);
                 conn->updateModes(res);
 
-                SRMDebug("[%s] Connector (%d) %s, %s, %s plugged.",
-                         nodeName().c_str(),
+                log(CZInfo, "SRMConnector ({}) {}, {}, {} plugged",
                          conn->id(),
                          conn->name().c_str(),
                          conn->model().c_str(),
@@ -321,12 +323,11 @@ bool SRMDevice::dispatchHotplugEvents() noexcept
             }
             else
             {
-                SRMDebug("[%s] Connector (%d) %s, %s, %s unplugged.",
-                         nodeName().c_str(),
-                         conn->id(),
-                         conn->name().c_str(),
-                         conn->model().c_str(),
-                         conn->make().c_str());
+                log(CZInfo, "SRMConnector ({}) {}, {}, {} unplugged",
+                    conn->id(),
+                    conn->name().c_str(),
+                    conn->model().c_str(),
+                    conn->make().c_str());
 
                 core()->onConnectorUnplugged.notify(conn);
 

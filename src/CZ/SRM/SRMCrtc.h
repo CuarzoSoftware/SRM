@@ -58,6 +58,8 @@ public:
     UInt64 gammaSize() const noexcept;
 private:
     friend class SRMDevice;
+    friend class SRMConnector;
+    friend class SRMRenderer;
     static SRMCrtc *Make(UInt32 id, SRMDevice *device) noexcept;
     SRMCrtc(UInt32 id, SRMDevice *device) noexcept :
         m_id(id),

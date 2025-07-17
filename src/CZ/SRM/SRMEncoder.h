@@ -55,6 +55,8 @@ public:
     SRMConnector *currentConnector() const noexcept { return m_currentConnector; };
 private:
     friend class SRMDevice;
+    friend class SRMConnector;
+    friend class SRMRenderer;
     static SRMEncoder *Make(UInt32 id, SRMDevice *device) noexcept;
     SRMEncoder(UInt32 id, SRMDevice *device) noexcept :
         m_id(id),

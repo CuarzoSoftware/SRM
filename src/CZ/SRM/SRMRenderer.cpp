@@ -646,7 +646,7 @@ bool SRMRenderer::rendResume() noexcept
 
 void SRMRenderer::rendUnit() noexcept
 {
-
+    conn->m_state = SRMConnector::Uninitialized;
 }
 
 void SRMRenderer::updateAgeAndIndex() noexcept

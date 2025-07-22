@@ -478,7 +478,30 @@ bool SRMConnector::repaint() noexcept
 
 void SRMConnector::uninitialize() noexcept
 {
+    // Wait for those states to change
+    while (m_state == ChangingMode || m_state == Initializing)
+    {
+        usleep(20000);
+    }
 
+    // Nothing to do
+    if (m_state == Uninitialized || m_state == Uninitializing)
+    {
+        return;
+    }
+
+    // Unitialize
+    m_state = Uninitializing;
+
+    while (m_state != Uninitialized)
+    {
+        unlockRenderer(false);
+        usleep(1000);
+    }
+
+    //srmConnectorRenderThreadCleanUp(connector);
+
+    //SRMDebug("[%s] [%s] Uninitialized.", connector->device->shortName, connector->name);
 }
 
 bool SRMConnector::suspend() noexcept

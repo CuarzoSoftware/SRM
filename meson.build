@@ -27,8 +27,7 @@ add_project_arguments([
 # -------------- HEADERS --------------
 
 header_dirs = [
-    ['src/CZ/SRM', ''],
-    ['src/CZ/SRM/Modes', 'Modes']
+    ['src/CZ/SRM', '']
 ]
 
 foreach header_dir : header_dirs

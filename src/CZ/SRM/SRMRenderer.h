@@ -13,6 +13,7 @@
 #include <semaphore>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
+#include <gbm.h>
 
 class CZ::SRMRenderer final : SRMObject
 {

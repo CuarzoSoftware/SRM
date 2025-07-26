@@ -251,11 +251,19 @@ bool SRMCore::initReam() noexcept
         }
     }
 
+    SRMDevice *bestDev { nullptr };
+
     for (auto *dev : devices())
     {
+        if (dev->m_pf.has(SRMDevice::pIsBootVGA))
+            bestDev = dev;
+
         dev->m_renderMode = SRMMode::Self;
-        dev->m_rendererDevice = m_ream->mainDevice()->srmDevice();
+        dev->m_rendererDevice = dev;
     }
+
+    if (bestDev)
+        m_ream->overrideMainDevice(bestDev->reamDevice());
 
     return true;
 }

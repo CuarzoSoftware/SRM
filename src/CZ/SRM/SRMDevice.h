@@ -184,6 +184,8 @@ public:
      */
     const std::vector<SRMEncoder*> &encoders() const noexcept { return m_encoders; }
 
+    bool isBootVGA() const noexcept { return m_pf.has(pIsBootVGA); }
+
     RDevice *reamDevice() const noexcept { return m_reamDevice; }
 
     ~SRMDevice() noexcept;

@@ -117,9 +117,9 @@ void SRMPlane::initInFormats(UInt64 blobId) noexcept
         if (blob)
         {
             drmModeFormatModifierIterator iter {};
-            m_formats.clear();
+            m_formats = {};
             while (drmModeFormatModifierBlobIterNext(blob, &iter))
-                m_formats[iter.fmt].insert(iter.mod);
+                m_formats.add(iter.fmt, iter.mod);
 
             drmModeFreePropertyBlob(blob);
         }
@@ -129,7 +129,7 @@ void SRMPlane::initInFormats(UInt64 blobId) noexcept
 bool SRMPlane::initLegacyFormats(drmModePlanePtr res) noexcept
 {
     for (UInt32 i = 0; i < res->count_formats; i++)
-        m_formats[res->formats[i]].insert(DRM_FORMAT_MOD_INVALID);
+        m_formats.add(res->formats[i], DRM_FORMAT_MOD_INVALID);
 
     return true;
 }

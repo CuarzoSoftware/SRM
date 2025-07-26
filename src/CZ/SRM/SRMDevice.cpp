@@ -48,6 +48,9 @@ static bool DeviceInBlacklist(const char *nodePath)
 
 SRMDevice *SRMDevice::Make(SRMCore *core, const char *nodePath, bool isBootVGA) noexcept
 {
+    //if (isBootVGA)
+    //    return {};
+
     if (DeviceInBlacklist(nodePath))
     {
         SRMLog(CZWarning, "SRMDevice {} is blacklisted. Ignoring it...", nodePath);

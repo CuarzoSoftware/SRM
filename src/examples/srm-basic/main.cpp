@@ -22,7 +22,7 @@ extern "C" {
 using namespace CZ;
 
 static libseat *seat {};
-static std::shared_ptr<RImage> squaresPre, squaresUnpre, mask, writeTest;
+static std::shared_ptr<RImage> svg;
 
 static int openRestricted(const char *path, int flags, void *userData)
 {
@@ -61,6 +61,8 @@ static libseat_seat_listener libseatIface
     .disable_seat = &disableSeat
 };
 
+static std::mutex mtx;
+
 static const SRMConnectorInterface connIface
 {
     .initializeGL = [](SRMConnector *conn, void *) {
@@ -68,49 +70,50 @@ static const SRMConnectorInterface connIface
     },
     .paintGL = [](SRMConnector *conn, void *)
     {
-        static float dx { 0.f }; dx += 0.1f;
+        std::lock_guard g {mtx};
+        static float dx { 0.f }; dx += 0.01f;
         float phase { 0.5f * (std::sin(dx) + 1.f) };
-        float phaseC { 0.5f * (std::cos(dx) + 1.f) };
         auto image { conn->currentImage() };
         auto surface { RSurface::WrapImage(image) };
 
-        SkRegion clip;
+        SkRegion clip { SkIRect::MakeSize(image->size()) };
+        /*
+        for (int y = 0; y < 20; y++)
+            for (int x = 0; x < 20; x++)
+                clip.op(SkIRect::MakeXYWH(x * 400, y * 400, 300, 300), SkRegion::kUnion_Op);*/
 
-        for (int y = 0; y < 60; y++)
-            for (int x = 0; x < 70; x++)
-                clip.op(SkIRect::MakeXYWH(x * 50, y * 50, 25, 25), SkRegion::kUnion_Op);
-
-        if (dx < 10.f)
+        if (dx > 10.f)
         {
-            auto pass { surface->beginSKPass() };
+            auto pass { surface->beginSKPass(image->allocator()) };
             assert(pass.isValid());
             pass()->save();
             SkPaint p;
             p.setBlendMode(SkBlendMode::kSrcOver);
             pass()->clear(SK_ColorWHITE);
             pass()->clipRegion(clip);
-            auto skImage { squaresPre->skImage() };
-            for (int y = 0; y < 20; y++)
-                for (int x = 0; x < 25; x++)
-                    pass()->drawImage(skImage.get(), 1000 * phase + 150 * x, 150 * y, SkSamplingOptions(SkFilterMode::kLinear), &p);
+            auto skImage { svg->skImage(image->allocator()) };
+            for (int y = 0; y < 10; y++)
+                for (int x = 0; x < 10; x++)
+                    pass()->drawImage(skImage.get(), 1000 * phase + 250 * x, 250 * y, SkSamplingOptions(SkFilterMode::kLinear), &p);
             pass()->restore();
         }
         else
         {
-            auto pass { surface->beginPass() };
+            auto pass { surface->beginPass(image->allocator()) };
             pass()->save();
-            pass()->setColor(SkColorSetARGB(255, 200, 250, 250));
+            pass()->setColor(SkColorSetARGB(255, 255, 255, 200));
             pass()->clearSurface();
             pass()->setBlendMode(RBlendMode::SrcOver);
+
             RDrawImageInfo info {};
-            info.image = squaresPre;
+            info.image = svg;
             info.src = SkRect::Make(info.image->size());
             info.dst = SkIRect::MakeSize(info.image->size());
-            for (int y = 0; y < 20; y++)
+            for (int y = 0; y < 10; y++)
             {
-                for (int x = 0; x < 25; x++)
+                for (int x = 0; x < 10; x++)
                 {
-                    info.dst.offsetTo(1000 * phase + 150 * x, 150 * y);
+                    info.dst.offsetTo(1000 * phase + 250 * x, 250 * y);
                     pass()->drawImage(info, &clip);
                 }
             }
@@ -128,16 +131,16 @@ static const SRMConnectorInterface connIface
 
 int main(void)
 {
-    setenv("CZ_SRM_LOG_LEVEL", "3", 0);
+    setenv("CZ_SRM_LOG_LEVEL", "6", 0);
     setenv("CZ_REAM_LOG_LEVEL", "6", 0);
-    setenv("CZ_REAM_EGL_LOG_LEVEL", "6", 0);
+    setenv("CZ_REAM_EGL_LOG_LEVEL", "4", 0);
     setenv("CZ_REAM_GAPI", "GL", 0);
 
-
+    /*
     std::thread([]{
-        usleep(5000000);
-        exit(0);
-    }).detach();
+        usleep(10000000);
+        abort();
+    }).detach();*/
 
     seat = libseat_open_seat(&libseatIface, NULL);
 
@@ -149,50 +152,32 @@ int main(void)
         return 1;
     }
 
-    RDRMFormat fmt { DRM_FORMAT_ABGR8888 , {DRM_FORMAT_MOD_INVALID }};
-    writeTest = RImage::Make({256, 256}, fmt);
-    writeTest->writePixels({});
-
-    std::vector<UInt32> pixels;
-    pixels.resize(256 * 256);
-    for (size_t i = 0; i < pixels.size(); i++)
-        pixels[i] = 0x88FF0000;
-
-    RPixelBufferInfo info {};
-    info.size = {256, 256};
-    info.format = DRM_FORMAT_ARGB8888;
-    info.stride = 256 * 4;
-    info.pixels = (UInt8*)pixels.data();
-    info.alphaType = kUnpremul_SkAlphaType;
-    squaresUnpre = RImage::MakeFromPixels(info, fmt);
-
-    for (size_t i = 0; i < pixels.size(); i++)
-        pixels[i] = 0x88880000;
-    info.alphaType = kPremul_SkAlphaType;
-    squaresPre = RImage::MakeFromPixels(info, fmt);
-
-    squaresPre = RImage::LoadFile("/home/eduardo/.local/share/icons/WhiteSur/apps/scalable/accessories-image-viewer.svg", fmt, {256, 256});
-    mask = RImage::LoadFile("/home/eduardo/.local/share/icons/WhiteSur/actions@2x/symbolic/color-tag-symbolic.svg", fmt, {512, 512});
+    RDRMFormat fmt {DRM_FORMAT_ARGB8888 , { DRM_FORMAT_MOD_LINEAR }};
+    svg = RImage::LoadFile("/home/eduardo/Descargas/svgviewer-output.svg", fmt, {256, 256});
 
     for (auto *dev : srm->devices())
     {
+        //if (dev->isBootVGA())
+        //    continue;
+
         for (auto *conn : dev->connectors())
         {
             if (conn->isConnected())
             {
                 conn->initialize(&connIface, nullptr);
-                goto skip;
             }
         }
     }
-skip:
+
     //while (srm->dispatch(-1) >= 0) { };
 
-    usleep(1000000);
+    usleep(10000000);
 
     for (auto *dev : srm->devices())
         for (auto *conn : dev->connectors())
                 conn->uninitialize();
+
+    svg.reset();
 
     return 0;
 }

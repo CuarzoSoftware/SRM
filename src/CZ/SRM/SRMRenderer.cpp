@@ -11,8 +11,14 @@
 #include <CZ/Ream/RImage.h>
 #include <CZ/Ream/RSurface.h>
 #include <CZ/Ream/RSync.h>
+#include <CZ/Ream/RCore.h>
+#include <CZ/Ream/RPass.h>
+#include <CZ/Ream/RPainter.h>
 #include <CZ/Ream/DRM/RDRMFramebuffer.h>
 
+#include <CZ/Ream/GL/RGLMakeCurrent.h>
+
+#include <GLES2/gl2.h>
 #include <future>
 
 #include <drm_fourcc.h>
@@ -218,6 +224,7 @@ bool SRMRenderer::initRenderThread() noexcept
 
         if (!rendInit())
         {
+            conn->setState(SRMConnector::Uninitialized);
             log(CZError, CZLN, "Failed to initialize renderer");
             initPromise.set_value(false);
             return;
@@ -245,7 +252,7 @@ bool SRMRenderer::initRenderThread() noexcept
                     rendering = true;
                     rendRender();
                     rendering = false;
-                    rendFlipPage();
+                    flipPage();
                     updateAgeAndIndex();
                     continue;
                 }
@@ -302,45 +309,7 @@ bool SRMRenderer::initRenderThread() noexcept
 
 bool SRMRenderer::rendInit() noexcept
 {
-    return rendInitImages() && rendInitCrtc();
-}
-
-bool SRMRenderer::rendInitImages() noexcept
-{
-    images.resize(3);
-    fbs.resize(images.size());
-    surfaces.resize(images.size());
-
-    const RDRMFormat format { DRM_FORMAT_XRGB8888, { DRM_FORMAT_MOD_LINEAR } };
-
-    for (size_t i = 0; i < images.size(); i++)
-    {
-        images[i] = RImage::Make(conn->currentMode()->size(), format, RStorageType::GBM, device()->reamDevice());
-
-        if (!images[i])
-        {
-            log(CZError, CZLN, "Failed to create swapchain RImage {}", i);
-            return false;
-        }
-
-        fbs[i] = images[i]->drmFb(device()->reamDevice());
-
-        if (!fbs[i])
-        {
-            log(CZError, CZLN, "Failed to get RDRMFramebuffer from swapchain RImage {}", i);
-            return false;
-        }
-
-        surfaces[i] = RSurface::WrapImage(images[i], 1);
-
-        if (!surfaces[i])
-        {
-            log(CZError, CZLN, "Failed to create RSurface from swapchain RImage {}", i);
-            return false;
-        }
-    }
-
-    return true;
+    return initSwapchain() && rendInitCrtc();
 }
 
 bool SRMRenderer::rendInitCrtc() noexcept
@@ -354,6 +323,7 @@ bool SRMRenderer::rendInitCrtc() noexcept
 
         // Plane
 
+        /*
         drmModeAtomicAddProperty(req,
                                  primaryPlane->id(),
                                  primaryPlane->m_propIDs.FB_ID,
@@ -362,7 +332,7 @@ bool SRMRenderer::rendInitCrtc() noexcept
         drmModeAtomicAddProperty(req,
                                  primaryPlane->id(),
                                  primaryPlane->m_propIDs.CRTC_ID,
-                                 0);
+                                 0);*/
 
         // CRTC
 
@@ -408,34 +378,42 @@ bool SRMRenderer::rendInitCrtc() noexcept
         {
             if (cursorPlane)
                 cursorI = prevCursorIndex;
+
             logAtomic(CZError, CZLN, "Failed to set CRTC mode. DRM Error: {}", strerror(ret));
+            return false;
         }
         else
         {
             atomicChanges = 0;
-            goto skipLegacy;
         }
     }
-
-    /* Occasionally, the Atomic API fails to set the connector CRTC for reasons unknown.
-     * As a workaround, we enforce the use of the legacy API in this case. */
-
-    ret = drmModeSetCrtc(device()->fd(),
-                         crtc->id(),
-                         0,
-                         0,
-                         0,
-                         &conn->m_id,
-                         1,
-                         &conn->currentMode()->m_info);
-
-    if (ret)
+    else
     {
-        logLegacy(CZError, CZLN, "Failed to set CRTC mode. DRM Error: {}", ret);
-        return false;
-    }
+        if (drmModeConnectorSetProperty(
+                device()->fd(),
+                conn->m_id,
+                conn->m_propIDs.DPMS,
+                DRM_MODE_DPMS_ON) != 0)
+        {
 
-skipLegacy:
+            return false;
+        }
+
+        ret = drmModeSetCrtc(device()->fd(),
+                             crtc->id(),
+                             fbs[imageI]->id(),
+                             0,
+                             0,
+                             &conn->m_id,
+                             1,
+                             &conn->currentMode()->m_info);
+
+        if (ret)
+        {
+            logLegacy(CZError, CZLN, "Failed to set CRTC mode. DRM Error: {}", ret);
+            return false;
+        }
+    }
 
     if (conn->state() == SRMConnector::Initializing)
     {
@@ -445,6 +423,362 @@ skipLegacy:
     else if (conn->state() == SRMConnector::ChangingMode)
     {
         iface->resizeGL(conn, ifaceData);
+    }
+
+    return true;
+}
+
+bool SRMRenderer::initSwapchain() noexcept
+{
+    strategy = Self;
+    if (initSwapchainSelf()) return true;
+
+    strategy = Prime;
+    if (initSwapchainPrime()) return true;
+
+    log(CZError, CZLN, "Failed to create swapchain");
+
+    return false;
+}
+
+bool SRMRenderer::initSwapchainSelf() noexcept
+{
+    auto ream { RCore::Get() };
+
+    if (device()->reamDevice() != ream->mainDevice())
+        return false;
+
+    const auto inFormats { RDRMFormatSet::Intersect(primaryPlane->formats(), device()->reamDevice()->dmaRenderFormats()) };
+
+    if (inFormats.formats().empty())
+        return false;
+
+    std::vector<const RDRMFormat*> formats;
+    formats.reserve(inFormats.formats().size());
+
+    auto it { inFormats.formats().find(DRM_FORMAT_XRGB8888) };
+    if (it != inFormats.formats().end()) formats.emplace_back(&(*it));
+
+    it = inFormats.formats().find(DRM_FORMAT_XBGR8888);
+    if (it != inFormats.formats().end()) formats.emplace_back(&(*it));
+
+    for (const auto &fmt : inFormats.formats())
+        if (fmt.format() != DRM_FORMAT_XRGB8888 && fmt.format() != DRM_FORMAT_XBGR8888)
+            formats.emplace_back(&fmt);
+
+    images.resize(3);
+    fbs.resize(images.size());
+    surfaces.resize(images.size());
+
+    bool ok { false };
+
+    for (const auto *fmt : formats)
+    {
+        ok = true;
+
+        for (size_t i = 0; i < images.size(); i++)
+        {
+            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, RStorageType::GBM, device()->reamDevice());
+
+            if (!images[i])
+            {
+                log(CZTrace, CZLN, "Failed to create swapchain RImage {}", i);
+                ok = false;
+                break;
+            }
+
+            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RPassDst, device()->reamDevice()))
+            {
+                log(CZTrace, CZLN, "Missing RPassDst cap {}", i);
+                ok = false;
+                break;
+            }
+
+            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RSKPassDst, device()->reamDevice()))
+            {
+                log(CZTrace, CZLN, "Missing RSKPassDst cap {}", i);
+                ok = false;
+                break;
+            }
+
+            fbs[i] = images[i]->drmFb(device()->reamDevice());
+
+            if (!fbs[i])
+            {
+                log(CZTrace, CZLN, "Failed to get RDRMFramebuffer from swapchain RImage {}", i);
+                ok = false;
+                break;
+            }
+
+            surfaces[i] = RSurface::WrapImage(images[i], 1);
+
+            if (!surfaces[i])
+            {
+                log(CZTrace, CZLN, "Failed to create RSurface from swapchain RImage {}", i);
+                ok = false;
+                break;
+            }
+        }
+
+        if (ok)
+        {
+            log(CZInfo, "[Self] Plane format: {} - {}", RDRMFormat::FormatName(images[0]->formatInfo().format), RDRMFormat::ModifierName(images[0]->modifiers().front()));
+            break;
+        }
+    }
+
+    return ok;
+}
+
+bool SRMRenderer::initSwapchainPrime() noexcept
+{
+    auto ream { RCore::Get() };
+
+    if (device()->reamDevice() == ream->mainDevice())
+        return false;
+
+    auto textureFormats { RDRMFormatSet::Intersect(device()->reamDevice()->dmaTextureFormats(), ream->mainDevice()->dmaRenderFormats()) };
+    textureFormats.removeModifier(DRM_FORMAT_MOD_INVALID);
+
+    if (textureFormats.formats().empty())
+        return false;
+
+    const auto inFormats { RDRMFormatSet::Intersect(primaryPlane->formats(), device()->reamDevice()->dmaRenderFormats()) };
+
+    if (inFormats.formats().empty())
+        return false;
+
+    std::vector<const RDRMFormat*> formats;
+    formats.reserve(inFormats.formats().size());
+
+    auto it { inFormats.formats().find(DRM_FORMAT_XRGB8888) };
+    if (it != inFormats.formats().end()) formats.emplace_back(&(*it));
+
+    it = inFormats.formats().find(DRM_FORMAT_XBGR8888);
+    if (it != inFormats.formats().end()) formats.emplace_back(&(*it));
+
+    for (const auto &fmt : inFormats.formats())
+        if (fmt.format() != DRM_FORMAT_XRGB8888 && fmt.format() != DRM_FORMAT_XBGR8888)
+            formats.emplace_back(&fmt);
+
+    const size_t n { 3 };
+    fbs.resize(n);
+    primeImages.resize(n);
+    primeSurfaces.resize(n);
+
+    bool ok { false };
+
+    for (const auto *fmt : formats)
+    {
+        ok = true;
+
+        for (size_t i = 0; i < n; i++)
+        {
+            primeImages[i] = RImage::Make(conn->currentMode()->size(), *fmt, RStorageType::GBM, device()->reamDevice());
+
+            if (!primeImages[i])
+            {
+                log(CZTrace, CZLN, "Failed to create swapchain RImage {}", i);
+                ok = false;
+                break;
+            }
+
+            if (!primeImages[i]->checkDeviceCap(RImage::DeviceCap::RPassDst, device()->reamDevice()))
+            {
+                log(CZTrace, CZLN, "Missing RPassDst cap {}", i);
+                ok = false;
+                break;
+            }
+
+            fbs[i] = primeImages[i]->drmFb(device()->reamDevice());
+
+            if (!fbs[i])
+            {
+                log(CZTrace, CZLN, "Failed to get RDRMFramebuffer from swapchain RImage {}", i);
+                ok = false;
+                break;
+            }
+
+            primeSurfaces[i] = RSurface::WrapImage(primeImages[i], 1);
+
+            if (!primeSurfaces[i])
+            {
+                log(CZTrace, CZLN, "Failed to create RSurface from swapchain RImage {}", i);
+                ok = false;
+                break;
+            }
+        }
+
+        if (ok)
+            break;
+    }
+
+    if (!ok)
+        return false;
+
+    images.resize(n);
+    surfaces.resize(n);
+
+    formats.clear();
+    formats.reserve(textureFormats.formats().size());
+
+    it = textureFormats.formats().find(DRM_FORMAT_XRGB8888);
+    if (it != textureFormats.formats().end()) formats.emplace_back(&(*it));
+
+    it = textureFormats.formats().find(DRM_FORMAT_XBGR8888);
+    if (it != textureFormats.formats().end()) formats.emplace_back(&(*it));
+
+    for (const auto &fmt : textureFormats.formats())
+        if (fmt.format() != DRM_FORMAT_XRGB8888 && fmt.format() != DRM_FORMAT_XBGR8888)
+            formats.emplace_back(&fmt);
+
+    ok = false;
+
+    for (const auto *fmt : formats)
+    {
+        ok = true;
+
+        for (size_t i = 0; i < n; i++)
+        {
+            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, RStorageType::GBM, ream->mainDevice());
+
+            if (!images[i])
+            {
+                log(CZTrace, CZLN, "Failed to create swapchain RImage {}", i);
+                ok = false;
+                break;
+            }
+
+            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RPassDst, ream->mainDevice()))
+            {
+                log(CZTrace, CZLN, "Missing RPassDst cap {}", i);
+                ok = false;
+                break;
+            }
+
+            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RSKPassDst, ream->mainDevice()))
+            {
+                log(CZTrace, CZLN, "Missing RSKPassDst cap {}", i);
+                ok = false;
+                break;
+            }
+
+            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RPassSrc, device()->reamDevice()))
+            {
+                log(CZTrace, CZLN, "Missing RPassSrc cap {}", i);
+                ok = false;
+                break;
+            }
+
+            surfaces[i] = RSurface::WrapImage(images[i], 1);
+
+            if (!surfaces[i])
+            {
+                log(CZTrace, CZLN, "Failed to create RSurface from swapchain RImage {}", i);
+                ok = false;
+                break;
+            }
+        }
+
+        if (ok)
+        {
+            log(CZInfo, "[Prime] Plane format: {} - {}", RDRMFormat::FormatName(images[0]->formatInfo().format), RDRMFormat::ModifierName(images[0]->modifiers().front()));
+            break;
+        }
+    }
+
+    return ok;
+}
+
+bool SRMRenderer::flipPage() noexcept
+{
+    switch (strategy)
+    {
+    case Self:
+        flipPageSelf();
+        break;
+    case Prime:
+        flipPagePrime();
+        break;
+    }
+
+    presentFrame(fbs[imageI]->id());
+    iface->pageFlipped(conn, ifaceData);
+    return true;
+}
+
+bool SRMRenderer::flipPageSelf() noexcept
+{
+    if (primaryPlane->m_propIDs.IN_FENCE_FD)
+    {
+        if (fenceFd >= 0)
+        {
+            close(fenceFd);
+            fenceFd = -1;
+        }
+
+        if (images[imageI]->writeSync())
+        {
+            images[imageI]->writeSync()->gpuWait(device()->reamDevice());
+            fenceFd = images[imageI]->writeSync()->fd();
+        }
+    }
+
+    if (device()->reamDevice()->drmDriver() == RDriver::nvidia && fenceFd < 0)
+    {
+        if (auto dev = device()->reamDevice()->asGL())
+        {
+            auto current { RGLMakeCurrent::FromDevice(dev, false) };
+            glFinish();
+        }
+    }
+
+    return true;
+}
+
+bool SRMRenderer::flipPagePrime() noexcept
+{
+    auto srcImage { images[imageI] };
+
+    if (auto dev = srcImage->allocator()->asGL())
+    {
+        auto current { RGLMakeCurrent::FromDevice(dev, false) };
+        glFinish();
+    }
+
+    auto pass { primeSurfaces[imageI]->beginPass(device()->reamDevice()) };
+
+    assert(pass.isValid());
+
+    pass()->setBlendMode(RBlendMode::Src);
+    RDrawImageInfo info {};
+    info.image = srcImage;
+    info.src = SkRect::Make(srcImage->size());
+    info.dst = SkIRect::MakeSize(srcImage->size());
+    pass()->drawImage(info);
+    pass()->endPass();
+
+    auto primeImage { primeImages[imageI] };
+
+    if (primaryPlane->m_propIDs.IN_FENCE_FD)
+    {
+        if (fenceFd >= 0)
+        {
+            close(fenceFd);
+            fenceFd = -1;
+        }
+
+        if (primeImage->writeSync())
+            fenceFd = primeImage->writeSync()->fd();
+    }
+
+    if (device()->reamDevice()->drmDriver() == RDriver::nvidia && fenceFd < 0)
+    {
+        if (auto dev = device()->reamDevice()->asGL())
+        {
+            auto current { RGLMakeCurrent::FromDevice(dev, false) };
+            glFinish();
+        }
     }
 
     return true;
@@ -618,17 +952,6 @@ bool SRMRenderer::rendRender() noexcept
     return false;
 }
 
-bool SRMRenderer::rendFlipPage() noexcept
-{
-    if (images[imageI]->writeSync() && images[imageI]->writeSync()->gpuWait())
-    {
-        //printf("w");
-    }
-    presentFrame(fbs[imageI]->id());
-    iface->pageFlipped(conn, ifaceData);
-    return true;
-}
-
 bool SRMRenderer::rendUpdateMode() noexcept
 {
     return false;
@@ -651,7 +974,6 @@ void SRMRenderer::rendUnit() noexcept
 
 void SRMRenderer::updateAgeAndIndex() noexcept
 {
-    log(CZTrace, "Presented image index: {} age: {} fb: {}", imageI, imageAge, fbs[imageI]->id());
     if (++imageI == images.size())
         imageI = 0;
 
@@ -897,6 +1219,12 @@ void SRMRenderer::atomicAppendPlane(drmModeAtomicReqPtr req) noexcept
                              primaryPlane->id(),
                              primaryPlane->m_propIDs.SRC_H,
                              (UInt64)conn->currentMode()->info().vdisplay << 16);
+
+    if (primaryPlane->m_propIDs.IN_FENCE_FD)
+        drmModeAtomicAddProperty(req,
+                                 primaryPlane->id(),
+                                 primaryPlane->m_propIDs.IN_FENCE_FD,
+                                 fenceFd);
 }
 
 SRMDevice *SRMRenderer::device() const noexcept

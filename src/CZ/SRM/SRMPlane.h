@@ -1,6 +1,7 @@
 #ifndef SRMPLANE_H
 #define SRMPLANE_H
 
+#include <CZ/Ream/DRM/RDRMFormat.h>
 #include <CZ/Ream/Ream.h>
 #include <CZ/SRM/SRMObject.h>
 #include <CZ/CZWeak.h>
@@ -86,7 +87,7 @@ public:
      *
      * @return A list of DRM formats/modifiers supported by the plane.
      */
-    const std::unordered_map<RFormat, std::unordered_set<RModifier>> &formats() const noexcept { return m_formats; }
+    const RDRMFormatSet &formats() const noexcept { return m_formats; }
 private:
     friend class SRMDevice;
     friend class SRMConnector;
@@ -106,7 +107,7 @@ private:
     SRMDevice *m_device { nullptr };
     CZWeak<SRMConnector> m_currentConnector;
     std::vector<SRMCrtc*> m_crtcs;
-    std::unordered_map<RFormat, std::unordered_set<RModifier>> m_formats;
+    RDRMFormatSet m_formats;
     Type m_type;
 
     struct PropIDs
@@ -127,7 +128,7 @@ private:
             SRC_H,
             rotation,
             type;
-    } m_propIDs;
+    } m_propIDs {};
 };
 
 #endif // SRMPLANE_H

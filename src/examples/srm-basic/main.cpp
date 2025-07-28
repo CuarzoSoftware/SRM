@@ -66,6 +66,13 @@ static std::mutex mtx;
 static const SRMConnectorInterface connIface
 {
     .initializeGL = [](SRMConnector *conn, void *) {
+
+        std::vector<UInt32> cursor;
+        cursor.resize(64*64);
+        for (size_t i = 0; i < cursor.size(); i++)
+            cursor[i] = 0xFFFF00FF;
+        conn->setCursor((UInt8*)cursor.data());
+        conn->setCursorPos({200, 200});
         conn->repaint();
     },
     .paintGL = [](SRMConnector *conn, void *)
@@ -75,8 +82,9 @@ static const SRMConnectorInterface connIface
         float phase { 0.5f * (std::sin(dx) + 1.f) };
         auto image { conn->currentImage() };
         auto surface { RSurface::WrapImage(image) };
-
         SkRegion clip { SkIRect::MakeSize(image->size()) };
+
+        conn->setCursorPos(SkIPoint::Make(phase * 2000, phase * 2000));
         /*
         for (int y = 0; y < 20; y++)
             for (int x = 0; x < 20; x++)
@@ -131,8 +139,8 @@ static const SRMConnectorInterface connIface
 
 int main(void)
 {
-    setenv("CZ_SRM_LOG_LEVEL", "6", 0);
-    setenv("CZ_REAM_LOG_LEVEL", "6", 0);
+    setenv("CZ_SRM_LOG_LEVEL", "4", 0);
+    setenv("CZ_REAM_LOG_LEVEL", "4", 0);
     setenv("CZ_REAM_EGL_LOG_LEVEL", "4", 0);
     setenv("CZ_REAM_GAPI", "GL", 0);
 

@@ -111,44 +111,6 @@ public:
     int fd() const noexcept { return m_fd; }
 
     /**
-     * @brief Check if the device can perform rendering.
-     *
-     * This function returns true when the device can import buffers from the allocator device,
-     * which also means it can perform rendering for other non-rendering devices.
-     *
-     * @param device A pointer to the @ref SRMDevice instance.
-     *
-     * @return 1 if the device is capable of rendering, 0 otherwise.
-     */
-    bool isRenderer() const noexcept
-    {
-        // The device is renderer if it relies on itself to render
-        return rendererDevice() == this;
-    }
-
-    /**
-     * @brief Get the device that performs rendering for this device.
-     *
-     * The rendering device is equal to this device only when the **ITSELF** rendering mode is used.
-     *
-     * @param device A pointer to the @ref SRMDevice instance.
-     *
-     * @return A pointer to the @ref SRMDevice that performs rendering for this device.
-     */
-    SRMDevice *rendererDevice() const noexcept { return m_rendererDevice; }
-
-    /**
-     * @brief Get the rendering mode of the device.
-     *
-     * If the rendering device is equal to this device, then the rendering mode is **ITSELF**.
-     *
-     * @param device A pointer to the @ref SRMDevice instance.
-     *
-     * @return The rendering mode of the device (@ref SRM_RENDER_MODE).
-     */
-    SRMMode renderMode() const noexcept { return m_renderMode; }
-
-    /**
      * @brief Get a list of connectors of this device.
      *
      * @param device A pointer to the @ref SRMDevice instance.
@@ -231,9 +193,6 @@ private:
     std::string m_nodeName;
     SRMCore *m_core {};
     PDriver m_driver { PDriver::unknown };
-    SRMMode m_renderMode;
-
-    SRMDevice *m_rendererDevice {}; // Renderer device could be itself or another
 
     Caps m_caps {};
     CZBitset<PF> m_pf { pEnabled };

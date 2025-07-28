@@ -22,7 +22,7 @@ std::shared_ptr<SRMCore> SRMCore::Make(const SRMInterface *iface, void *data) no
 
     // Default env values
     setenv("SRM_FORCE_LEGACY_API",              "0", 0);
-    setenv("SRM_FORCE_LEGACY_CURSOR",           "1", 0);
+    setenv("SRM_FORCE_LEGACY_CURSOR",           "0", 0);
     setenv("SRM_FORCE_GL_ALLOCATION",           "0", 0);
     setenv("SRM_RENDER_MODE_SELF_FB_COUNT",     "2", 0);
     setenv("SRM_RENDER_MODE_PRIME_FB_COUNT",    "2", 0);
@@ -257,9 +257,6 @@ bool SRMCore::initReam() noexcept
     {
         if (dev->m_pf.has(SRMDevice::pIsBootVGA))
             bestDev = dev;
-
-        dev->m_renderMode = SRMMode::Self;
-        dev->m_rendererDevice = dev;
     }
 
     if (bestDev)

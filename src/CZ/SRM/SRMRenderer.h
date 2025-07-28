@@ -3,9 +3,7 @@
 
 #include <CZ/CZLogger.h>
 #include <CZ/skia/core/SkPoint.h>
-
-#include <CZ/SRM/SRMObject.h>
-
+#include <CZ/SRM/SRMPropertyBlob.h>
 #include <CZ/Ream/RPresentationTime.h>
 
 #include <mutex>
@@ -31,16 +29,29 @@ public:
     {
         Self,
         Prime,
-        /*
         Dumb,
-        Texture,
-        Raster*/
+        Copy,
+        Raster
     };
+
+    enum class CursorAPI
+    {
+        None,
+        Atomic,
+        Legacy
+    };
+
+    static std::string_view StrategyString(Strategy strategy) noexcept
+    {
+        static const std::array<std::string_view, 5> str { "Self", "Prime", "Dumb", "Copy", "Raster" };
+        return str[strategy];
+    }
 
     static std::unique_ptr<SRMRenderer> Make(SRMConnector *connector, const SRMConnectorInterface *iface, void *ifaceData) noexcept;
     SRMRenderer(SRMConnector *connector, const SRMConnectorInterface *iface, void *ifaceData) noexcept;
     ~SRMRenderer() noexcept;
     void initGamma() noexcept;
+    void initCursor() noexcept;
     bool initRenderThread() noexcept;
 
     bool rendInit() noexcept;
@@ -49,10 +60,12 @@ public:
     bool initSwapchain() noexcept;
     bool initSwapchainSelf() noexcept;
     bool initSwapchainPrime() noexcept;
+    bool initSwapchainDumb() noexcept;
 
     bool flipPage() noexcept;
     bool flipPageSelf() noexcept;
     bool flipPagePrime() noexcept;
+    bool flipPageDumb() noexcept;
 
 
     bool rendWaitForRepaint() noexcept;
@@ -67,9 +80,10 @@ public:
 
     void updateAgeAndIndex() noexcept;
 
-    int rendAtomicCommit(drmModeAtomicReqPtr req, UInt32 flags, void *data, bool forceRetry) noexcept;
-    void rendAppendAtomicChanges(drmModeAtomicReqPtr req, bool clearFlags) noexcept;
-    void atomicAppendPlane(drmModeAtomicReqPtr req) noexcept;
+    void rendAppendAtomicChanges(std::shared_ptr<SRMAtomicRequest> req, bool clearFlags) noexcept;
+    void atomicAppendPlane(std::shared_ptr<SRMAtomicRequest> req) noexcept;
+
+    void logInfo() noexcept;
 
     SRMDevice *device() const noexcept;
     SRMConnector *conn;
@@ -81,14 +95,16 @@ public:
 
     Strategy strategy;
 
-    struct AtomicCursor
+    struct Cursor
     {
-        gbm_bo *bo {};
-        UInt32 fb {};
-    } m_cursor[2] {};
-
-    Int32 cursorI;
+        std::shared_ptr<RImage> image;
+        std::shared_ptr<RDRMFramebuffer> fb;
+    } cursor[2] {};
+    Int32 cursorI { 1 };
     SkIPoint cursorPos {};
+    CursorAPI cursorAPI { CursorAPI::None };
+    bool cursorVisible { false };
+
     SRMCrtc *crtc {};
     SRMEncoder *encoder {};
     SRMPlane *primaryPlane {};
@@ -102,14 +118,16 @@ public:
     bool rendering { false };
 
     std::vector<drm_color_lut> m_gamma;
-    UInt32 m_gammaBlobId {};
+    std::shared_ptr<SRMPropertyBlob> gammaBlob;
+    std::shared_ptr<SRMPropertyBlob> modeBlob;
+
     drmEventContext drmEventCtx {};
     UInt32 lastFb {};
     UInt32 imageAge {};
     UInt32 imageI {};
     int fenceFd { -1 };
     std::binary_semaphore semaphore { 0 };
-    std::mutex propsMutex; // Protect stuff like cursor and gamma updates
+    std::recursive_mutex propsMutex; // Protect stuff like cursor and gamma updates
     std::unique_ptr<SkRegion> m_damage;
     RFormat m_currentFormat {};
     RPresentationTime presentationTime {};
@@ -125,6 +143,8 @@ public:
 
     std::vector<std::shared_ptr<RImage>> primeImages;
     std::vector<std::shared_ptr<RSurface>> primeSurfaces;
+
+    std::vector<std::shared_ptr<RDumbBuffer>> dumbBuffers;
 };
 
 #endif // SRMRENDERER_H

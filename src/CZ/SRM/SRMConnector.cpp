@@ -1,12 +1,14 @@
-#include "CZ/SRM/SRMCore.h"
-#include "CZ/SRM/SRMCrtc.h"
-#include "CZ/SRM/SRMPlane.h"
+#include <CZ/SRM/SRMCore.h>
+#include <CZ/SRM/SRMCrtc.h>
+#include <CZ/SRM/SRMPlane.h>
 #include <CZ/SRM/SRMEncoder.h>
 #include <CZ/SRM/SRMDevice.h>
 #include <CZ/SRM/SRMLog.h>
 #include <CZ/SRM/SRMConnector.h>
 #include <CZ/SRM/SRMConnectorMode.h>
 #include <CZ/Utils/CZVectorUtils.h>
+#include <CZ/Ream/GBM/RGBMBo.h>
+#include <CZ/Ream/RImage.h>
 #include <xf86drmMode.h>
 #include <xf86drm.h>
 #include <cstring>
@@ -400,11 +402,6 @@ std::string_view SRMConnector::TypeString(UInt32 type) noexcept
     }
 }
 
-SRMDevice *SRMConnector::rendererDevice() const noexcept
-{
-    return device()->rendererDevice();
-}
-
 SRMEncoder *SRMConnector::currentEncoder() const noexcept
 {
     return m_rend ? m_rend->encoder : nullptr;
@@ -412,7 +409,17 @@ SRMEncoder *SRMConnector::currentEncoder() const noexcept
 
 bool SRMConnector::setMode(SRMConnectorMode *mode) noexcept
 {
+    if (!mode || mode->connector() != this)
+    {
+        log(CZError, CZLN, "Invalid connector mode");
+        return false;
+    }
+
+    if (mode == currentMode())
+        return true;
+
     // TODO
+
     return false;
 }
 
@@ -433,20 +440,87 @@ SRMPlane *SRMConnector::currentCursorPlane() const noexcept
 
 bool SRMConnector::hasCursor() const noexcept
 {
-    // TODO
+    if (m_rend)
+        return m_rend->cursorAPI != SRMRenderer::CursorAPI::None;
+
     return false;
 }
 
 bool SRMConnector::setCursor(UInt8 *pixels) noexcept
 {
-    // TODO
-    return false;
+    if (!hasCursor())
+        return false;
+
+    std::lock_guard<std::recursive_mutex> lock { m_rend->propsMutex };
+
+    if (pixels)
+    {
+        const auto i { 1 - m_rend->cursorI };
+        auto image { m_rend->cursor[i].image };
+        RPixelBufferRegion info {};
+        info.pixels = pixels;
+        info.region.setRect(SkIRect::MakeWH(64, 64));
+        info.format = image->formatInfo().format;
+        info.stride = 64 * 4;
+
+        if (!image->writePixels(info))
+            return false;
+
+        m_rend->cursorVisible = true;
+
+        if (m_rend->cursorAPI == SRMRenderer::CursorAPI::Atomic)
+        {
+            m_rend->atomicChanges.add(SRMRenderer::CHCursorVisibility | SRMRenderer::CHCursorBuffer);
+            unlockRenderer(false);
+        }
+        else
+        {
+            drmModeSetCursor(device()->fd(), m_rend->crtc->id(),
+                             image->gbmBo(device()->reamDevice())->planeHandle(0).u32,
+                             image->size().width(), image->size().height());
+            m_rend->cursorI = i;
+        }
+    }
+    else
+    {
+        if (!m_rend->cursorVisible)
+            return true;
+
+        m_rend->cursorVisible = false;
+
+        if (m_rend->cursorAPI == SRMRenderer::CursorAPI::Atomic)
+        {
+            m_rend->atomicChanges.add(SRMRenderer::CHCursorVisibility);
+            unlockRenderer(false);
+        }
+        else
+            drmModeSetCursor(device()->fd(), m_rend->crtc->id(), 0, 0, 0);
+    }
+
+    return true;
 }
 
 bool SRMConnector::setCursorPos(SkIPoint pos) noexcept
 {
-    // TODO
-    return false;
+    if (!hasCursor())
+        return false;
+
+    if (m_rend->cursorPos.x() == pos.x() && m_rend->cursorPos.y() == pos.y())
+        return true;
+
+    std::lock_guard<std::recursive_mutex> lock { m_rend->propsMutex };
+
+    m_rend->cursorPos = pos;
+
+    if (m_rend->cursorAPI == SRMRenderer::CursorAPI::Atomic)
+    {
+        m_rend->atomicChanges.add(SRMRenderer::CHCursorPosition);
+        unlockRenderer(false);
+    }
+    else
+        drmModeMoveCursor(device()->fd(), m_rend->crtc->id(), pos.x(), pos.y());
+
+    return true;
 }
 
 bool SRMConnector::initialize(const SRMConnectorInterface *iface, void *data) noexcept

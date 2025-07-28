@@ -130,21 +130,6 @@ public:
     SRMDevice *device() const noexcept { return m_device; }
 
     /**
-     * @brief Retrieve the renderer device associated with the connector.
-     *
-     * This function returns the device responsible for rendering operations for the connector.
-     *
-     * When the **ITSELF** rendering mode is used, this device is the same as the one obtained with srmConnectorGetDevice().
-     * However, in the **PRIME**, **DUMB** or **CPU** modes, it differs.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which you want to obtain the renderer device.
-     * @return Pointer to the @ref SRMDevice responsible for rendering operations for the connector.
-     *
-     * @note Use this device when you need to access the OpenGL texture of a SRMBuffer with srmBufferGetTextureId().
-     */
-    SRMDevice *rendererDevice() const noexcept;
-
-    /**
      * @brief Get the name of the connector.
      *
      * The name is always unique, even across devices but could change after a reboot.

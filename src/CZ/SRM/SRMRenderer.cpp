@@ -7,6 +7,7 @@
 #include <CZ/SRM/SRMCrtc.h>
 #include <CZ/SRM/SRMEncoder.h>
 #include <CZ/SRM/SRMCore.h>
+#include <CZ/SRM/SRMAtomicRequest.h>
 
 #include <CZ/Ream/RImage.h>
 #include <CZ/Ream/RSurface.h>
@@ -15,6 +16,7 @@
 #include <CZ/Ream/RPass.h>
 #include <CZ/Ream/RPainter.h>
 #include <CZ/Ream/DRM/RDRMFramebuffer.h>
+#include <CZ/Ream/DRM/RDumbBuffer.h>
 
 #include <CZ/Ream/GL/RGLMakeCurrent.h>
 
@@ -65,6 +67,7 @@ std::unique_ptr<SRMRenderer> SRMRenderer::Make(SRMConnector *conn, const SRMConn
     }
 
     rend->initGamma();
+    rend->initCursor();
     return rend;
 }
 
@@ -152,6 +155,49 @@ void SRMRenderer::initGamma() noexcept
     }
 }
 
+void SRMRenderer::initCursor() noexcept
+{
+    if (device()->core()->m_pf.has(SRMCore::pDisableCursor))
+        return;
+
+    const bool atomic = device()->clientCaps().Atomic &&
+                   !device()->core()->m_pf.has(SRMCore::pForceLegacyCursor) &&
+                   cursorPlane &&
+                   (cursorPlane->formats().has(DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR) ||
+                    cursorPlane->formats().has(DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_INVALID));
+
+    for (size_t i = 0; i < 2; i++)
+    {
+        cursor[i].image = RImage::Make(
+            { 64, 64 },
+            { DRM_FORMAT_ARGB8888, { DRM_FORMAT_MOD_LINEAR } },
+            RStorageType::GBM,
+            device()->reamDevice());
+
+        if (!cursor[i].image || !cursor[i].image->writeFormats().contains(DRM_FORMAT_ARGB8888))
+            goto fail;
+
+        if (atomic)
+        {
+            cursor[i].fb = cursor[i].image->drmFb(device()->reamDevice());
+
+            if (!cursor[i].fb)
+                goto fail;
+        }
+    }
+
+    cursorAPI = atomic ? CursorAPI::Atomic : CursorAPI::Legacy;
+    return;
+
+fail:
+    for (size_t i = 0; i < 2; i++)
+    {
+        cursor[i].image.reset();
+        cursor[i].fb.reset();
+    }
+    cursorAPI = CursorAPI::None;
+}
+
 static void drmPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec, void *data)
 {
     CZ_UNUSED(fd);
@@ -229,6 +275,8 @@ bool SRMRenderer::initRenderThread() noexcept
             initPromise.set_value(false);
             return;
         }
+
+        logInfo();
 
         initPromise.set_value(true);
 
@@ -318,65 +366,23 @@ bool SRMRenderer::rendInitCrtc() noexcept
 
     if (device()->clientCaps().Atomic)
     {
-        drmModeAtomicReqPtr req;
-        req = drmModeAtomicAlloc();
+        auto req { SRMAtomicRequest::Make(device()) };
 
-        // Plane
+        if (!modeBlob)
+            modeBlob = SRMPropertyBlob::Make(device(), &conn->currentMode()->info(), sizeof(drmModeModeInfo));
 
-        /*
-        drmModeAtomicAddProperty(req,
-                                 primaryPlane->id(),
-                                 primaryPlane->m_propIDs.FB_ID,
-                                 0);
-
-        drmModeAtomicAddProperty(req,
-                                 primaryPlane->id(),
-                                 primaryPlane->m_propIDs.CRTC_ID,
-                                 0);*/
-
-        // CRTC
-
-        if (conn->m_currentModeBlobId)
-        {
-            drmModeDestroyPropertyBlob(device()->fd(), conn->m_currentModeBlobId);
-            conn->m_currentModeBlobId = 0;
-        }
-
-        drmModeCreatePropertyBlob(device()->fd(),
-                                  &conn->currentMode()->info(),
-                                  sizeof(drmModeModeInfo),
-                                  &conn->m_currentModeBlobId);
-
-        drmModeAtomicAddProperty(req,
-                                 crtc->id(),
-                                 crtc->m_propIDs.MODE_ID,
-                                 conn->m_currentModeBlobId);
-
-        drmModeAtomicAddProperty(req,
-                                 crtc->id(),
-                                 crtc->m_propIDs.ACTIVE,
-                                 1);
-        // Connector
-
-        drmModeAtomicAddProperty(req,
-                                 conn->id(),
-                                 conn->m_propIDs.CRTC_ID,
-                                 crtc->id());
-
-        drmModeAtomicAddProperty(req,
-                                 conn->id(),
-                                 conn->m_propIDs.link_status,
-                                 DRM_MODE_LINK_STATUS_GOOD);
-
-
+        req->attachPropertyBlob(modeBlob);
+        req->addProperty(crtc->id(), crtc->m_propIDs.MODE_ID, modeBlob->id());
+        req->addProperty(crtc->id(), crtc->m_propIDs.ACTIVE, 1);
+        req->addProperty(conn->id(), conn->m_propIDs.CRTC_ID, crtc->id());
+        req->addProperty(conn->id(), conn->m_propIDs.link_status, DRM_MODE_LINK_STATUS_GOOD);
         auto prevCursorIndex { cursorI };
         rendAppendAtomicChanges(req, false);
-        ret = rendAtomicCommit(req, DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
-        drmModeAtomicFree(req);
+        ret = req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
 
         if (ret)
         {
-            if (cursorPlane)
+            if (cursorAPI == CursorAPI::Atomic)
                 cursorI = prevCursorIndex;
 
             logAtomic(CZError, CZLN, "Failed to set CRTC mode. DRM Error: {}", strerror(ret));
@@ -435,6 +441,9 @@ bool SRMRenderer::initSwapchain() noexcept
 
     strategy = Prime;
     if (initSwapchainPrime()) return true;
+
+    strategy = Dumb;
+    if (initSwapchainDumb()) return true;
 
     log(CZError, CZLN, "Failed to create swapchain");
 
@@ -521,10 +530,7 @@ bool SRMRenderer::initSwapchainSelf() noexcept
         }
 
         if (ok)
-        {
-            log(CZInfo, "[Self] Plane format: {} - {}", RDRMFormat::FormatName(images[0]->formatInfo().format), RDRMFormat::ModifierName(images[0]->modifiers().front()));
             break;
-        }
     }
 
     return ok;
@@ -681,11 +687,111 @@ bool SRMRenderer::initSwapchainPrime() noexcept
         }
 
         if (ok)
-        {
-            log(CZInfo, "[Prime] Plane format: {} - {}", RDRMFormat::FormatName(images[0]->formatInfo().format), RDRMFormat::ModifierName(images[0]->modifiers().front()));
             break;
-        }
     }
+
+    return ok;
+}
+
+bool SRMRenderer::initSwapchainDumb() noexcept
+{
+    auto ream { RCore::Get() };
+
+    if (device()->reamDevice() == ream->mainDevice() || !device()->reamDevice()->caps().DumbBuffer)
+        return false;
+
+    const auto inFormats { RDRMFormatSet::Intersect(primaryPlane->formats(), ream->mainDevice()->dmaRenderFormats()) };
+
+    if (inFormats.formats().empty())
+        return false;
+
+    std::vector<const RDRMFormat*> formats;
+    formats.reserve(inFormats.formats().size());
+    const std::unordered_set<RFormat> preferred {
+        DRM_FORMAT_XRGB8888,
+        DRM_FORMAT_XBGR8888,
+        DRM_FORMAT_ARGB8888,
+        DRM_FORMAT_ABGR8888
+    };
+
+    auto it { inFormats.formats().find(DRM_FORMAT_XRGB8888) };
+    if (it != inFormats.formats().end()) formats.emplace_back(&(*it));
+
+    it = inFormats.formats().find(DRM_FORMAT_XBGR8888);
+    if (it != inFormats.formats().end()) formats.emplace_back(&(*it));
+
+    it = inFormats.formats().find(DRM_FORMAT_ARGB8888);
+    if (it != inFormats.formats().end()) formats.emplace_back(&(*it));
+
+    it = inFormats.formats().find(DRM_FORMAT_ABGR8888);
+    if (it != inFormats.formats().end()) formats.emplace_back(&(*it));
+
+    for (const auto &fmt : inFormats.formats())
+        if (!preferred.contains(fmt.format()))
+            formats.emplace_back(&fmt);
+
+    const size_t n { 3 };
+    fbs.resize(n);
+    dumbBuffers.resize(n);
+    images.resize(n);
+
+    bool ok { false };
+
+    for (const auto *fmt : formats)
+    {
+        ok = true;
+
+        for (size_t i = 0; i < n; i++)
+        {
+            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, RStorageType::GBM, ream->mainDevice());
+
+            if (!images[i])
+            {
+                log(CZTrace, CZLN, "Failed to create swapchain RImage {}", i);
+                ok = false;
+                break;
+            }
+
+            if (!images[i]->readFormats().contains(fmt->format()))
+            {
+                log(CZTrace, CZLN, "The swapchain RImage doesn't support reading {}", i);
+                ok = false;
+                break;
+            }
+
+            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RPassDst, ream->mainDevice()))
+            {
+                log(CZTrace, CZLN, "Missing RPassDst cap {}", i);
+                ok = false;
+                break;
+            }
+
+            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RSKPassDst, ream->mainDevice()))
+            {
+                log(CZTrace, CZLN, "Missing RSKPassDst cap {}", i);
+                ok = false;
+                break;
+            }
+
+            dumbBuffers[i] = RDumbBuffer::Make(conn->currentMode()->size(), *fmt, device()->reamDevice());
+
+            if (!dumbBuffers[i])
+            {
+                log(CZTrace, CZLN, "Failed to create RDumbBufer {}", i);
+                ok = false;
+                break;
+            }
+
+            fbs[i] = dumbBuffers[i]->fb();
+        }
+
+        if (ok)
+            break;
+    }
+
+    if (!ok)
+        return false;
+
 
     return ok;
 }
@@ -699,6 +805,9 @@ bool SRMRenderer::flipPage() noexcept
         break;
     case Prime:
         flipPagePrime();
+        break;
+    case Dumb:
+        flipPageDumb();
         break;
     }
 
@@ -725,13 +834,7 @@ bool SRMRenderer::flipPageSelf() noexcept
     }
 
     if (device()->reamDevice()->drmDriver() == RDriver::nvidia && fenceFd < 0)
-    {
-        if (auto dev = device()->reamDevice()->asGL())
-        {
-            auto current { RGLMakeCurrent::FromDevice(dev, false) };
-            glFinish();
-        }
-    }
+        device()->reamDevice()->wait();
 
     return true;
 }
@@ -739,12 +842,7 @@ bool SRMRenderer::flipPageSelf() noexcept
 bool SRMRenderer::flipPagePrime() noexcept
 {
     auto srcImage { images[imageI] };
-
-    if (auto dev = srcImage->allocator()->asGL())
-    {
-        auto current { RGLMakeCurrent::FromDevice(dev, false) };
-        glFinish();
-    }
+    srcImage->allocator()->wait();
 
     auto pass { primeSurfaces[imageI]->beginPass(device()->reamDevice()) };
 
@@ -773,15 +871,20 @@ bool SRMRenderer::flipPagePrime() noexcept
     }
 
     if (device()->reamDevice()->drmDriver() == RDriver::nvidia && fenceFd < 0)
-    {
-        if (auto dev = device()->reamDevice()->asGL())
-        {
-            auto current { RGLMakeCurrent::FromDevice(dev, false) };
-            glFinish();
-        }
-    }
+        device()->reamDevice()->wait();
 
     return true;
+}
+
+bool SRMRenderer::flipPageDumb() noexcept
+{
+    auto dumb { dumbBuffers[imageI] };
+    RPixelBufferRegion info {};
+    info.pixels = dumb->pixels();
+    info.stride = dumb->stride();
+    info.format = dumb->formatInfo().format;
+    info.region.setRect(SkIRect::MakeSize(dumb->size()));
+    return images[imageI]->readPixels(info);
 }
 
 bool SRMRenderer::rendWaitForRepaint() noexcept
@@ -848,47 +951,39 @@ void SRMRenderer::presentFrame(UInt32 fb) noexcept
 
     if (device()->clientCaps().Atomic)
     {
-        const std::lock_guard<std::mutex> lock { propsMutex };
+        const std::lock_guard<std::recursive_mutex> lock { propsMutex };
 
         if (currentVSync)
         {
-            drmModeAtomicReqPtr req;
-            req = drmModeAtomicAlloc();
-
+            auto req { SRMAtomicRequest::Make(device()) };
             const auto prevCursorIndex { cursorI };
             rendAppendAtomicChanges(req, false);
             atomicAppendPlane(req);
-            ret = rendAtomicCommit(req, DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, this, false);
+            ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, this, false);
 
             if (ret && cursorPlane)
                 cursorI = prevCursorIndex;
             else
                 atomicChanges = 0;
 
-            drmModeAtomicFree(req);
             pendingPageFlip = true;
         }
         else
         {
             if (atomicChanges == 0)
             {
-                drmModeAtomicReqPtr req;
-                req = drmModeAtomicAlloc();
+                auto req { SRMAtomicRequest::Make(device()) };
                 atomicAppendPlane(req);
-                ret = rendAtomicCommit(req, DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK, this, false);
-                drmModeAtomicFree(req);
+                ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK, this, false);
             }
 
             if (atomicChanges || ret == -22)
             {
-                drmModeAtomicReqPtr req;
-                req = drmModeAtomicAlloc();
-
+                auto req { SRMAtomicRequest::Make(device()) };
                 const auto prevCursorIndex { cursorI };
                 rendAppendAtomicChanges(req, false);
                 atomicAppendPlane(req);
-                ret = rendAtomicCommit(req, DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, this, false);
-                drmModeAtomicFree(req);
+                ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, this, false);
 
                 if (ret && cursorPlane)
                     cursorI = prevCursorIndex;
@@ -981,145 +1076,69 @@ void SRMRenderer::updateAgeAndIndex() noexcept
         imageAge++;
 }
 
-int SRMRenderer::rendAtomicCommit(drmModeAtomicReqPtr req, UInt32 flags, void *data, bool forceRetry) noexcept
+void SRMRenderer::rendAppendAtomicChanges(std::shared_ptr<SRMAtomicRequest> req, bool clearFlags) noexcept
 {
-    if (!forceRetry)
-        return drmModeAtomicCommit(device()->fd(), req, flags, data);
-
-    int ret;
-retry:
-    ret = drmModeAtomicCommit(device()->fd(), req, flags | DRM_MODE_ATOMIC_TEST_ONLY, data);
-
-    if (ret == -16) // -EBUSY
+    if (cursorAPI == CursorAPI::Atomic)
     {
-        usleep(2000);
-        goto retry;
-    }
+        bool updatedFB { false };
 
-    return drmModeAtomicCommit(device()->fd(), req, flags, data);
-}
-
-void SRMRenderer::rendAppendAtomicChanges(drmModeAtomicReqPtr req, bool clearFlags) noexcept
-{
-    /*
-    if (connector->currentCursorPlane)
-    {
-        UInt8 updatedFB = 0;
-
-        if (connector->atomicChanges & SRM_ATOMIC_CHANGE_CURSOR_BUFFER)
+        if (atomicChanges.has(CHCursorBuffer))
         {
             if (clearFlags)
-                connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_BUFFER;
+                atomicChanges.remove(CHCursorBuffer);
 
-            connector->cursorIndex = 1 - connector->cursorIndex;
+            cursorI = 1 - cursorI;
 
-            if (connector->cursorVisible)
+            if (cursorVisible)
             {
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.FB_ID,
-                                         connector->cursor[connector->cursorIndex].fb);
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.FB_ID, cursor[cursorI].fb->id());
                 updatedFB = 1;
             }
         }
 
         UInt8 updatedVisibility = 0;
 
-        if (connector->atomicChanges & SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY)
+        if (atomicChanges.has(CHCursorVisibility))
         {
             if (clearFlags)
-                connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
+                atomicChanges.remove(CHCursorVisibility);
 
-            if (connector->cursorVisible)
+            if (cursorVisible)
             {
                 updatedVisibility = 1;
 
                 if (!updatedFB)
-                {
-                    drmModeAtomicAddProperty(req,
-                                             connector->currentCursorPlane->id,
-                                             connector->currentCursorPlane->propIDs.FB_ID,
-                                             connector->cursor[connector->cursorIndex].fb);
-                }
+                    req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.FB_ID, cursor[cursorI].fb->id());
 
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.CRTC_ID,
-                                         connector->currentCrtc->id);
-
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.CRTC_X,
-                                         connector->cursorX);
-
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.CRTC_Y,
-                                         connector->cursorY);
-
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.CRTC_W,
-                                         64);
-
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.CRTC_H,
-                                         64);
-
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.SRC_X,
-                                         0);
-
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.SRC_Y,
-                                         0);
-
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.SRC_W,
-                                         (UInt64)64 << 16);
-
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.SRC_H,
-                                         (UInt64)64 << 16);
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_ID, crtc->id());
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_X, cursorPos.x());
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_Y, cursorPos.y());
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_W, 64);
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_H, 64);
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.SRC_X, 0);
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.SRC_Y, 0);
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.SRC_W, (UInt64)64 << 16);
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.SRC_H, (UInt64)64 << 16);
             }
             else
             {
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.CRTC_ID,
-                                         0);
-
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.FB_ID,
-                                         0);
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_ID, 0);
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.FB_ID, 0);
             }
         }
 
-        if (connector->atomicChanges & SRM_ATOMIC_CHANGE_CURSOR_POSITION)
+        if (atomicChanges.has(CHCursorPosition))
         {
             if (clearFlags)
-                connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CURSOR_POSITION;
+                atomicChanges.has(CHCursorPosition);
 
             if (!updatedVisibility)
             {
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.CRTC_X,
-                                         connector->cursorX);
-
-                drmModeAtomicAddProperty(req,
-                                         connector->currentCursorPlane->id,
-                                         connector->currentCursorPlane->propIDs.CRTC_Y,
-                                         connector->cursorY);
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_X, cursorPos.x());
+                req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_Y, cursorPos.y());
             }
         }
-    }*/
+    }
 
     /*
     if (connector->atomicChanges & SRM_ATOMIC_CHANGE_GAMMA_LUT)
@@ -1168,63 +1187,41 @@ void SRMRenderer::rendAppendAtomicChanges(drmModeAtomicReqPtr req, bool clearFla
                              connector->fenceFD); */
 }
 
-void SRMRenderer::atomicAppendPlane(drmModeAtomicReqPtr req) noexcept
+void SRMRenderer::atomicAppendPlane(std::shared_ptr<SRMAtomicRequest> req) noexcept
 {
-    drmModeAtomicAddProperty(req,
-                             primaryPlane->id(),
-                             primaryPlane->m_propIDs.FB_ID,
-                             fbs[imageI]->id());
-
-    drmModeAtomicAddProperty(req,
-                             primaryPlane->id(),
-                             primaryPlane->m_propIDs.CRTC_ID,
-                             crtc->id());
-
-    drmModeAtomicAddProperty(req,
-                             primaryPlane->id(),
-                             primaryPlane->m_propIDs.CRTC_X,
-                             0);
-
-    drmModeAtomicAddProperty(req,
-                             primaryPlane->id(),
-                             primaryPlane->m_propIDs.CRTC_Y,
-                             0);
-
-    drmModeAtomicAddProperty(req,
-                             primaryPlane->id(),
-                             primaryPlane->m_propIDs.CRTC_W,
-                             conn->currentMode()->info().hdisplay);
-
-    drmModeAtomicAddProperty(req,
-                             primaryPlane->id(),
-                             primaryPlane->m_propIDs.CRTC_H,
-                             conn->currentMode()->info().vdisplay);
-
-    drmModeAtomicAddProperty(req,
-                             primaryPlane->id(),
-                             primaryPlane->m_propIDs.SRC_X,
-                             0);
-
-    drmModeAtomicAddProperty(req,
-                             primaryPlane->id(),
-                             primaryPlane->m_propIDs.SRC_Y,
-                             0);
-
-    drmModeAtomicAddProperty(req,
-                             primaryPlane->id(),
-                             primaryPlane->m_propIDs.SRC_W,
-                             (UInt64)conn->currentMode()->info().hdisplay << 16);
-
-    drmModeAtomicAddProperty(req,
-                             primaryPlane->id(),
-                             primaryPlane->m_propIDs.SRC_H,
-                             (UInt64)conn->currentMode()->info().vdisplay << 16);
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.FB_ID, fbs[imageI]->id());
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_ID, crtc->id());
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_X, 0);
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_Y, 0);
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_W, conn->currentMode()->info().hdisplay);
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_H, conn->currentMode()->info().vdisplay);
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_X, 0);
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_Y, 0);
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_W, (UInt64)conn->currentMode()->info().hdisplay << 16);
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_H, (UInt64)conn->currentMode()->info().vdisplay << 16);
 
     if (primaryPlane->m_propIDs.IN_FENCE_FD)
-        drmModeAtomicAddProperty(req,
-                                 primaryPlane->id(),
-                                 primaryPlane->m_propIDs.IN_FENCE_FD,
-                                 fenceFd);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.IN_FENCE_FD, fenceFd);
+}
+
+void SRMRenderer::logInfo() noexcept
+{
+    if (SRMLog.level() >= CZInfo)
+    {
+        auto ream { RCore::Get() };
+        printf("\n");
+        SRMLog(CZInfo, "---------------- Connector Initialized ----------------");
+        SRMLog(CZInfo, "Name: {} {} {}", conn->name(), conn->model(), conn->make());
+        SRMLog(CZInfo, "Mode: {} x {} @ {}", conn->currentMode()->size().width(), conn->currentMode()->size().height(), conn->currentMode()->refreshRate());
+        SRMLog(CZInfo, "Strategy: {}", StrategyString(strategy));
+        SRMLog(CZInfo, "DRM API: {}", device()->clientCaps().Atomic ? "Atomic" : "Legacy");
+        SRMLog(CZInfo, "Device: {} - {}", device()->nodeName(), device()->reamDevice()->drmDriverName());
+        SRMLog(CZInfo, "Renderer: {} - {}", ream->mainDevice()->srmDevice()->nodeName(), ream->mainDevice()->drmDriverName());
+        SRMLog(CZInfo, "Surface Format: {} - {}", RDRMFormat::FormatName(images[0]->formatInfo().format), RDRMFormat::ModifierName(images[0]->modifiers()[0]));
+        SRMLog(CZInfo, "Buffering: {}", images.size());
+        SRMLog(CZInfo, "Cursor Plane: {}", cursor[0].image != nullptr);
+        SRMLog(CZInfo, "-------------------------------------------------------\n");
+    }
 }
 
 SRMDevice *SRMRenderer::device() const noexcept

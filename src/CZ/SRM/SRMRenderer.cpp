@@ -166,24 +166,26 @@ void SRMRenderer::initCursor() noexcept
                    (cursorPlane->formats().has(DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR) ||
                     cursorPlane->formats().has(DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_INVALID));
 
+    RImageConstraints consts {};
+    consts.allocator = device()->reamDevice();
+    consts.writeFormats.emplace(DRM_FORMAT_ARGB8888);
+    consts.caps[device()->reamDevice()] = RImageCap_GBMBo;
+
+    if (atomic)
+        consts.caps[device()->reamDevice()].add(RImageCap_DRMFb);
+
     for (size_t i = 0; i < 2; i++)
     {
         cursor[i].image = RImage::Make(
             { 64, 64 },
             { DRM_FORMAT_ARGB8888, { DRM_FORMAT_MOD_LINEAR } },
-            RStorageType::GBM,
-            device()->reamDevice());
+            &consts);
 
-        if (!cursor[i].image || !cursor[i].image->writeFormats().contains(DRM_FORMAT_ARGB8888))
+        if (!cursor[i].image)
             goto fail;
 
         if (atomic)
-        {
             cursor[i].fb = cursor[i].image->drmFb(device()->reamDevice());
-
-            if (!cursor[i].fb)
-                goto fail;
-        }
     }
 
     cursorAPI = atomic ? CursorAPI::Atomic : CursorAPI::Legacy;
@@ -481,52 +483,27 @@ bool SRMRenderer::initSwapchainSelf() noexcept
 
     bool ok { false };
 
+    RImageConstraints consts {};
+    consts.allocator = device()->reamDevice();
+    consts.caps[device()->reamDevice()] = RImageCap_Dst | RImageCap_DRMFb;
+
     for (const auto *fmt : formats)
     {
         ok = true;
 
         for (size_t i = 0; i < images.size(); i++)
         {
-            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, RStorageType::GBM, device()->reamDevice());
+            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, &consts);
 
             if (!images[i])
             {
-                log(CZTrace, CZLN, "Failed to create swapchain RImage {}", i);
-                ok = false;
-                break;
-            }
-
-            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RPassDst, device()->reamDevice()))
-            {
-                log(CZTrace, CZLN, "Missing RPassDst cap {}", i);
-                ok = false;
-                break;
-            }
-
-            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RSKPassDst, device()->reamDevice()))
-            {
-                log(CZTrace, CZLN, "Missing RSKPassDst cap {}", i);
+                log(CZTrace, CZLN, "Failed to create swapchain RImage N° {}/{}", i + 1, images.size());
                 ok = false;
                 break;
             }
 
             fbs[i] = images[i]->drmFb(device()->reamDevice());
-
-            if (!fbs[i])
-            {
-                log(CZTrace, CZLN, "Failed to get RDRMFramebuffer from swapchain RImage {}", i);
-                ok = false;
-                break;
-            }
-
-            surfaces[i] = RSurface::WrapImage(images[i], 1);
-
-            if (!surfaces[i])
-            {
-                log(CZTrace, CZLN, "Failed to create RSurface from swapchain RImage {}", i);
-                ok = false;
-                break;
-            }
+            surfaces[i] = RSurface::WrapImage(images[i]);
         }
 
         if (ok)
@@ -574,45 +551,27 @@ bool SRMRenderer::initSwapchainPrime() noexcept
 
     bool ok { false };
 
+    RImageConstraints primeConsts {};
+    primeConsts.allocator = device()->reamDevice();
+    primeConsts.caps[device()->reamDevice()] = RImageCap_Dst | RImageCap_DRMFb;
+
     for (const auto *fmt : formats)
     {
         ok = true;
 
         for (size_t i = 0; i < n; i++)
         {
-            primeImages[i] = RImage::Make(conn->currentMode()->size(), *fmt, RStorageType::GBM, device()->reamDevice());
+            primeImages[i] = RImage::Make(conn->currentMode()->size(), *fmt, &primeConsts);
 
             if (!primeImages[i])
             {
-                log(CZTrace, CZLN, "Failed to create swapchain RImage {}", i);
-                ok = false;
-                break;
-            }
-
-            if (!primeImages[i]->checkDeviceCap(RImage::DeviceCap::RPassDst, device()->reamDevice()))
-            {
-                log(CZTrace, CZLN, "Missing RPassDst cap {}", i);
+                log(CZTrace, CZLN, "Failed to create swapchain RImage {}/{}", i+1, primeImages.size());
                 ok = false;
                 break;
             }
 
             fbs[i] = primeImages[i]->drmFb(device()->reamDevice());
-
-            if (!fbs[i])
-            {
-                log(CZTrace, CZLN, "Failed to get RDRMFramebuffer from swapchain RImage {}", i);
-                ok = false;
-                break;
-            }
-
-            primeSurfaces[i] = RSurface::WrapImage(primeImages[i], 1);
-
-            if (!primeSurfaces[i])
-            {
-                log(CZTrace, CZLN, "Failed to create RSurface from swapchain RImage {}", i);
-                ok = false;
-                break;
-            }
+            primeSurfaces[i] = RSurface::WrapImage(primeImages[i]);
         }
 
         if (ok)
@@ -640,50 +599,27 @@ bool SRMRenderer::initSwapchainPrime() noexcept
 
     ok = false;
 
+    RImageConstraints consts {};
+    consts.allocator = ream->mainDevice();
+    consts.caps[ream->mainDevice()] = RImageCap_Dst;
+    consts.caps[device()->reamDevice()] = RImageCap_Src;
+
     for (const auto *fmt : formats)
     {
         ok = true;
 
         for (size_t i = 0; i < n; i++)
         {
-            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, RStorageType::GBM, ream->mainDevice());
+            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, &consts);
 
             if (!images[i])
             {
-                log(CZTrace, CZLN, "Failed to create swapchain RImage {}", i);
+                log(CZTrace, CZLN, "Failed to create PRIME swapchain RImage {}/{}", i+1, images.size());
                 ok = false;
                 break;
             }
 
-            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RPassDst, ream->mainDevice()))
-            {
-                log(CZTrace, CZLN, "Missing RPassDst cap {}", i);
-                ok = false;
-                break;
-            }
-
-            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RSKPassDst, ream->mainDevice()))
-            {
-                log(CZTrace, CZLN, "Missing RSKPassDst cap {}", i);
-                ok = false;
-                break;
-            }
-
-            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RPassSrc, device()->reamDevice()))
-            {
-                log(CZTrace, CZLN, "Missing RPassSrc cap {}", i);
-                ok = false;
-                break;
-            }
-
-            surfaces[i] = RSurface::WrapImage(images[i], 1);
-
-            if (!surfaces[i])
-            {
-                log(CZTrace, CZLN, "Failed to create RSurface from swapchain RImage {}", i);
-                ok = false;
-                break;
-            }
+            surfaces[i] = RSurface::WrapImage(images[i]);
         }
 
         if (ok)
@@ -737,13 +673,20 @@ bool SRMRenderer::initSwapchainDumb() noexcept
 
     bool ok { false };
 
+    RImageConstraints consts {};
+    consts.allocator = ream->mainDevice();
+    consts.caps[ream->mainDevice()] = RImageCap_Dst;
+
     for (const auto *fmt : formats)
     {
         ok = true;
 
+        consts.readFormats.clear();
+        consts.readFormats.emplace(fmt->format());
+
         for (size_t i = 0; i < n; i++)
         {
-            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, RStorageType::GBM, ream->mainDevice());
+            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, &consts);
 
             if (!images[i])
             {
@@ -752,28 +695,21 @@ bool SRMRenderer::initSwapchainDumb() noexcept
                 break;
             }
 
-            if (!images[i]->readFormats().contains(fmt->format()))
-            {
-                log(CZTrace, CZLN, "The swapchain RImage doesn't support reading {}", i);
-                ok = false;
-                break;
-            }
-
-            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RPassDst, ream->mainDevice()))
-            {
-                log(CZTrace, CZLN, "Missing RPassDst cap {}", i);
-                ok = false;
-                break;
-            }
-
-            if (!images[i]->checkDeviceCap(RImage::DeviceCap::RSKPassDst, ream->mainDevice()))
-            {
-                log(CZTrace, CZLN, "Missing RSKPassDst cap {}", i);
-                ok = false;
-                break;
-            }
-
             dumbBuffers[i] = RDumbBuffer::Make(conn->currentMode()->size(), *fmt, device()->reamDevice());
+
+            if (!dumbBuffers[i])
+            {
+                for (auto format : images[i]->readFormats())
+                {
+                    if (format == fmt->format())
+                        continue;
+
+                    dumbBuffers[i] = RDumbBuffer::Make(conn->currentMode()->size(), {format, {DRM_FORMAT_MOD_LINEAR}}, device()->reamDevice());
+
+                    if (dumbBuffers[i])
+                        break;
+                }
+            }
 
             if (!dumbBuffers[i])
             {
@@ -1217,7 +1153,7 @@ void SRMRenderer::logInfo() noexcept
         SRMLog(CZInfo, "DRM API: {}", device()->clientCaps().Atomic ? "Atomic" : "Legacy");
         SRMLog(CZInfo, "Device: {} - {}", device()->nodeName(), device()->reamDevice()->drmDriverName());
         SRMLog(CZInfo, "Renderer: {} - {}", ream->mainDevice()->srmDevice()->nodeName(), ream->mainDevice()->drmDriverName());
-        SRMLog(CZInfo, "Surface Format: {} - {}", RDRMFormat::FormatName(images[0]->formatInfo().format), RDRMFormat::ModifierName(images[0]->modifiers()[0]));
+        SRMLog(CZInfo, "Surface Format: {} - {}", RDRMFormat::FormatName(images[0]->formatInfo().format), RDRMFormat::ModifierName(images[0]->modifier()));
         SRMLog(CZInfo, "Buffering: {}", images.size());
         SRMLog(CZInfo, "Cursor Plane: {}", cursor[0].image != nullptr);
         SRMLog(CZInfo, "-------------------------------------------------------\n");

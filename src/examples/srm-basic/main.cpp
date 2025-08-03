@@ -22,7 +22,11 @@ extern "C" {
 using namespace CZ;
 
 static libseat *seat {};
-static std::shared_ptr<RImage> svg;
+static std::shared_ptr<RImage> imgNorm;
+static std::shared_ptr<RImage> img90;
+static std::shared_ptr<RImage> img180;
+static std::shared_ptr<RImage> img270;
+
 
 static int openRestricted(const char *path, int flags, void *userData)
 {
@@ -82,6 +86,11 @@ static const SRMConnectorInterface connIface
         float phase { 0.5f * (std::sin(dx) + 1.f) };
         auto image { conn->currentImage() };
         auto surface { RSurface::WrapImage(image) };
+        surface->setGeometry(
+            SkRect::MakeWH(image->size().width(), image->size().height()),
+            SkRect::MakeWH(image->size().width(), image->size().height()),
+            CZTransform::Normal);
+
         SkRegion clip { SkIRect::MakeSize(image->size()) };
 
         conn->setCursorPos(SkIPoint::Make(phase * 2000, phase * 2000));
@@ -92,6 +101,7 @@ static const SRMConnectorInterface connIface
 
         if (dx > 10.f)
         {
+            /*
             auto pass { surface->beginSKPass(image->allocator()) };
             assert(pass.isValid());
             pass()->save();
@@ -100,10 +110,9 @@ static const SRMConnectorInterface connIface
             pass()->clear(SK_ColorWHITE);
             pass()->clipRegion(clip);
             auto skImage { svg->skImage(image->allocator()) };
-            for (int y = 0; y < 10; y++)
-                for (int x = 0; x < 10; x++)
-                    pass()->drawImage(skImage.get(), 1000 * phase + 250 * x, 250 * y, SkSamplingOptions(SkFilterMode::kLinear), &p);
-            pass()->restore();
+
+            pass()->drawImage(skImage.get(), 1000 * phase + 250, 250, SkSamplingOptions(SkFilterMode::kLinear), &p);
+            pass()->restore();*/
         }
         else
         {
@@ -114,17 +123,37 @@ static const SRMConnectorInterface connIface
             pass()->setBlendMode(RBlendMode::SrcOver);
 
             RDrawImageInfo info {};
-            info.image = svg;
-            info.src = SkRect::Make(info.image->size());
-            info.dst = SkIRect::MakeSize(info.image->size());
-            for (int y = 0; y < 10; y++)
-            {
-                for (int x = 0; x < 10; x++)
-                {
-                    info.dst.offsetTo(1000 * phase + 250 * x, 250 * y);
-                    pass()->drawImage(info, &clip);
-                }
-            }
+            info.image = imgNorm;
+            info.srcScale = 2.f;
+            info.srcTransform = CZTransform::Normal;
+            info.src = SkRect::MakeXYWH(100, 200, 40, 50);
+            info.dst = SkIRect::MakeXYWH(100, 100, 512, 512);
+            pass()->drawImage(info);
+
+            info.image = imgNorm;
+            info.srcTransform = CZTransform::Normal;
+            info.src = SkRect::MakeXYWH(0, 0, 1024, 1024);
+            info.dst = SkIRect::MakeXYWH(1800, 100, 1024, 1024);
+            pass()->drawImage(info);
+
+            info.image = img90;
+            info.srcTransform = CZTransform::Rotated90;
+            info.src = SkRect::MakeXYWH(100, 200, 40, 50);
+            info.dst = SkIRect::MakeXYWH(700, 100, 512, 512);
+            pass()->drawImage(info);
+
+            info.image = img180;
+            info.srcTransform = CZTransform::Rotated180;
+            info.src = SkRect::MakeXYWH(100, 200, 40, 50);
+            info.dst = SkIRect::MakeXYWH(100, 700, 512, 512);
+            pass()->drawImage(info);
+
+            info.image = img270;
+            info.srcTransform = CZTransform::Rotated270;
+            info.src = SkRect::MakeXYWH(100, 200, 40, 50);
+            info.dst = SkIRect::MakeXYWH(700, 700, 512, 512);
+            pass()->drawImage(info);
+
             pass()->restore();
         }
 
@@ -161,7 +190,10 @@ int main(void)
     }
 
     RDRMFormat fmt {DRM_FORMAT_ARGB8888 , { DRM_FORMAT_MOD_LINEAR }};
-    svg = RImage::LoadFile("/home/eduardo/Descargas/svgviewer-output.svg", fmt, {256, 256});
+    imgNorm = RImage::LoadFile("/home/eduardo/Escritorio/atlas.png", fmt);
+    img90 = RImage::LoadFile("/home/eduardo/Escritorio/atlas90.png", fmt);
+    img180 = RImage::LoadFile("/home/eduardo/Escritorio/atlas180.png", fmt);
+    img270 = RImage::LoadFile("/home/eduardo/Escritorio/atlas270.png", fmt);
 
     for (auto *dev : srm->devices())
     {
@@ -179,13 +211,16 @@ int main(void)
 
     //while (srm->dispatch(-1) >= 0) { };
 
-    usleep(10000000);
+    usleep(4000000);
 
     for (auto *dev : srm->devices())
         for (auto *conn : dev->connectors())
                 conn->uninitialize();
 
-    svg.reset();
+    imgNorm.reset();
+    img90.reset();
+    img180.reset();
+    img270.reset();
 
     return 0;
 }

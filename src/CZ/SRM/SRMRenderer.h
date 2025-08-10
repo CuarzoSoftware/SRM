@@ -22,7 +22,8 @@ public:
         CHCursorPosition   = 1 << 1,
         CHCursorBuffer     = 1 << 2,
         CHGammaLUT         = 1 << 3,
-        CHContentType      = 1 << 4
+        CHContentType      = 1 << 4,
+        CHPrimaryPlaneFb   = 1 << 5
     };
 
     enum Strategy
@@ -50,6 +51,7 @@ public:
     static std::unique_ptr<SRMRenderer> Make(SRMConnector *connector, const SRMConnectorInterface *iface, void *ifaceData) noexcept;
     SRMRenderer(SRMConnector *connector, const SRMConnectorInterface *iface, void *ifaceData) noexcept;
     ~SRMRenderer() noexcept;
+    void initContentType() noexcept;
     void initGamma() noexcept;
     void initCursor() noexcept;
     bool initRenderThread() noexcept;
@@ -67,10 +69,9 @@ public:
     bool flipPagePrime() noexcept;
     bool flipPageDumb() noexcept;
 
-
     bool rendWaitForRepaint() noexcept;
     bool rendWaitPageFlip(int iterLimit) noexcept;
-    void presentFrame(UInt32 fb) noexcept;
+    void commit() noexcept;
 
     bool rendRender() noexcept;
     bool rendUpdateMode() noexcept;
@@ -80,8 +81,9 @@ public:
 
     void updateAgeAndIndex() noexcept;
 
-    void rendAppendAtomicChanges(std::shared_ptr<SRMAtomicRequest> req, bool clearFlags) noexcept;
-    void atomicAppendPlane(std::shared_ptr<SRMAtomicRequest> req) noexcept;
+    // Appends AtomicChange flags to req
+    void atomicReqAppendChanges(std::shared_ptr<SRMAtomicRequest> req) noexcept;
+    void atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> req) noexcept;
 
     void logInfo() noexcept;
 
@@ -117,12 +119,11 @@ public:
     bool pendingRepaint { false };
     bool rendering { false };
 
-    std::vector<drm_color_lut> m_gamma;
+    std::shared_ptr<const RGammaLUT> gammaLUT;
     std::shared_ptr<SRMPropertyBlob> gammaBlob;
     std::shared_ptr<SRMPropertyBlob> modeBlob;
 
     drmEventContext drmEventCtx {};
-    UInt32 lastFb {};
     UInt32 imageAge {};
     UInt32 imageI {};
     int fenceFd { -1 };

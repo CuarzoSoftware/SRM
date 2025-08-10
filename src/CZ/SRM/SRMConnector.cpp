@@ -9,6 +9,7 @@
 #include <CZ/Utils/CZVectorUtils.h>
 #include <CZ/Ream/GBM/RGBMBo.h>
 #include <CZ/Ream/RImage.h>
+#include <CZ/Ream/RGammaLUT.h>
 #include <xf86drmMode.h>
 #include <xf86drm.h>
 #include <cstring>
@@ -233,7 +234,7 @@ bool SRMConnector::unlockRenderer(bool repaint) noexcept
     if (!m_rend)
         return false;
 
-    m_rend->pendingRepaint = repaint;
+    m_rend->pendingRepaint |= repaint;
     m_rend->semaphore.release();
     return true;
 }
@@ -609,9 +610,106 @@ std::shared_ptr<RImage> SRMConnector::currentImage() const noexcept
     return m_rend ? m_rend->images[m_rend->imageI] : nullptr;
 }
 
-void SRMConnector::setContentType(RContentType type) noexcept
+UInt64 SRMConnector::gammaSize() const noexcept
 {
+    return m_rend ? m_rend->crtc->gammaSize() : 0;
+}
 
+std::shared_ptr<const RGammaLUT> SRMConnector::gammaLUT() const noexcept
+{
+    return m_rend ? m_rend->gammaLUT : nullptr;
+}
+
+bool SRMConnector::setGammaLUT(std::shared_ptr<const RGammaLUT> gammaLUT) noexcept
+{
+    if (!m_rend)
+    {
+        log(CZError, CZLN, "Failed to set gamma LUT (uninitialized connector)");
+        return false;
+    }
+
+    if (gammaSize() == 0)
+    {
+        log(CZError, CZLN, "Failed to set gamma LUT (unsupported)");
+        return false;
+    }
+
+    if (gammaLUT)
+    {
+        if (gammaLUT->size() != gammaSize())
+        {
+            log(CZError, CZLN, "Invalid gamma LUT size {} != {}", gammaLUT->size(), gammaSize());
+            return false;
+        }
+    }
+    else
+        gammaLUT = RGammaLUT::MakeFilled(gammaSize(), 1, 1, 1);
+
+
+    if (device()->clientCaps().Atomic)
+    {
+        std::lock_guard<std::recursive_mutex> lock { m_rend->propsMutex };
+
+        const auto R { gammaLUT->red() };
+        const auto G { gammaLUT->green() };
+        const auto B { gammaLUT->blue() };
+
+        std::vector<drm_color_lut> table;
+        table.resize(gammaLUT->size());
+
+        for (size_t i = 0; i < gammaLUT->size(); i++)
+        {
+            table[i].red = R[i];
+            table[i].green = G[i];
+            table[i].blue = B[i];
+        }
+
+        m_rend->gammaBlob = SRMPropertyBlob::Make(device(), table.data(), table.size() * sizeof(*table.data()));
+
+        if (!m_rend->gammaBlob)
+        {
+            log(CZError, CZLN, "Failed to create property blob for gamma LUT");
+            return false;
+        }
+
+        m_rend->atomicChanges |= SRMRenderer::CHGammaLUT;
+        m_rend->gammaLUT = gammaLUT;
+        unlockRenderer(false);
+    }
+    else
+    {
+        if (drmModeCrtcSetGamma(device()->fd(), m_rend->crtc->id(), gammaLUT->size(), gammaLUT->red().data(), gammaLUT->green().data(), gammaLUT->blue().data()))
+        {
+            log(CZError, CZLN, "Failed to set gamma LUT (drmModeCrtcSetGamma)");
+            return false;
+        }
+
+        m_rend->gammaLUT = gammaLUT;
+    }
+
+    return true;
+}
+
+void SRMConnector::setContentType(RContentType type, bool force) noexcept
+{
+    if (!m_propIDs.content_type || !m_rend)
+    {
+        m_contentType = type;
+        return;
+    }
+
+    if (!force && m_contentType == type)
+        return;
+
+    std::lock_guard<std::recursive_mutex> lock { m_rend->propsMutex };
+
+    if (device()->clientCaps().Atomic)
+    {
+        m_rend->atomicChanges |= SRMRenderer::CHContentType;
+        unlockRenderer(false);
+    }
+    else
+        drmModeConnectorSetProperty(device()->fd(), id(), m_propIDs.content_type, static_cast<UInt64>(type));
 }
 
 

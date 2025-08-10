@@ -66,8 +66,6 @@ std::unique_ptr<SRMRenderer> SRMRenderer::Make(SRMConnector *conn, const SRMConn
             bestCursorPlane->m_currentConnector = conn;
     }
 
-    rend->initGamma();
-    rend->initCursor();
     return rend;
 }
 
@@ -101,58 +99,14 @@ SRMRenderer::~SRMRenderer() noexcept
     conn->setState(SRMConnector::Uninitialized);
 }
 
+void SRMRenderer::initContentType() noexcept
+{
+    conn->setContentType(conn->contentType(), true);
+}
+
 void SRMRenderer::initGamma() noexcept
 {
-    const UInt64 gammaSize { crtc->gammaSize() };
-
-    if (gammaSize > 0)
-    {
-        log(CZInfo, "Gamma LUT Size: {}", gammaSize);
-
-        m_gamma.resize(gammaSize);
-
-        /* Apply linear gamma */
-
-        Float64 n = gammaSize - 1.0;
-        Float64 val;
-
-        if (device()->clientCaps().Atomic)
-        {
-            for (UInt32 i = 0; i < gammaSize; i++)
-            {
-                val = (Float64)i / n;
-                m_gamma[i].red = m_gamma[i].green = m_gamma[i].blue = (UInt16)(UINT16_MAX * val);
-            }
-
-            atomicChanges.add(CHGammaLUT);
-        }
-        else
-        {
-            UInt16 *r = (UInt16*)m_gamma.data();
-            UInt16 *g = r + gammaSize;
-            UInt16 *b = g + gammaSize;
-
-            for (UInt32 i = 0; i < gammaSize; i++)
-            {
-                val = (Float64)i / n;
-                r[i] = g[i] = b[i] = (UInt16)(UINT16_MAX * val);
-            }
-
-            if (drmModeCrtcSetGamma(device()->fd(),
-                                    crtc->id(),
-                                    (UInt32)gammaSize,
-                                    r,
-                                    g,
-                                    b))
-            {
-                logLegacy(CZError, CZLN, "Failed to set gamma LUT");
-            }
-        }
-    }
-    else
-    {
-        log(CZInfo, "Gamma LUT not supported");
-    }
+    conn->setGammaLUT(nullptr);
 }
 
 void SRMRenderer::initCursor() noexcept
@@ -298,7 +252,7 @@ bool SRMRenderer::initRenderThread() noexcept
                 if (pendingRepaint)
                 {
                     pendingRepaint = false;
-
+                    atomicChanges.add(CHPrimaryPlaneFb);
                     rendering = true;
                     rendRender();
                     rendering = false;
@@ -308,7 +262,7 @@ bool SRMRenderer::initRenderThread() noexcept
                 }
                 else if (atomicChanges)
                 {
-                    presentFrame(lastFb);
+                    commit();
                 }
             }
 
@@ -359,6 +313,9 @@ bool SRMRenderer::initRenderThread() noexcept
 
 bool SRMRenderer::rendInit() noexcept
 {
+    initContentType();
+    initGamma();
+    initCursor();
     return initSwapchain() && rendInitCrtc();
 }
 
@@ -379,7 +336,7 @@ bool SRMRenderer::rendInitCrtc() noexcept
         req->addProperty(conn->id(), conn->m_propIDs.CRTC_ID, crtc->id());
         req->addProperty(conn->id(), conn->m_propIDs.link_status, DRM_MODE_LINK_STATUS_GOOD);
         auto prevCursorIndex { cursorI };
-        rendAppendAtomicChanges(req, false);
+        atomicReqAppendChanges(req);
         ret = req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
 
         if (ret)
@@ -747,7 +704,7 @@ bool SRMRenderer::flipPage() noexcept
         break;
     }
 
-    presentFrame(fbs[imageI]->id());
+    commit();
     iface->pageFlipped(conn, ifaceData);
     return true;
 }
@@ -875,15 +832,13 @@ bool SRMRenderer::rendWaitPageFlip(int iterLimit) noexcept
     return true;
 }
 
-void SRMRenderer::presentFrame(UInt32 fb) noexcept
+void SRMRenderer::commit() noexcept
 {
     int ret { 0 };
     const auto buffersCount { images.size() };
 
     if (pendingPageFlip || buffersCount == 1 || buffersCount > 2)
         rendWaitPageFlip(-1);
-
-    lastFb = fb;
 
     if (device()->clientCaps().Atomic)
     {
@@ -893,12 +848,15 @@ void SRMRenderer::presentFrame(UInt32 fb) noexcept
         {
             auto req { SRMAtomicRequest::Make(device()) };
             const auto prevCursorIndex { cursorI };
-            rendAppendAtomicChanges(req, false);
-            atomicAppendPlane(req);
+            atomicReqAppendChanges(req);
+
             ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, this, false);
 
-            if (ret && cursorPlane)
-                cursorI = prevCursorIndex;
+            if (ret)
+            {
+                if (cursorPlane)
+                    cursorI = prevCursorIndex;
+            }
             else
                 atomicChanges = 0;
 
@@ -906,23 +864,25 @@ void SRMRenderer::presentFrame(UInt32 fb) noexcept
         }
         else
         {
-            if (atomicChanges == 0)
-            {
-                auto req { SRMAtomicRequest::Make(device()) };
-                atomicAppendPlane(req);
-                ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK, this, false);
-            }
+            const bool primaryPlaneCommitOnly { atomicChanges.get() == CHPrimaryPlaneFb };
+            auto req { SRMAtomicRequest::Make(device()) };
+            atomicReqAppendChanges(req);
 
-            if (atomicChanges || ret == -22)
+            // Sadly, we can only disable vsync if req only contains the primary plane
+            if (primaryPlaneCommitOnly)
+                ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK, this, false);
+
+            // If req contains more changes or failed, fallback to vsync
+            if (!primaryPlaneCommitOnly || ret == -22)
             {
-                auto req { SRMAtomicRequest::Make(device()) };
                 const auto prevCursorIndex { cursorI };
-                rendAppendAtomicChanges(req, false);
-                atomicAppendPlane(req);
                 ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, this, false);
 
-                if (ret && cursorPlane)
-                    cursorI = prevCursorIndex;
+                if (ret)
+                {
+                    if (cursorPlane)
+                        cursorI = prevCursorIndex;
+                }
                 else
                     atomicChanges = 0;
             }
@@ -935,14 +895,16 @@ void SRMRenderer::presentFrame(UInt32 fb) noexcept
     }
     else
     {
+        const auto primaryPlaneFb { fbs[imageI]->id() };
+
         if (currentVSync)
-            ret = drmModePageFlip(device()->fd(), crtc->id(), lastFb, DRM_MODE_PAGE_FLIP_EVENT, this);
+            ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, this);
         else
         {
-            ret = drmModePageFlip(device()->fd(), crtc->id(), lastFb, DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_PAGE_FLIP_EVENT, this);
+            ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_PAGE_FLIP_EVENT, this);
 
             if (ret == -22)
-                ret = drmModePageFlip(device()->fd(), crtc->id(), lastFb, DRM_MODE_PAGE_FLIP_EVENT, this);
+                ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, this);
         }
 
         pendingPageFlip = true;
@@ -1012,17 +974,23 @@ void SRMRenderer::updateAgeAndIndex() noexcept
         imageAge++;
 }
 
-void SRMRenderer::rendAppendAtomicChanges(std::shared_ptr<SRMAtomicRequest> req, bool clearFlags) noexcept
+void SRMRenderer::atomicReqAppendChanges(std::shared_ptr<SRMAtomicRequest> req) noexcept
 {
+    if (atomicChanges.has(CHPrimaryPlaneFb))
+        atomicReqAppendPrimaryPlane(req);
+
+    if (atomicChanges.has(CHContentType))
+        req->addProperty(conn->id(), conn->m_propIDs.content_type, static_cast<UInt64>(conn->contentType()));
+
+    if (atomicChanges.has(CHGammaLUT))
+        req->addProperty(crtc->id(), crtc->m_propIDs.GAMMA_LUT, gammaBlob ? gammaBlob->id() : 0);
+
     if (cursorAPI == CursorAPI::Atomic)
     {
         bool updatedFB { false };
 
         if (atomicChanges.has(CHCursorBuffer))
         {
-            if (clearFlags)
-                atomicChanges.remove(CHCursorBuffer);
-
             cursorI = 1 - cursorI;
 
             if (cursorVisible)
@@ -1036,9 +1004,6 @@ void SRMRenderer::rendAppendAtomicChanges(std::shared_ptr<SRMAtomicRequest> req,
 
         if (atomicChanges.has(CHCursorVisibility))
         {
-            if (clearFlags)
-                atomicChanges.remove(CHCursorVisibility);
-
             if (cursorVisible)
             {
                 updatedVisibility = 1;
@@ -1065,65 +1030,16 @@ void SRMRenderer::rendAppendAtomicChanges(std::shared_ptr<SRMAtomicRequest> req,
 
         if (atomicChanges.has(CHCursorPosition))
         {
-            if (clearFlags)
-                atomicChanges.has(CHCursorPosition);
-
             if (!updatedVisibility)
             {
                 req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_X, cursorPos.x());
                 req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_Y, cursorPos.y());
             }
         }
-    }
-
-    /*
-    if (connector->atomicChanges & SRM_ATOMIC_CHANGE_GAMMA_LUT)
-    {
-        if (clearFlags)
-            connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_GAMMA_LUT;
-
-        if (connector->gammaBlobId)
-        {
-            drmModeDestroyPropertyBlob(connector->device->fd, connector->gammaBlobId);
-            connector->gammaBlobId = 0;
-        }
-
-        if (drmModeCreatePropertyBlob(connector->device->fd,
-                                      connector->gamma,
-                                      srmCrtcGetGammaSize(connector->currentCrtc) * sizeof(*connector->gamma),
-                                      &connector->gammaBlobId))
-        {
-            connector->gammaBlobId = 0;
-            SRMError("[%s] [%s] Failed to create gamma lut blob.", connector->device->shortName, connector->name);
-        }
-        else
-        {
-            drmModeAtomicAddProperty(req,
-                                     connector->currentCrtc->id,
-                                     connector->currentCrtc->propIDs.GAMMA_LUT,
-                                     connector->gammaBlobId);
-        }
-    }
-
-    if (connector->atomicChanges & SRM_ATOMIC_CHANGE_CONTENT_TYPE)
-    {
-        if (clearFlags)
-            connector->atomicChanges &= ~SRM_ATOMIC_CHANGE_CONTENT_TYPE;
-
-        if (connector->propIDs.content_type)
-            drmModeAtomicAddProperty(req,
-                                     connector->id,
-                                     connector->propIDs.content_type,
-                                     connector->contentType);
-    }
-
-    drmModeAtomicAddProperty(req,
-                             connector->currentPrimaryPlane->id,
-                             connector->currentPrimaryPlane->propIDs.IN_FENCE_FD,
-                             connector->fenceFD); */
+    } 
 }
 
-void SRMRenderer::atomicAppendPlane(std::shared_ptr<SRMAtomicRequest> req) noexcept
+void SRMRenderer::atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> req) noexcept
 {
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.FB_ID, fbs[imageI]->id());
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_ID, crtc->id());

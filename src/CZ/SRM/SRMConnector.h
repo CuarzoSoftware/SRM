@@ -472,7 +472,9 @@ public:
      * @return On success, returns 1. On failure (uninitialized connector or no gamma correction support),
      *         returns 0.
      */
-    bool setGamma(UInt16 *table) noexcept;
+    bool setGammaLUT(std::shared_ptr<const RGammaLUT> gammaLUT) noexcept;
+
+    std::shared_ptr<const RGammaLUT> gammaLUT() const noexcept;
 
     /**
      * @brief Checks if the driver supports the ability to turn off vsync.
@@ -574,7 +576,7 @@ public:
      * @param connector A pointer to the @ref SRMConnector instance.
      * @param contentType The content type hint.
      */
-    void setContentType(RContentType type) noexcept;
+    void setContentType(RContentType type, bool force = false) noexcept;
 
     /**
      * @brief Gets the content type hint.
@@ -583,7 +585,7 @@ public:
      *
      * @param connector A pointer to the @ref SRMConnector instance.
      */
-    RContentType contentType() const noexcept;
+    RContentType contentType() const noexcept { return m_contentType; }
 
     /**
      * @brief Sets a custom scanout buffer for the primary plane.

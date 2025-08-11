@@ -241,7 +241,7 @@ bool SRMRenderer::initRenderThread() noexcept
         {
             currentVSync = pendingVSync;
 
-            if (!rendWaitForRepaint())
+            if (!waitForRepaintRequest())
                 return;
 
             const std::lock_guard<std::recursive_mutex> lockState { conn->m_stateMutex };
@@ -252,23 +252,22 @@ bool SRMRenderer::initRenderThread() noexcept
                 if (pendingRepaint)
                 {
                     pendingRepaint = false;
-                    atomicChanges.add(CHPrimaryPlaneFb);
                     rendering = true;
                     rendRender();
                     rendering = false;
                     flipPage();
-                    updateAgeAndIndex();
+                    swapchain.advanceAge();
                     continue;
                 }
-                else if (atomicChanges)
+                else if (atomicChanges && currentFb)
                 {
-                    commit();
+                    commit(currentFb);
                 }
             }
 
             if (state == SRMConnector::ChangingMode)
             {
-                imageAge = 0;
+                swapchain.resetAge();
 
                 if (rendUpdateMode())
                 {
@@ -293,7 +292,7 @@ bool SRMRenderer::initRenderThread() noexcept
             else if (state == SRMConnector::Resuming)
             {
                 conn->setState(SRMConnector::Initialized);
-                imageAge = 0;
+                swapchain.resetAge();
                 rendResume();
                 usleep(1000);
                 continue;
@@ -336,7 +335,7 @@ bool SRMRenderer::rendInitCrtc() noexcept
         req->addProperty(conn->id(), conn->m_propIDs.CRTC_ID, crtc->id());
         req->addProperty(conn->id(), conn->m_propIDs.link_status, DRM_MODE_LINK_STATUS_GOOD);
         auto prevCursorIndex { cursorI };
-        atomicReqAppendChanges(req);
+        atomicReqAppendChanges(req, nullptr);
         ret = req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
 
         if (ret)
@@ -366,7 +365,7 @@ bool SRMRenderer::rendInitCrtc() noexcept
 
         ret = drmModeSetCrtc(device()->fd(),
                              crtc->id(),
-                             fbs[imageI]->id(),
+                             swapchain.fb()->id(),
                              0,
                              0,
                              &conn->m_id,
@@ -434,9 +433,9 @@ bool SRMRenderer::initSwapchainSelf() noexcept
         if (fmt.format() != DRM_FORMAT_XRGB8888 && fmt.format() != DRM_FORMAT_XBGR8888)
             formats.emplace_back(&fmt);
 
-    images.resize(3);
-    fbs.resize(images.size());
-    surfaces.resize(images.size());
+    swapchain.images.resize(swapchain.n);
+    swapchain.fbs.resize(swapchain.n);
+    swapchain.surfaces.resize(swapchain.n);
 
     bool ok { false };
 
@@ -448,19 +447,19 @@ bool SRMRenderer::initSwapchainSelf() noexcept
     {
         ok = true;
 
-        for (size_t i = 0; i < images.size(); i++)
+        for (size_t i = 0; i < swapchain.n; i++)
         {
-            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, &consts);
+            swapchain.images[i] = RImage::Make(conn->currentMode()->size(), *fmt, &consts);
 
-            if (!images[i])
+            if (!swapchain.images[i])
             {
-                log(CZTrace, CZLN, "Failed to create swapchain RImage N° {}/{}", i + 1, images.size());
+                log(CZTrace, CZLN, "Failed to create swapchain RImage N° {}/{}", i + 1, swapchain.n);
                 ok = false;
                 break;
             }
 
-            fbs[i] = images[i]->drmFb(device()->reamDevice());
-            surfaces[i] = RSurface::WrapImage(images[i]);
+            swapchain.fbs[i] = swapchain.images[i]->drmFb(device()->reamDevice());
+            swapchain.surfaces[i] = RSurface::WrapImage(swapchain.images[i]);
         }
 
         if (ok)
@@ -501,10 +500,9 @@ bool SRMRenderer::initSwapchainPrime() noexcept
         if (fmt.format() != DRM_FORMAT_XRGB8888 && fmt.format() != DRM_FORMAT_XBGR8888)
             formats.emplace_back(&fmt);
 
-    const size_t n { 3 };
-    fbs.resize(n);
-    primeImages.resize(n);
-    primeSurfaces.resize(n);
+    swapchain.fbs.resize(swapchain.n);
+    swapchain.primeImages.resize(swapchain.n);
+    swapchain.primeSurfaces.resize(swapchain.n);
 
     bool ok { false };
 
@@ -516,19 +514,19 @@ bool SRMRenderer::initSwapchainPrime() noexcept
     {
         ok = true;
 
-        for (size_t i = 0; i < n; i++)
+        for (size_t i = 0; i < swapchain.n; i++)
         {
-            primeImages[i] = RImage::Make(conn->currentMode()->size(), *fmt, &primeConsts);
+            swapchain.primeImages[i] = RImage::Make(conn->currentMode()->size(), *fmt, &primeConsts);
 
-            if (!primeImages[i])
+            if (!swapchain.primeImages[i])
             {
-                log(CZTrace, CZLN, "Failed to create swapchain RImage {}/{}", i+1, primeImages.size());
+                log(CZTrace, CZLN, "Failed to create swapchain RImage {}/{}", i+1, swapchain.n);
                 ok = false;
                 break;
             }
 
-            fbs[i] = primeImages[i]->drmFb(device()->reamDevice());
-            primeSurfaces[i] = RSurface::WrapImage(primeImages[i]);
+            swapchain.fbs[i] = swapchain.primeImages[i]->drmFb(device()->reamDevice());
+            swapchain.primeSurfaces[i] = RSurface::WrapImage(swapchain.primeImages[i]);
         }
 
         if (ok)
@@ -538,8 +536,8 @@ bool SRMRenderer::initSwapchainPrime() noexcept
     if (!ok)
         return false;
 
-    images.resize(n);
-    surfaces.resize(n);
+    swapchain.images.resize(swapchain.n);
+    swapchain.surfaces.resize(swapchain.n);
 
     formats.clear();
     formats.reserve(textureFormats.formats().size());
@@ -565,18 +563,18 @@ bool SRMRenderer::initSwapchainPrime() noexcept
     {
         ok = true;
 
-        for (size_t i = 0; i < n; i++)
+        for (size_t i = 0; i < swapchain.n; i++)
         {
-            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, &consts);
+            swapchain.images[i] = RImage::Make(conn->currentMode()->size(), *fmt, &consts);
 
-            if (!images[i])
+            if (!swapchain.images[i])
             {
-                log(CZTrace, CZLN, "Failed to create PRIME swapchain RImage {}/{}", i+1, images.size());
+                log(CZTrace, CZLN, "Failed to create PRIME swapchain RImage {}/{}", i+1, swapchain.n);
                 ok = false;
                 break;
             }
 
-            surfaces[i] = RSurface::WrapImage(images[i]);
+            swapchain.surfaces[i] = RSurface::WrapImage(swapchain.images[i]);
         }
 
         if (ok)
@@ -623,10 +621,9 @@ bool SRMRenderer::initSwapchainDumb() noexcept
         if (!preferred.contains(fmt.format()))
             formats.emplace_back(&fmt);
 
-    const size_t n { 3 };
-    fbs.resize(n);
-    dumbBuffers.resize(n);
-    images.resize(n);
+    swapchain.fbs.resize(swapchain.n);
+    swapchain.dumbBuffers.resize(swapchain.n);
+    swapchain.images.resize(swapchain.n);
 
     bool ok { false };
 
@@ -641,41 +638,41 @@ bool SRMRenderer::initSwapchainDumb() noexcept
         consts.readFormats.clear();
         consts.readFormats.emplace(fmt->format());
 
-        for (size_t i = 0; i < n; i++)
+        for (size_t i = 0; i < swapchain.n; i++)
         {
-            images[i] = RImage::Make(conn->currentMode()->size(), *fmt, &consts);
+            swapchain.images[i] = RImage::Make(conn->currentMode()->size(), *fmt, &consts);
 
-            if (!images[i])
+            if (!swapchain.images[i])
             {
                 log(CZTrace, CZLN, "Failed to create swapchain RImage {}", i);
                 ok = false;
                 break;
             }
 
-            dumbBuffers[i] = RDumbBuffer::Make(conn->currentMode()->size(), *fmt, device()->reamDevice());
+            swapchain.dumbBuffers[i] = RDumbBuffer::Make(conn->currentMode()->size(), *fmt, device()->reamDevice());
 
-            if (!dumbBuffers[i])
+            if (!swapchain.dumbBuffers[i])
             {
-                for (auto format : images[i]->readFormats())
+                for (auto format : swapchain.images[i]->readFormats())
                 {
                     if (format == fmt->format())
                         continue;
 
-                    dumbBuffers[i] = RDumbBuffer::Make(conn->currentMode()->size(), {format, {DRM_FORMAT_MOD_LINEAR}}, device()->reamDevice());
+                    swapchain.dumbBuffers[i] = RDumbBuffer::Make(conn->currentMode()->size(), {format, {DRM_FORMAT_MOD_LINEAR}}, device()->reamDevice());
 
-                    if (dumbBuffers[i])
+                    if (swapchain.dumbBuffers[i])
                         break;
                 }
             }
 
-            if (!dumbBuffers[i])
+            if (!swapchain.dumbBuffers[i])
             {
                 log(CZTrace, CZLN, "Failed to create RDumbBufer {}", i);
                 ok = false;
                 break;
             }
 
-            fbs[i] = dumbBuffers[i]->fb();
+            swapchain.fbs[i] = swapchain.dumbBuffers[i]->fb();
         }
 
         if (ok)
@@ -704,14 +701,14 @@ bool SRMRenderer::flipPage() noexcept
         break;
     }
 
-    commit();
+    commit(swapchain.fb());
     iface->pageFlipped(conn, ifaceData);
     return true;
 }
 
 bool SRMRenderer::flipPageSelf() noexcept
 {
-    if (primaryPlane->m_propIDs.IN_FENCE_FD)
+    if (device()->clientCaps().Atomic && primaryPlane->m_propIDs.IN_FENCE_FD)
     {
         if (fenceFd >= 0)
         {
@@ -719,10 +716,10 @@ bool SRMRenderer::flipPageSelf() noexcept
             fenceFd = -1;
         }
 
-        if (images[imageI]->writeSync())
+        if (swapchain.image()->writeSync())
         {
-            images[imageI]->writeSync()->gpuWait(device()->reamDevice());
-            fenceFd = images[imageI]->writeSync()->fd();
+            swapchain.image()->writeSync()->gpuWait(device()->reamDevice());
+            fenceFd = swapchain.image()->writeSync()->fd();
         }
     }
 
@@ -734,10 +731,10 @@ bool SRMRenderer::flipPageSelf() noexcept
 
 bool SRMRenderer::flipPagePrime() noexcept
 {
-    auto srcImage { images[imageI] };
+    auto srcImage { swapchain.image() };
     srcImage->allocator()->wait();
 
-    auto pass { primeSurfaces[imageI]->beginPass(device()->reamDevice()) };
+    auto pass { swapchain.primeSurface()->beginPass(device()->reamDevice()) };
 
     assert(pass.isValid());
 
@@ -749,9 +746,9 @@ bool SRMRenderer::flipPagePrime() noexcept
     pass()->drawImage(info);
     pass()->endPass();
 
-    auto primeImage { primeImages[imageI] };
+    auto primeImage { swapchain.primeImage() };
 
-    if (primaryPlane->m_propIDs.IN_FENCE_FD)
+    if (device()->clientCaps().Atomic && primaryPlane->m_propIDs.IN_FENCE_FD)
     {
         if (fenceFd >= 0)
         {
@@ -771,16 +768,16 @@ bool SRMRenderer::flipPagePrime() noexcept
 
 bool SRMRenderer::flipPageDumb() noexcept
 {
-    auto dumb { dumbBuffers[imageI] };
+    auto dumb { swapchain.dumbBuffer() };
     RPixelBufferRegion info {};
     info.pixels = dumb->pixels();
     info.stride = dumb->stride();
     info.format = dumb->formatInfo().format;
     info.region.setRect(SkIRect::MakeSize(dumb->size()));
-    return images[imageI]->readPixels(info);
+    return swapchain.image()->readPixels(info);
 }
 
-bool SRMRenderer::rendWaitForRepaint() noexcept
+bool SRMRenderer::waitForRepaintRequest() noexcept
 {
     const bool needsWait { (!pendingRepaint && atomicChanges == 0) || device()->core()->isSuspended() };
 
@@ -796,7 +793,7 @@ bool SRMRenderer::rendWaitForRepaint() noexcept
     {
         stateLock.unlock();
         pendingPageFlip = true;
-        rendWaitPageFlip(3);
+        waitPendingPageFlip(3);
         iface->uninitializeGL(conn, ifaceData);
         rendUnit();
         return false;
@@ -805,7 +802,7 @@ bool SRMRenderer::rendWaitForRepaint() noexcept
     return true;
 }
 
-bool SRMRenderer::rendWaitPageFlip(int iterLimit) noexcept
+bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
 {
     pollfd fds {};
     fds.fd = device()->fd();
@@ -832,13 +829,12 @@ bool SRMRenderer::rendWaitPageFlip(int iterLimit) noexcept
     return true;
 }
 
-void SRMRenderer::commit() noexcept
+void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
 {
     int ret { 0 };
-    const auto buffersCount { images.size() };
 
-    if (pendingPageFlip || buffersCount == 1 || buffersCount > 2)
-        rendWaitPageFlip(-1);
+    if (pendingPageFlip || swapchain.n == 1 || swapchain.n > 2)
+        waitPendingPageFlip(-1);
 
     if (device()->clientCaps().Atomic)
     {
@@ -848,7 +844,7 @@ void SRMRenderer::commit() noexcept
         {
             auto req { SRMAtomicRequest::Make(device()) };
             const auto prevCursorIndex { cursorI };
-            atomicReqAppendChanges(req);
+            atomicReqAppendChanges(req, fb);
 
             ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, this, false);
 
@@ -864,9 +860,9 @@ void SRMRenderer::commit() noexcept
         }
         else
         {
-            const bool primaryPlaneCommitOnly { atomicChanges.get() == CHPrimaryPlaneFb };
+            const bool primaryPlaneCommitOnly { atomicChanges.get() == 0 };
             auto req { SRMAtomicRequest::Make(device()) };
-            atomicReqAppendChanges(req);
+            atomicReqAppendChanges(req, fb);
 
             // Sadly, we can only disable vsync if req only contains the primary plane
             if (primaryPlaneCommitOnly)
@@ -895,7 +891,7 @@ void SRMRenderer::commit() noexcept
     }
     else
     {
-        const auto primaryPlaneFb { fbs[imageI]->id() };
+        const auto primaryPlaneFb { fb ? fb->id() : 0 };
 
         if (currentVSync)
             ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, this);
@@ -931,11 +927,13 @@ void SRMRenderer::commit() noexcept
                     connector->userScanoutBufferRef[0]->scanout.fmt.modifier);
         }*/
     }
+    else
+        currentFb = fb;
 
-    if (/*customScanoutBuffer ||*/ buffersCount == 2 || firstPageFlip)
+    if (/*customScanoutBuffer ||*/ swapchain.n == 2 || firstPageFlip)
     {
         firstPageFlip = false;
-        rendWaitPageFlip(-1);
+        waitPendingPageFlip(-1);
     }
 }
 
@@ -965,19 +963,10 @@ void SRMRenderer::rendUnit() noexcept
     conn->m_state = SRMConnector::Uninitialized;
 }
 
-void SRMRenderer::updateAgeAndIndex() noexcept
+void SRMRenderer::atomicReqAppendChanges(std::shared_ptr<SRMAtomicRequest> req, std::shared_ptr<RDRMFramebuffer> fb) noexcept
 {
-    if (++imageI == images.size())
-        imageI = 0;
-
-    if (imageAge < images.size())
-        imageAge++;
-}
-
-void SRMRenderer::atomicReqAppendChanges(std::shared_ptr<SRMAtomicRequest> req) noexcept
-{
-    if (atomicChanges.has(CHPrimaryPlaneFb))
-        atomicReqAppendPrimaryPlane(req);
+    if (fb)
+        atomicReqAppendPrimaryPlane(req, fb);
 
     if (atomicChanges.has(CHContentType))
         req->addProperty(conn->id(), conn->m_propIDs.content_type, static_cast<UInt64>(conn->contentType()));
@@ -1039,9 +1028,10 @@ void SRMRenderer::atomicReqAppendChanges(std::shared_ptr<SRMAtomicRequest> req) 
     } 
 }
 
-void SRMRenderer::atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> req) noexcept
+void SRMRenderer::atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> req, std::shared_ptr<RDRMFramebuffer> fb) noexcept
 {
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.FB_ID, fbs[imageI]->id());
+    // Note: Both fb and crtc must be set or neither
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.FB_ID, fb ? fb->id() : 0);
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_ID, crtc->id());
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_X, 0);
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_Y, 0);
@@ -1054,6 +1044,14 @@ void SRMRenderer::atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> 
 
     if (primaryPlane->m_propIDs.IN_FENCE_FD)
         req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.IN_FENCE_FD, fenceFd);
+
+    if (fenceFd >= 0)
+    {
+        // Apparently the kernel only uses the fd to access a dma fence but doesn't own it
+        // so by attaching it here, it will be closed when the request is destroyed
+        req->attachFd(fenceFd);
+        fenceFd = -1;
+    }
 }
 
 void SRMRenderer::logInfo() noexcept
@@ -1069,8 +1067,8 @@ void SRMRenderer::logInfo() noexcept
         SRMLog(CZInfo, "DRM API: {}", device()->clientCaps().Atomic ? "Atomic" : "Legacy");
         SRMLog(CZInfo, "Device: {} - {}", device()->nodeName(), device()->reamDevice()->drmDriverName());
         SRMLog(CZInfo, "Renderer: {} - {}", ream->mainDevice()->srmDevice()->nodeName(), ream->mainDevice()->drmDriverName());
-        SRMLog(CZInfo, "Surface Format: {} - {}", RDRMFormat::FormatName(images[0]->formatInfo().format), RDRMFormat::ModifierName(images[0]->modifier()));
-        SRMLog(CZInfo, "Buffering: {}", images.size());
+        SRMLog(CZInfo, "Surface Format: {} - {}", RDRMFormat::FormatName(swapchain.images[0]->formatInfo().format), RDRMFormat::ModifierName(swapchain.images[0]->modifier()));
+        SRMLog(CZInfo, "Buffering: {}", swapchain.n);
         SRMLog(CZInfo, "Cursor Plane: {}", cursor[0].image != nullptr);
         SRMLog(CZInfo, "-------------------------------------------------------\n");
     }

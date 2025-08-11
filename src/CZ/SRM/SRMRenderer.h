@@ -22,8 +22,7 @@ public:
         CHCursorPosition   = 1 << 1,
         CHCursorBuffer     = 1 << 2,
         CHGammaLUT         = 1 << 3,
-        CHContentType      = 1 << 4,
-        CHPrimaryPlaneFb   = 1 << 5
+        CHContentType      = 1 << 4
     };
 
     enum Strategy
@@ -40,6 +39,11 @@ public:
         None,
         Atomic,
         Legacy
+    };
+
+    struct Commit
+    {
+        bool vSync;
     };
 
     static std::string_view StrategyString(Strategy strategy) noexcept
@@ -69,9 +73,9 @@ public:
     bool flipPagePrime() noexcept;
     bool flipPageDumb() noexcept;
 
-    bool rendWaitForRepaint() noexcept;
-    bool rendWaitPageFlip(int iterLimit) noexcept;
-    void commit() noexcept;
+    bool waitForRepaintRequest() noexcept;
+    bool waitPendingPageFlip(int iterLimit) noexcept;
+    void commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept;
 
     bool rendRender() noexcept;
     bool rendUpdateMode() noexcept;
@@ -79,11 +83,9 @@ public:
     bool rendResume() noexcept;
     void rendUnit() noexcept;
 
-    void updateAgeAndIndex() noexcept;
-
     // Appends AtomicChange flags to req
-    void atomicReqAppendChanges(std::shared_ptr<SRMAtomicRequest> req) noexcept;
-    void atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> req) noexcept;
+    void atomicReqAppendChanges(std::shared_ptr<SRMAtomicRequest> req, std::shared_ptr<RDRMFramebuffer> fb) noexcept;
+    void atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> req, std::shared_ptr<RDRMFramebuffer> fb) noexcept;
 
     void logInfo() noexcept;
 
@@ -124,8 +126,6 @@ public:
     std::shared_ptr<SRMPropertyBlob> modeBlob;
 
     drmEventContext drmEventCtx {};
-    UInt32 imageAge {};
-    UInt32 imageI {};
     int fenceFd { -1 };
     std::binary_semaphore semaphore { 0 };
     std::recursive_mutex propsMutex; // Protect stuff like cursor and gamma updates
@@ -135,17 +135,42 @@ public:
     Int32 tearingLimit { -1 };
     std::shared_ptr<RImage> m_userScanoutBuffers[2] {};
 
+    std::shared_ptr<RDRMFramebuffer> currentFb; // Currently being presented
 
     const SRMConnectorInterface *iface;
     void *ifaceData;
-    std::vector<std::shared_ptr<RImage>> images;
-    std::vector<std::shared_ptr<RSurface>> surfaces;
-    std::vector<std::shared_ptr<RDRMFramebuffer>> fbs;
 
-    std::vector<std::shared_ptr<RImage>> primeImages;
-    std::vector<std::shared_ptr<RSurface>> primeSurfaces;
+    struct
+    {
+        UInt32 i {};
+        UInt32 age {};
+        UInt32 n { 2 };
 
-    std::vector<std::shared_ptr<RDumbBuffer>> dumbBuffers;
+        void advanceAge() noexcept
+        {
+            if (++i == n) i = 0;
+            if (age < n) age++;
+        }
+
+        void resetAge() noexcept
+        {
+            i = age = 0;
+        }
+
+        auto fb() const noexcept { return fbs[i]; }
+        auto image() const noexcept { return images[i]; }
+        auto surface() const noexcept { return surfaces[i]; }
+        auto primeImage() const noexcept { return primeImages[i]; }
+        auto primeSurface() const noexcept { return primeSurfaces[i]; }
+        auto dumbBuffer() const noexcept { return dumbBuffers[i]; }
+
+        std::vector<std::shared_ptr<RDRMFramebuffer>> fbs;
+        std::vector<std::shared_ptr<RImage>> images;
+        std::vector<std::shared_ptr<RSurface>> surfaces;
+        std::vector<std::shared_ptr<RImage>> primeImages;
+        std::vector<std::shared_ptr<RSurface>> primeSurfaces;
+        std::vector<std::shared_ptr<RDumbBuffer>> dumbBuffers;
+    } swapchain;
 };
 
 #endif // SRMRENDERER_H

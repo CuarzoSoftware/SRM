@@ -592,22 +592,22 @@ bool SRMConnector::resume() noexcept
 const std::vector<std::shared_ptr<RImage>> &SRMConnector::images() const noexcept
 {
     static const std::vector<std::shared_ptr<RImage>> dummy;
-    return m_rend ? m_rend->images : dummy;
+    return m_rend ? m_rend->swapchain.images : dummy;
 }
 
 UInt32 SRMConnector::imageIndex() const noexcept
 {
-    return m_rend ? m_rend->imageI : 0;
+    return m_rend ? m_rend->swapchain.i : 0;
 }
 
 UInt32 SRMConnector::imageAge() const noexcept
 {
-    return m_rend ? m_rend->imageAge : 0;
+    return m_rend ? m_rend->swapchain.age : 0;
 }
 
 std::shared_ptr<RImage> SRMConnector::currentImage() const noexcept
 {
-    return m_rend ? m_rend->images[m_rend->imageI] : nullptr;
+    return m_rend ? m_rend->swapchain.image() : nullptr;
 }
 
 UInt64 SRMConnector::gammaSize() const noexcept

@@ -23,8 +23,11 @@ int SRMAtomicRequest::commit(UInt32 flags, void *data, bool forceRetry) noexcept
         return drmModeAtomicCommit(device()->fd(), m_req, flags, data);
 
     int ret;
+
+    // EVENT + TEST is not allowed
+    const UInt32 testFlags { (flags & ~DRM_MODE_PAGE_FLIP_EVENT) | DRM_MODE_ATOMIC_TEST_ONLY };
 retry:
-    ret = drmModeAtomicCommit(device()->fd(), m_req, flags | DRM_MODE_ATOMIC_TEST_ONLY, data);
+    ret = drmModeAtomicCommit(device()->fd(), m_req, testFlags, data);
 
     if (ret == -16) // -EBUSY
     {
@@ -40,6 +43,12 @@ void SRMAtomicRequest::attachPropertyBlob(std::shared_ptr<SRMPropertyBlob> blob)
     m_blobs.emplace_back(blob);
 }
 
+void SRMAtomicRequest::attachFd(int fd) noexcept
+{
+    if (fd >= 0)
+        m_fds.emplace(fd);
+}
+
 int SRMAtomicRequest::addProperty(UInt32 objectId, UInt32 propertyId, UInt64 value) noexcept
 {
     return drmModeAtomicAddProperty(m_req, objectId, propertyId, value);
@@ -47,6 +56,8 @@ int SRMAtomicRequest::addProperty(UInt32 objectId, UInt32 propertyId, UInt64 val
 
 SRMAtomicRequest::~SRMAtomicRequest() noexcept
 {
+    for (auto fd : m_fds)
+        close(fd);
 
     drmModeAtomicFree(m_req);
 }

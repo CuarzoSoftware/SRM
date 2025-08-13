@@ -2,13 +2,16 @@
 #define SRMRENDERER_H
 
 #include <CZ/CZLogger.h>
+#include <CZ/CZSpFd.h>
 #include <CZ/skia/core/SkPoint.h>
 #include <CZ/SRM/SRMPropertyBlob.h>
 #include <CZ/Ream/RPresentationTime.h>
 
+#include <future>
 #include <mutex>
 #include <memory>
 #include <semaphore>
+#include <thread>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 #include <gbm.h>
@@ -55,13 +58,15 @@ public:
     static std::unique_ptr<SRMRenderer> Make(SRMConnector *connector, const SRMConnectorInterface *iface, void *ifaceData) noexcept;
     SRMRenderer(SRMConnector *connector, const SRMConnectorInterface *iface, void *ifaceData) noexcept;
     ~SRMRenderer() noexcept;
+
+    bool init() noexcept;
+    void unit() noexcept;
     void initContentType() noexcept;
     void initGamma() noexcept;
     void initCursor() noexcept;
-    bool initRenderThread() noexcept;
+    bool applyCrtcMode() noexcept;
 
-    bool rendInit() noexcept;
-    bool rendInitCrtc() noexcept;
+    bool startRenderThread() noexcept;
 
     bool initSwapchain() noexcept;
     bool initSwapchainSelf() noexcept;
@@ -73,7 +78,7 @@ public:
     bool flipPagePrime() noexcept;
     bool flipPageDumb() noexcept;
 
-    bool waitForRepaintRequest() noexcept;
+    void waitForRepaintRequest() noexcept;
     bool waitPendingPageFlip(int iterLimit) noexcept;
     void commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept;
 
@@ -81,7 +86,6 @@ public:
     bool rendUpdateMode() noexcept;
     bool rendSuspend() noexcept;
     bool rendResume() noexcept;
-    void rendUnit() noexcept;
 
     // Appends AtomicChange flags to req
     void atomicReqAppendChanges(std::shared_ptr<SRMAtomicRequest> req, std::shared_ptr<RDRMFramebuffer> fb) noexcept;
@@ -90,6 +94,8 @@ public:
     void logInfo() noexcept;
 
     SRMDevice *device() const noexcept;
+    std::thread::id threadId;
+
     SRMConnector *conn;
     CZBitset<AtomicChange> atomicChanges;
 
@@ -120,14 +126,15 @@ public:
     bool pendingPageFlip { false };
     bool pendingRepaint { false };
     bool rendering { false };
+    bool isDead { false };
+
+    CZSpFd inFence {};
 
     std::shared_ptr<const RGammaLUT> gammaLUT;
     std::shared_ptr<SRMPropertyBlob> gammaBlob;
-    std::shared_ptr<SRMPropertyBlob> modeBlob;
 
     drmEventContext drmEventCtx {};
-    int fenceFd { -1 };
-    std::binary_semaphore semaphore { 0 };
+    std::binary_semaphore repaintSemaphore { 0 };
     std::recursive_mutex propsMutex; // Protect stuff like cursor and gamma updates
     std::unique_ptr<SkRegion> m_damage;
     RFormat m_currentFormat {};
@@ -171,6 +178,9 @@ public:
         std::vector<std::shared_ptr<RSurface>> primeSurfaces;
         std::vector<std::shared_ptr<RDumbBuffer>> dumbBuffers;
     } swapchain;
+
+    std::optional<std::promise<bool>> unitPromise;
+    std::promise<int> setModePromise;
 };
 
 #endif // SRMRENDERER_H

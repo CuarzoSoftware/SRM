@@ -204,7 +204,8 @@ private:
     std::vector<SRMCrtc*> m_crtcs;
     std::vector<SRMEncoder*> m_encoders;
 
-    std::mutex m_pageFlipMutex; // Prevents multiple threads calling drmModeHandleEvent
+    // Prevents multiple threads calling drmModeHandleEvent
+    std::recursive_mutex m_pageFlipMutex;
 };
 
 #endif // SRMDEVICE_H

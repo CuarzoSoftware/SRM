@@ -3,6 +3,7 @@
 
 #include <CZ/skia/core/SkSize.h>
 #include <CZ/SRM/SRMObject.h>
+#include <format>
 #include <xf86drmMode.h>
 
 /**
@@ -64,6 +65,13 @@ private:
     friend class SRMRenderer;
     SRMConnector *m_connector { nullptr };
     drmModeModeInfo m_info {};
+};
+
+template <>
+struct std::formatter<CZ::SRMConnectorMode> : std::formatter<std::string> {
+    auto format(const CZ::SRMConnectorMode& obj, std::format_context& ctx) const {
+        return std::formatter<std::string>::format(std::format("{}x{}@{} Hz", obj.size().width(), obj.size().height(), obj.refreshRate()), ctx);
+    }
 };
 
 #endif // SRMCONNECTORMODE_H

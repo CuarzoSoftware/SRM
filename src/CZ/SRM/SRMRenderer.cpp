@@ -77,7 +77,6 @@ SRMRenderer::SRMRenderer(SRMConnector *connector, const SRMConnectorInterface *i
     log = conn->log.newWithContext("REND");
     logAtomic = log.newWithContext("ATOMIC");
     logLegacy = log.newWithContext("LEGACY");
-    conn->setState(SRMConnector::Initializing);
 }
 
 SRMRenderer::~SRMRenderer() noexcept
@@ -95,8 +94,6 @@ SRMRenderer::~SRMRenderer() noexcept
 
     if (cursorPlane)
         cursorPlane->m_currentConnector = nullptr;
-
-    conn->setState(SRMConnector::Uninitialized);
 }
 
 void SRMRenderer::initContentType() noexcept
@@ -163,9 +160,6 @@ static void drmPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec, vo
         SRMRenderer *rend { static_cast<SRMRenderer*>(data) };
         rend->pendingPageFlip = false;
 
-        if (rend->conn->state() == SRMConnector::Initialized)
-            return;
-
         if (rend->currentVSync)
         {
             rend->presentationTime.flags.set(RPresentationTime::HWClock | RPresentationTime::HWCompletion | RPresentationTime::VSync);
@@ -209,24 +203,22 @@ static void drmPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec, vo
     }
 }
 
-bool SRMRenderer::initRenderThread() noexcept
+bool SRMRenderer::startRenderThread() noexcept
 {
     std::promise<bool> initPromise;
     std::future<bool> initFuture = initPromise.get_future();
 
     std::thread([this](std::promise<bool> initPromise)
     {
+        threadId = std::this_thread::get_id();
         drmEventCtx.version = DRM_EVENT_CONTEXT_VERSION,
         drmEventCtx.vblank_handler = NULL,
         drmEventCtx.page_flip_handler = &drmPageFlipHandler,
         drmEventCtx.page_flip_handler2 = NULL;
         drmEventCtx.sequence_handler = NULL;
 
-        //srmRenderModeCommonCreateCursor(connector);
-
-        if (!rendInit())
+        if (!init())
         {
-            conn->setState(SRMConnector::Uninitialized);
             log(CZError, CZLN, "Failed to initialize renderer");
             initPromise.set_value(false);
             return;
@@ -239,32 +231,72 @@ bool SRMRenderer::initRenderThread() noexcept
         // Render loop
         while (true)
         {
+            // Blocks until repaint or unlock is called
+            waitForRepaintRequest();
+
             currentVSync = pendingVSync;
 
-            if (!waitForRepaintRequest())
-                return;
-
-            const std::lock_guard<std::recursive_mutex> lockState { conn->m_stateMutex };
-            const auto state { conn->state() };
-
-            if (state == SRMConnector::Initialized)
+            // Uninitialize
+            if (unitPromise.has_value())
             {
-                if (pendingRepaint)
+                unit();
+                return;
+            }
+
+            // E.g. if physically unplugged
+            if (isDead)
+            {
+                atomicChanges = 0;
+                continue;
+            }
+
+            // Set mode
+            if (conn->m_pendingMode)
+            {
+                auto modeBackup { conn->m_currentMode };
+                conn->m_currentMode = conn->m_pendingMode;
+                conn->m_pendingMode.reset();
+                assert(conn->m_currentMode);
+
+                if (applyCrtcMode())
                 {
-                    pendingRepaint = false;
-                    rendering = true;
-                    rendRender();
-                    rendering = false;
-                    flipPage();
-                    swapchain.advanceAge();
-                    continue;
+                    iface->resizeGL(conn, ifaceData);
+                    setModePromise.set_value(1); // Ok
                 }
-                else if (atomicChanges && currentFb)
+                else
                 {
-                    commit(currentFb);
+                    conn->m_currentMode = modeBackup;
+                    if (applyCrtcMode())
+                        setModePromise.set_value(0); // Rollback
+                    else
+                    {
+                        log(CZFatal, CZLN, "Failed to apply mode and rollback to previous one (the connector was probably unplugged)");
+                        isDead = true;
+                        setModePromise.set_value(-1); // Dead
+                        continue;
+                    }
                 }
             }
 
+            // paintGL...
+            if (pendingRepaint)
+            {
+                pendingRepaint = false;
+                rendering = true;
+                rendRender();
+                rendering = false;
+                flipPage();
+                swapchain.advanceAge();
+                continue;
+            }
+            // Only updates the cursor, gamma, etc
+            else if (atomicChanges && currentFb)
+            {
+                commit(currentFb);
+            }
+
+
+            /*
             if (state == SRMConnector::ChangingMode)
             {
                 swapchain.resetAge();
@@ -296,7 +328,7 @@ bool SRMRenderer::initRenderThread() noexcept
                 rendResume();
                 usleep(1000);
                 continue;
-            }
+            }*/
 
         }
 
@@ -310,25 +342,40 @@ bool SRMRenderer::initRenderThread() noexcept
     }
 }
 
-bool SRMRenderer::rendInit() noexcept
+bool SRMRenderer::init() noexcept
 {
     initContentType();
     initGamma();
     initCursor();
-    return initSwapchain() && rendInitCrtc();
+
+    if (!applyCrtcMode())
+        return false;
+
+    iface->initializeGL(conn, ifaceData);
+
+    return true;
 }
 
-bool SRMRenderer::rendInitCrtc() noexcept
+void SRMRenderer::unit() noexcept
+{
+    waitPendingPageFlip(-1);
+    iface->uninitializeGL(conn, ifaceData);
+    unitPromise.value().set_value(true);
+}
+
+bool SRMRenderer::applyCrtcMode() noexcept
 {
     Int32 ret;
+
+    waitPendingPageFlip(-1);
+
+    if (!initSwapchain())
+        return false;
 
     if (device()->clientCaps().Atomic)
     {
         auto req { SRMAtomicRequest::Make(device()) };
-
-        if (!modeBlob)
-            modeBlob = SRMPropertyBlob::Make(device(), &conn->currentMode()->info(), sizeof(drmModeModeInfo));
-
+        auto modeBlob = SRMPropertyBlob::Make(device(), &conn->currentMode()->info(), sizeof(drmModeModeInfo));
         req->attachPropertyBlob(modeBlob);
         req->addProperty(crtc->id(), crtc->m_propIDs.MODE_ID, modeBlob->id());
         req->addProperty(crtc->id(), crtc->m_propIDs.ACTIVE, 1);
@@ -353,15 +400,11 @@ bool SRMRenderer::rendInitCrtc() noexcept
     }
     else
     {
-        if (drmModeConnectorSetProperty(
-                device()->fd(),
-                conn->m_id,
-                conn->m_propIDs.DPMS,
-                DRM_MODE_DPMS_ON) != 0)
-        {
-
-            return false;
-        }
+        drmModeConnectorSetProperty(
+            device()->fd(),
+            conn->m_id,
+            conn->m_propIDs.DPMS,
+            DRM_MODE_DPMS_ON);
 
         ret = drmModeSetCrtc(device()->fd(),
                              crtc->id(),
@@ -379,21 +422,13 @@ bool SRMRenderer::rendInitCrtc() noexcept
         }
     }
 
-    if (conn->state() == SRMConnector::Initializing)
-    {
-        iface->initializeGL(conn, ifaceData);
-        conn->setState(SRMConnector::Initialized);
-    }
-    else if (conn->state() == SRMConnector::ChangingMode)
-    {
-        iface->resizeGL(conn, ifaceData);
-    }
-
     return true;
 }
 
 bool SRMRenderer::initSwapchain() noexcept
 {
+    swapchain = {};
+
     strategy = Self;
     if (initSwapchainSelf()) return true;
 
@@ -710,20 +745,14 @@ bool SRMRenderer::flipPageSelf() noexcept
 {
     if (device()->clientCaps().Atomic && primaryPlane->m_propIDs.IN_FENCE_FD)
     {
-        if (fenceFd >= 0)
-        {
-            close(fenceFd);
-            fenceFd = -1;
-        }
-
         if (swapchain.image()->writeSync())
         {
             swapchain.image()->writeSync()->gpuWait(device()->reamDevice());
-            fenceFd = swapchain.image()->writeSync()->fd();
+            inFence.reset(swapchain.image()->writeSync()->fd().release());
         }
     }
 
-    if (device()->reamDevice()->drmDriver() == RDriver::nvidia && fenceFd < 0)
+    if (device()->reamDevice()->drmDriver() == RDriver::nvidia && inFence.get() < 0)
         device()->reamDevice()->wait();
 
     return true;
@@ -731,8 +760,14 @@ bool SRMRenderer::flipPageSelf() noexcept
 
 bool SRMRenderer::flipPagePrime() noexcept
 {
+    // TODO: Use damage
     auto srcImage { swapchain.image() };
-    srcImage->allocator()->wait();
+    auto ream { RCore::Get() };
+
+    const bool gpuSync { srcImage->writeSync() && device()->caps().PrimeImport && ream->mainDevice()->caps().SyncExport };
+
+    if (!gpuSync)
+        srcImage->allocator()->wait();
 
     auto pass { swapchain.primeSurface()->beginPass(device()->reamDevice()) };
 
@@ -750,24 +785,16 @@ bool SRMRenderer::flipPagePrime() noexcept
 
     if (device()->clientCaps().Atomic && primaryPlane->m_propIDs.IN_FENCE_FD)
     {
-        if (fenceFd >= 0)
-        {
-            close(fenceFd);
-            fenceFd = -1;
-        }
-
         if (primeImage->writeSync())
-            fenceFd = primeImage->writeSync()->fd();
+            inFence.reset(primeImage->writeSync()->fd().release());
     }
-
-    if (device()->reamDevice()->drmDriver() == RDriver::nvidia && fenceFd < 0)
-        device()->reamDevice()->wait();
 
     return true;
 }
 
 bool SRMRenderer::flipPageDumb() noexcept
 {
+    // TODO: Use damage
     auto dumb { swapchain.dumbBuffer() };
     RPixelBufferRegion info {};
     info.pixels = dumb->pixels();
@@ -777,29 +804,15 @@ bool SRMRenderer::flipPageDumb() noexcept
     return swapchain.image()->readPixels(info);
 }
 
-bool SRMRenderer::waitForRepaintRequest() noexcept
+void SRMRenderer::waitForRepaintRequest() noexcept
 {
     const bool needsWait { (!pendingRepaint && atomicChanges == 0) || device()->core()->isSuspended() };
 
     if (needsWait)
     {
         atomicChanges.set(0);
-        semaphore.acquire();
+        repaintSemaphore.acquire();
     }
-
-    std::unique_lock<std::recursive_mutex> stateLock { conn->m_stateMutex };
-
-    if (conn->state() == SRMConnector::Uninitializing)
-    {
-        stateLock.unlock();
-        pendingPageFlip = true;
-        waitPendingPageFlip(3);
-        iface->uninitializeGL(conn, ifaceData);
-        rendUnit();
-        return false;
-    }
-
-    return true;
 }
 
 bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
@@ -810,10 +823,10 @@ bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
 
     while (pendingPageFlip)
     {
-        if (conn->state() != SRMConnector::Initialized || iterLimit == 0)
+        if (iterLimit == 0)
             return false;
 
-        const std::lock_guard<std::mutex> lock { device()->m_pageFlipMutex };
+        const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
 
         // Double check if the pageflip was notified in another thread
         if (!pendingPageFlip)
@@ -958,11 +971,6 @@ bool SRMRenderer::rendResume() noexcept
     return false;
 }
 
-void SRMRenderer::rendUnit() noexcept
-{
-    conn->m_state = SRMConnector::Uninitialized;
-}
-
 void SRMRenderer::atomicReqAppendChanges(std::shared_ptr<SRMAtomicRequest> req, std::shared_ptr<RDRMFramebuffer> fb) noexcept
 {
     if (fb)
@@ -1043,15 +1051,11 @@ void SRMRenderer::atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> 
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_H, (UInt64)conn->currentMode()->info().vdisplay << 16);
 
     if (primaryPlane->m_propIDs.IN_FENCE_FD)
-        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.IN_FENCE_FD, fenceFd);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.IN_FENCE_FD, inFence.get());
 
-    if (fenceFd >= 0)
-    {
-        // Apparently the kernel only uses the fd to access a dma fence but doesn't own it
-        // so by attaching it here, it will be closed when the request is destroyed
-        req->attachFd(fenceFd);
-        fenceFd = -1;
-    }
+    // Apparently the kernel only uses the fd to access a dma fence but doesn't own it
+    // so by attaching it here, it will be closed after the commit, when the request is destroyed
+    req->attachFd(inFence.release());
 }
 
 void SRMRenderer::logInfo() noexcept

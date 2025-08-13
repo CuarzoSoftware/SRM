@@ -39,19 +39,6 @@ class CZ::SRMConnector : public SRMObject
 {
 public:
 
-    enum State : UInt8
-    {
-        Uninitialized,  ///< The connector is uninitialized.
-        Initialized,    ///< The connector is initialized.
-        Uninitializing, ///< The connector is in the process of uninitializing.
-        Initializing,   ///< The connector is in the process of initializing.
-        ChangingMode,  ///< The connector is changing display mode.
-        RevertingMode, ///< Special case when changing mode fails and reverts to its previous mode.
-        Suspending,     ///< The connector state is changing from initialized to suspended.
-        Suspended,      ///< The connector is suspended.
-        Resuming        ///< The connector state is changing from suspended to initialized.
-    };
-
     ~SRMConnector() noexcept;
 
     /**
@@ -72,9 +59,7 @@ public:
      * @param connector Pointer to the @ref SRMConnector for which to retrieve the state.
      * @return The current rendering state (e.g., initialized, uninitialized, etc).
      */
-    State state() const noexcept { return m_state; }
-
-    static std::string_view StateString(State state) noexcept;
+    bool isInitialized() const noexcept { return m_rend != nullptr; }
 
     /**
      * @brief Check if the connector is connected.
@@ -210,18 +195,16 @@ public:
     /**
      * @brief Sets the current mode of the connector.
      *
-     * This function sets the current mode of the given @ref SRMConnector.
-     * You can use srmConnectorGetModes() to obtain a list of all available modes.
      * If the connector is initialized the `resizeGL()` event is invoked.
      *
-     * @note All connector use the srmConnectorGetPreferredMode() by default.
-     * @warning Do not call this function from any of the OpenGL events, as it may result in a deadlock.
+     * @see srmConnectorGetModes() to obtain a list of all available modes.
      *
-     * @param connector Pointer to the @ref SRMConnector for which to set the mode.
-     * @param mode Pointer to the @ref SRMConnectorMode to set as the current mode.
-     * @return 1 if setting the mode is successful, 0 if an error occurs.
+     * @note This method will fail if called from the connector's render thread.
+     *
+     * @return 1 on success, 0 if failed and rolled back to the previous mode and -1 if
+     *         rollback also failed (e.g. because the connector was unplugged during the change)
      */
-    bool setMode(SRMConnectorMode *mode) noexcept;
+    int setMode(SRMConnectorMode *mode) noexcept;
 
     /**
      * @brief Get the currently used CRT controller (CRTC) for the connector.
@@ -239,7 +222,7 @@ public:
      * This function returns the currently used @ref SRMPlane associated with the primary display plane for the given @ref SRMConnector.
      *
      * @param connector Pointer to the @ref SRMConnector for which to retrieve the current primary plane.
-     * @return The currently used @ref SRMPlane for the primary display.
+     * @return The currently used @ref SRMPlane for the primary display or NULL if not assigned.
      */
     SRMPlane *currentPrimaryPlane() const noexcept;
 
@@ -319,15 +302,11 @@ public:
     bool repaint() noexcept;
 
     /**
-     * @brief Uninitializes the connector.
+     * @brief Uninitializes the connector, triggering `uninitializeGL()`.
      *
-     * This function uninitializes the given @ref SRMConnector, eventually calling `uninitializeGL()` once uninitialized.
-     *
-     * @warning Do not call this function from any of the OpenGL events, as it may result in a deadlock.
-     *
-     * @param connector Pointer to the @ref SRMConnector to uninitialize.
+     * @returns true on success, and false if its already uninitialized or if called from its rendering thread.
      */
-    void uninitialize() noexcept;
+    bool uninitialize() noexcept;
 
     /**
      * @brief Locks the rendering thread until srmConnectorResume() is called.
@@ -454,26 +433,16 @@ public:
     UInt64 gammaSize() const noexcept;
 
     /**
-     * @brief Sets the gamma correction curves for each RGB component.
+     * @brief Sets the gamma table.
      *
-     * This method allows you to set the gamma correction curves for each RGB component.
-     * The number of elements for each curve (N) should be obtained using srmConnectorGetGammaSize().
-     * The table array should then have a size of `3 * N * sizeof(UInt16)` bytes, with N @ref UInt16 values for red,
-     * N for green, and N for blue, in that order. Each value of the curves can represent the full range of @ref UInt16.
+     * Defaults to linear.
      *
-     * @note This method must only be called after the connector is initialized.
-     *       If the connector is uninitialized or the driver does not support gamma correction,
-     *       the function returns 0.
-     *
-     * The default gamma curves are linear.
-     *
-     * @param connector Pointer to the @ref SRMConnector.
-     * @param table Pointer to the array containing RGB curves for gamma correction.
-     * @return On success, returns 1. On failure (uninitialized connector or no gamma correction support),
-     *         returns 0.
+     * @param gammaLUT The gamma lut to set, or nullptr to set it linear.
+     * @return true on success, false on failure (uninitialized connector or no gamma correction support).
      */
     bool setGammaLUT(std::shared_ptr<const RGammaLUT> gammaLUT) noexcept;
 
+    // nullptr if not available or the connector is uninitialized
     std::shared_ptr<const RGammaLUT> gammaLUT() const noexcept;
 
     /**
@@ -654,7 +623,6 @@ private:
     bool updateEncoders(drmModeConnectorPtr res) noexcept;
     bool updateModes(drmModeConnectorPtr res) noexcept;
 
-    void setState(State state) noexcept;
     bool unlockRenderer(bool repaint) noexcept;
 
     SRMConnectorMode *findPreferredMode() const noexcept;
@@ -664,12 +632,10 @@ private:
     void destroyModes() noexcept;
 
     std::unique_ptr<SRMRenderer> m_rend;
-    std::recursive_mutex m_stateMutex;
 
     UInt32 m_id {};
     UInt32 m_nameId {}; // Used to name the connector e.g HDMI-A-<0>
     UInt32 m_type {}; // DRM connector type
-    State m_state { Uninitialized };
 
     SRMDevice *m_device { nullptr };
     RSubPixel m_subPixel { RSubPixel::Unknown };
@@ -679,10 +645,9 @@ private:
     bool m_isConnected {};
     bool m_nonDesktop {};
 
-    UInt32 m_currentModeBlobId {};
     CZWeak<SRMConnectorMode> m_currentMode;
+    CZWeak<SRMConnectorMode> m_pendingMode;
     CZWeak<SRMConnectorMode> m_preferredMode;
-    CZWeak<SRMConnectorMode> m_targetMode; // Used while changing mode
     std::vector<SRMConnectorMode*> m_modes;
     std::vector<SRMCrtc*> m_crtcs;
     std::vector<SRMEncoder*> m_encoders;
@@ -706,7 +671,6 @@ private:
             subconnector,
             vrr_capable;
     } m_propIDs {};
-
 };
 
 #endif // SRMCONNECTOR_H

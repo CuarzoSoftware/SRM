@@ -218,24 +218,13 @@ bool SRMConnector::updateModes(drmModeConnectorPtr res) noexcept
     return true;
 }
 
-void SRMConnector::setState(State state) noexcept
-{
-    const std::lock_guard<std::recursive_mutex> lock { m_stateMutex };
-
-    if (state == m_state)
-        return;
-
-    m_state = state;
-    log(CZDebug, "Changed state: {}", StateString(state));
-}
-
 bool SRMConnector::unlockRenderer(bool repaint) noexcept
 {
     if (!m_rend)
         return false;
 
     m_rend->pendingRepaint |= repaint;
-    m_rend->semaphore.release();
+    m_rend->repaintSemaphore.release();
     return true;
 }
 
@@ -346,36 +335,6 @@ SRMConnector::~SRMConnector() noexcept
     destroyModes();
 }
 
-enum State : UInt8
-{
-    Uninitialized,  ///< The connector is uninitialized.
-    Initialized,    ///< The connector is initialized.
-    Uninitializing, ///< The connector is in the process of uninitializing.
-    Initializing,   ///< The connector is in the process of initializing.
-    ChangingMode,  ///< The connector is changing display mode.
-    RevertingMode, ///< Special case when changing mode fails and reverts to its previous mode.
-    Suspending,     ///< The connector state is changing from initialized to suspended.
-    Suspended,      ///< The connector is suspended.
-    Resuming,        ///< The connector state is changing from suspended to initialized.
-    StateLast
-};
-
-std::string_view SRMConnector::StateString(State state) noexcept
-{
-    static constexpr const std::array<std::string_view, StateLast> strings {
-        "Uninitialized",
-        "Initialized",
-        "Uninitializing",
-        "Initializing",
-        "ChangingMode",
-        "RevertingMode",
-        "Suspending",
-        "Suspended",
-        "Resuming"
-    };
-    return strings[state];
-}
-
 std::string_view SRMConnector::TypeString(UInt32 type) noexcept
 {
     switch (type)
@@ -408,20 +367,55 @@ SRMEncoder *SRMConnector::currentEncoder() const noexcept
     return m_rend ? m_rend->encoder : nullptr;
 }
 
-bool SRMConnector::setMode(SRMConnectorMode *mode) noexcept
+int SRMConnector::setMode(SRMConnectorMode *mode) noexcept
 {
-    if (!mode || mode->connector() != this)
+    if (!mode)
     {
-        log(CZError, CZLN, "Invalid connector mode");
-        return false;
+        log(CZError, CZLN, "Invalid connector mode (nullptr)");
+        return 0;
+    }
+
+    if (mode->connector() != this)
+    {
+        log(CZError, CZLN, "Invalid connector mode {} (belongs to another connector)", *mode);
+        return 0;
     }
 
     if (mode == currentMode())
-        return true;
+    {
+        log(CZTrace, CZLN, "Mode {} already assigned", *mode);
+        return 1;
+    }
 
-    // TODO
+    if (!m_rend)
+    {
+        log(CZTrace, CZLN, "Mode {} successfully assigned (while the connector is uninitialized)", *mode);
+        m_currentMode = mode;
+        return 1;
+    }
 
-    return false;
+    if (m_rend->isDead)
+    {
+        log(CZError, CZLN, "Failed to set mode {} (the connector is in a dead state and can only be uninitialized)", *mode);
+        return -1;
+    }
+
+    if (std::this_thread::get_id() == m_rend->threadId)
+    {
+        log(CZError, CZLN, "Changing a connector's mode from its render thread is not allowed");
+        return 0;
+    }
+
+    m_rend->setModePromise = std::promise<int>();
+    auto future { m_rend->setModePromise.get_future() };
+    m_pendingMode = mode;
+    unlockRenderer(false);
+    const auto ret { future.get() };
+
+    if (!ret)
+        log(CZError, CZLN, "Failed to set mode {}", *mode);
+
+    return ret;
 }
 
 SRMCrtc *SRMConnector::currentCrtc() const noexcept
@@ -526,7 +520,7 @@ bool SRMConnector::setCursorPos(SkIPoint pos) noexcept
 
 bool SRMConnector::initialize(const SRMConnectorInterface *iface, void *data) noexcept
 {
-    if (state() != State::Uninitialized || !isConnected())
+    if (isInitialized() || !isConnected())
         return false;
 
     m_rend = SRMRenderer::Make(this, iface, data);
@@ -534,49 +528,33 @@ bool SRMConnector::initialize(const SRMConnectorInterface *iface, void *data) no
     if (!m_rend)
         return false;
 
-    return m_rend->initRenderThread();
+    const bool ret  { m_rend->startRenderThread() };
+    if (!ret) m_rend.reset();
+    return ret;
 }
 
 bool SRMConnector::repaint() noexcept
 {
-    if (m_rend &&
-        (state() == Initialized ||
-         state() == Initializing ||
-         state() == ChangingMode))
-    {
-        unlockRenderer(true);
-        return true;
-    }
-
-    return false;
+    return unlockRenderer(true);
 }
 
-void SRMConnector::uninitialize() noexcept
+bool SRMConnector::uninitialize() noexcept
 {
-    // Wait for those states to change
-    while (m_state == ChangingMode || m_state == Initializing)
+    if (!isInitialized())
+        return false;
+
+    if (std::this_thread::get_id() == m_rend->threadId)
     {
-        usleep(20000);
+        log(CZError, CZLN, "Calling uninitialize() from the connector's rendering thread is not allowed");
+        return false;
     }
 
-    // Nothing to do
-    if (m_state == Uninitialized || m_state == Uninitializing)
-    {
-        return;
-    }
-
-    // Unitialize
-    m_state = Uninitializing;
-
-    while (m_state != Uninitialized)
-    {
-        unlockRenderer(false);
-        usleep(1000);
-    }
-
-    //srmConnectorRenderThreadCleanUp(connector);
-
-    //SRMDebug("[%s] [%s] Uninitialized.", connector->device->shortName, connector->name);
+    m_rend->unitPromise = std::promise<bool>();
+    auto future { m_rend->unitPromise->get_future() };
+    unlockRenderer(false);
+    assert(future.get());
+    m_rend.reset();
+    return true;
 }
 
 bool SRMConnector::suspend() noexcept
@@ -714,160 +692,7 @@ void SRMConnector::setContentType(RContentType type, bool force) noexcept
 
 
 #if 1 == 2
-UInt8 srmConnectorSetCursor(SRMConnector *connector, UInt8 *pixels)
-{
-    if (!connector->cursor[0].bo)
-        return 0;
 
-    if (!pixels && !connector->cursorVisible)
-        return 1;
-
-    pthread_mutex_lock(&connector->propsMutex);
-
-    if (connector->currentCursorPlane)
-    {
-        if (pixels)
-        {
-            if (!connector->cursorVisible)
-            {
-                connector->cursorVisible = 1;
-                connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
-            }
-
-            /* The index is updated during the atomic commit */
-            UInt32 pendingCursorIndex = 1 - connector->cursorIndex;
-            gbm_bo_write(connector->cursor[pendingCursorIndex].bo, pixels, 64*64*4);
-            connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_BUFFER;
-        }
-        else
-        {
-            connector->cursorVisible = 0;
-            connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_VISIBILITY;
-        }
-
-        pthread_mutex_unlock(&connector->propsMutex);
-        pthread_cond_signal(&connector->repaintCond);
-    }
-    else
-    {
-        if (pixels)
-        {
-            connector->cursorVisible = 1;
-            connector->cursorIndex = 1 - connector->cursorIndex;
-            gbm_bo_write(connector->cursor[connector->cursorIndex].bo, pixels, 64*64*4);
-
-            drmModeSetCursor(connector->device->fd,
-                             connector->currentCrtc->id,
-                             gbm_bo_get_handle(connector->cursor[connector->cursorIndex].bo).u32,
-                             64,
-                             64);
-        }
-        else
-        {
-            drmModeSetCursor(connector->device->fd,
-                             connector->currentCrtc->id,
-                             0,
-                             0,
-                             0);
-        }
-
-        pthread_mutex_unlock(&connector->propsMutex);
-    }
-
-    return 1;
-}
-
-UInt8 srmConnectorSetCursorPos(SRMConnector *connector, Int32 x, Int32 y)
-{
-    if (!connector->cursor[0].bo)
-        return 0;
-
-    if (connector->cursorX == x && connector->cursorY == y)
-        return 1;
-
-    pthread_mutex_lock(&connector->propsMutex);
-
-    connector->cursorX = x;
-    connector->cursorY = y;
-
-    if (connector->currentCursorPlane)
-    {
-        if (connector->cursorVisible)
-            connector->atomicChanges |= SRM_ATOMIC_CHANGE_CURSOR_POSITION;
-        pthread_mutex_unlock(&connector->propsMutex);
-        pthread_cond_signal(&connector->repaintCond);
-    }
-    else
-    {
-        drmModeMoveCursor(connector->device->fd,
-                          connector->currentCrtc->id,
-                          x,
-                          y);
-
-        pthread_mutex_unlock(&connector->propsMutex);
-    }
-
-    return 1;
-}
-
-
-UInt8 srmConnectorSetMode(SRMConnector *connector, SRMConnectorMode *mode)
-{
-    if (connector->currentMode == mode)
-        return 1;
-
-    pthread_mutex_lock(&connector->stateMutex);
-
-    if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
-    {
-        SRMConnectorMode *modeBackup = connector->currentMode;
-
-        connector->targetMode = mode;
-        connector->state = SRM_CONNECTOR_STATE_CHANGING_MODE;        
-        pthread_mutex_unlock(&connector->stateMutex);
-
-        retry:
-        srmConnectorUnlockRenderThread(connector, 0);
-        pthread_mutex_lock(&connector->stateMutex);
-
-        if (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
-        {
-            pthread_mutex_unlock(&connector->stateMutex);
-            goto retry;
-        }
-
-        if (connector->state == SRM_CONNECTOR_STATE_INITIALIZED)
-        {
-            pthread_mutex_unlock(&connector->stateMutex);
-            return 1;
-        }
-        else // REVERTING MODE CHANGE
-        {
-            connector->targetMode = modeBackup;
-            connector->state = SRM_CONNECTOR_STATE_CHANGING_MODE;
-            pthread_mutex_unlock(&connector->stateMutex);
-            goto retry;
-            return 0;
-        }
-    }
-
-    else if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED)
-    {
-        pthread_mutex_unlock(&connector->stateMutex);
-        connector->currentMode = mode;
-        return 1;
-    }
-
-    // Wait for intermediate states to finish
-    else
-    {
-        pthread_mutex_unlock(&connector->stateMutex);
-        return 0;
-    }
-
-    pthread_mutex_unlock(&connector->stateMutex);
-    return 1;
-}
 
 UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *interface, void *userData)
 {

@@ -5,6 +5,7 @@
 #include <CZ/CZSignal.h>
 #include <CZ/CZBitset.h>
 #include <memory>
+#include <thread>
 
 struct udev;
 struct udev_monitor;
@@ -89,7 +90,7 @@ public:
      * @param core A pointer to the @ref SRMCore instance to check.
      * @return Returns 1 if the @ref SRMCore is suspended, and 0 if it is active.
      */
-    bool isSuspended() noexcept { return m_pf.has(pSuspended); }
+    bool isSuspended() noexcept { return m_isSuspended; }
 
     /**
      * @brief Get a pollable udev monitor file descriptor for listening to hotplugging events.
@@ -101,7 +102,7 @@ public:
      *
      * @return The file descriptor for monitoring hotplugging events.
      */
-    int fd() const noexcept { return m_fd; }
+    int fd() const noexcept;
 
     /**
      * @brief Dispatch pending udev monitor events or block until an event occurs or a timeout is reached.
@@ -161,22 +162,19 @@ private:
     bool initMonitor() noexcept;
     bool initReam() noexcept;
 
-    enum PF : UInt8
-    {
-        pSuspended         = static_cast<UInt8>(1) << 0,
-        pForceLegacyCursor = static_cast<UInt8>(1) << 1,
-        pDisableCursor     = static_cast<UInt8>(1) << 2,
-        pDisableScanout    = static_cast<UInt8>(1) << 3
-    };
+    void unplugAllConnectors() noexcept;
+    bool isRenderThread(std::thread::id threadId) noexcept;
 
-    int m_fd { -1 }; // EPOLL
-    CZBitset<PF> m_pf;
-    std::shared_ptr<RCore> m_ream;
-    const SRMInterface *m_iface { nullptr };
-    void *m_ifaceData { nullptr };
     udev *m_udev {};
     udev_monitor *m_monitor {};
     std::vector<SRMDevice*> m_devices;
+    bool m_isSuspended {};
+    bool m_forceLegacyCursor {};
+    bool m_disableCursor {};
+    bool m_disableScanout {};
+    std::shared_ptr<RCore> m_ream;
+    const SRMInterface *m_iface { nullptr };
+    void *m_ifaceData { nullptr };
 };
 
 #endif // SRMCORE_H

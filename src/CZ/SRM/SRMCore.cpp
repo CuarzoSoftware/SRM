@@ -61,12 +61,6 @@ SRMCore::~SRMCore() noexcept
 
     CZVectorUtils::DeleteAndPopBackAll(m_devices);
 
-    if (m_fd >= 0)
-    {
-        close(m_fd);
-        m_fd = -1;
-    }
-
     if (m_monitor)
     {
         udev_monitor_unref(m_monitor);
@@ -86,16 +80,16 @@ SRMCore::~SRMCore() noexcept
 bool SRMCore::init() noexcept
 {
     const char *env { getenv("SRM_DISABLE_CUSTOM_SCANOUT") };
-    m_pf.setFlag(pDisableScanout, env && atoi(env) == 1);
-    SRMLog(CZInfo, "Direct Scanout Enabled: {}.", !m_pf.has(pDisableScanout));
+    m_disableScanout = env && atoi(env) == 1;
+    SRMLog(CZInfo, "Direct Scanout Enabled: {}.", !m_disableScanout);
 
     env = getenv("SRM_DISABLE_CURSOR");
-    m_pf.setFlag(pDisableCursor, env && atoi(env) == 1);
-    SRMLog(CZInfo, "Cursor Planes Enabled: {}.", !m_pf.has(pDisableCursor));
+    m_disableCursor =env && atoi(env) == 1;
+    SRMLog(CZInfo, "Cursor Planes Enabled: {}.", !m_disableCursor);
 
     env = getenv("SRM_FORCE_LEGACY_CURSOR");
-    m_pf.setFlag(pForceLegacyCursor, env && atoi(env) == 1);
-    SRMLog(CZInfo, "Forcing Legacy Cursor IOCTLs: {}.", m_pf.has(pForceLegacyCursor));
+    m_forceLegacyCursor = env && atoi(env) == 1;
+    SRMLog(CZInfo, "Forcing Legacy Cursor IOCTLs: {}.", m_forceLegacyCursor);
 
     const bool ret {
         initUdev() &&
@@ -194,24 +188,6 @@ bool SRMCore::initMonitor() noexcept
         return false;
     }
 
-    m_fd = epoll_create1(EPOLL_CLOEXEC);
-
-    if (m_fd < 0)
-    {
-        SRMLog(CZFatal, CZLN, "Failed to create epoll fd.");
-        return false;
-    }
-
-    epoll_event event {};
-    event.events = EPOLLIN;
-    event.data.fd = udev_monitor_get_fd(m_monitor);
-
-    if (epoll_ctl(m_fd, EPOLL_CTL_ADD, event.data.fd, &event) != 0)
-    {
-        SRMLog(CZFatal, CZLN, "Failed to add udev monitor fd to epoll fd.");
-        return false;
-    }
-
     return true;
 }
 
@@ -255,7 +231,7 @@ bool SRMCore::initReam() noexcept
 
     for (auto *dev : devices())
     {
-        if (dev->m_pf.has(SRMDevice::pIsBootVGA))
+        if (dev->isBootVGA())
             bestDev = dev;
     }
 
@@ -265,25 +241,65 @@ bool SRMCore::initReam() noexcept
     return true;
 }
 
+void SRMCore::unplugAllConnectors() noexcept
+{
+    for (auto *dev : m_devices)
+    {
+        for (auto *conn : dev->connectors())
+        {
+            if (!conn->isConnected() || !conn->m_rend)
+                continue;
+
+            conn->m_rend->isDead = true;
+        }
+    }
+
+    for (auto *dev : m_devices)
+    {
+        for (auto *conn : dev->connectors())
+        {
+            if (!conn->isConnected())
+                continue;
+
+            dev->log(CZInfo, "SRMConnector ({}) {}, {}, {} unplugged",
+                conn->id(),
+                conn->name().c_str(),
+                conn->model().c_str(),
+                conn->make().c_str());
+
+            onConnectorUnplugged.notify(conn);
+
+            conn->uninitialize();
+            conn->m_isConnected = false;
+        }
+    }
+}
+
+bool SRMCore::isRenderThread(std::thread::id threadId) noexcept
+{
+    for (auto *dev : m_devices)
+        for (auto *conn : dev->connectors())
+            if (conn->m_rend && conn->m_rend->threadId == threadId)
+                return true;
+    return false;
+}
+
 bool SRMCore::suspend() noexcept
 {
     if (isSuspended())
     {
-        SRMLog(CZWarning, CZLN, "Already suspended.");
-        return false;
+        SRMLog(CZDebug, CZLN, "Already suspended");
+        return true;
     }
 
-    for (auto *dev : m_devices)
-        for (auto *conn : dev->connectors())
-            conn->suspend();
-
-    if (epoll_ctl(m_fd, EPOLL_CTL_DEL, udev_monitor_get_fd(m_monitor), NULL) != 0)
+    if (isRenderThread(std::this_thread::get_id()))
     {
-        SRMLog(CZError, CZLN, "Failed to remove udev monitor fd from epoll.");
+        SRMLog(CZError, CZLN, "Calling suspend from a render thread is not allowed");
         return false;
     }
 
-    m_pf.add(pSuspended);
+    unplugAllConnectors();
+    m_isSuspended = true;
     return true;
 }
 
@@ -291,102 +307,96 @@ bool SRMCore::resume() noexcept
 {
     if (!isSuspended())
     {
-        SRMLog(CZWarning, CZLN, "Not suspended.");
+        SRMLog(CZDebug, CZLN, "Already resumed");
+        return true;
+    }
+
+    if (isRenderThread(std::this_thread::get_id()))
+    {
+        SRMLog(CZError, CZLN, "Calling resume from a render thread is not allowed");
         return false;
     }
+
+    m_isSuspended = false;
 
     for (auto *dev : m_devices)
-        for (auto *conn : dev->connectors())
-            conn->resume();
+        dev->dispatchHotplugEvents();
 
-    epoll_event event;
-    event.events = EPOLLIN;
-    event.data.fd = udev_monitor_get_fd(m_monitor);
-
-    if (epoll_ctl(m_fd, EPOLL_CTL_ADD, event.data.fd, &event) != 0)
-    {
-        SRMLog(CZError, CZLN, "Failed to add udev monitor fd to epoll.");
-        return false;
-    }
-
-    m_pf.remove(pSuspended);
     return true;
+}
+
+int SRMCore::fd() const noexcept
+{
+    return m_monitor ? udev_monitor_get_fd(m_monitor) : -1;
 }
 
 int SRMCore::dispatch(int timeoutMs) noexcept
 {
-    if (isSuspended())
-        goto checkPoll;
-
-    for (auto *dev : devices())
-    {
-        if (!dev->m_pf.has(SRMDevice::pPendingUdevEvents))
-            continue;
-
-        // Returns false if is not a drm master
-        if (!dev->dispatchHotplugEvents())
-            timeoutMs = 500;
-    }
-
-checkPoll:
+    if (!isSuspended())
+        for (auto *dev : devices())
+            if (dev->m_rescanConnectors)
+                dev->dispatchHotplugEvents();
 
     pollfd fds {};
     fds.events = POLLIN;
-    fds.fd = m_fd;
+    fds.fd = fd();
     const int ret { poll(&fds, 1, timeoutMs) };
 
-    if (!isSuspended() && ret > 0 && fds.revents & POLLIN)
+    if (!(ret > 0 && fds.revents & POLLIN))
+        return ret;
+
+    udev_device *dev { udev_monitor_receive_device(m_monitor) };
+
+    if (!dev)
+        return ret;
+
+    const char *action { udev_device_get_action(dev) };
+    const char *devnode { udev_device_get_devnode(dev) };
+
+    // Events must be ignored until resumed
+    if (isSuspended())
+        goto unref;
+
+    if (devnode && strncmp(devnode, "/dev/dri/card", 13) == 0)
     {
-        udev_device *dev { udev_monitor_receive_device(m_monitor) };
+        SRMDevice *device {};
 
-        if (dev)
+        for (auto *dev : devices())
         {
-            const char *action { udev_device_get_action(dev) };
-            const char *devnode { udev_device_get_devnode(dev) };
-
-            if (devnode && strncmp(devnode, "/dev/dri/card", 13) == 0)
+            if (dev->nodePath() == devnode)
             {
-                SRMDevice *device {};
-
-                for (auto *dev : devices())
-                {
-                    if (dev->nodePath() == devnode)
-                    {
-                        device = dev;
-                        break;
-                    }
-                }
-
-                if (!device)
-                {
-                    /* TODO: Handle GPU hotplug */
-                    goto unref;
-                }
-
-                // Possible connector hotplug event
-                if (strcmp(action, "change") == 0)
-                {
-                    device->dispatchHotplugEvents();
-                }
-
-                // GPU added
-                else if (strcmp(action, "add") == 0)
-                {
-                    /* TODO: Support GPU hotplug */
-                }
-
-                // GPU removed
-                else if (strcmp(action, "remove") == 0)
-                {
-                    /* TODO: Support GPU hotplug */
-                }
+                device = dev;
+                break;
             }
+        }
 
-        unref:
-            udev_device_unref(dev);
+        if (!device)
+        {
+            /* TODO: Handle GPU hotplug */
+            goto unref;
+        }
+
+        // Possible connector hotplug event
+        if (strcmp(action, "change") == 0)
+        {
+            device->dispatchHotplugEvents();
+        }
+
+        // GPU added
+        else if (strcmp(action, "add") == 0)
+        {
+            /* TODO: Support GPU hotplug */
+        }
+
+        // GPU removed
+        else if (strcmp(action, "remove") == 0)
+        {
+            /* TODO: Support GPU hotplug */
         }
     }
 
+unref:
+    udev_device_unref(dev);
     return ret;
 }
 

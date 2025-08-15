@@ -389,7 +389,7 @@ int SRMConnector::setMode(SRMConnectorMode *mode) noexcept
 
     if (!m_rend)
     {
-        log(CZTrace, CZLN, "Mode {} successfully assigned (while the connector is uninitialized)", *mode);
+        log(CZTrace, CZLN, "Mode {} successfully applied (while the connector is uninitialized)", *mode);
         m_currentMode = mode;
         return 1;
     }
@@ -408,11 +408,13 @@ int SRMConnector::setMode(SRMConnectorMode *mode) noexcept
 
     m_rend->setModePromise = std::promise<int>();
     auto future { m_rend->setModePromise.get_future() };
-    m_pendingMode = mode;
+    m_rend->pendingMode = mode;
     unlockRenderer(false);
     const auto ret { future.get() };
 
-    if (!ret)
+    if (ret == 1)
+        log(CZTrace, CZLN, "Mode {} successfully applied", *mode);
+    else
         log(CZError, CZLN, "Failed to set mode {}", *mode);
 
     return ret;
@@ -557,16 +559,6 @@ bool SRMConnector::uninitialize() noexcept
     return true;
 }
 
-bool SRMConnector::suspend() noexcept
-{
-
-}
-
-bool SRMConnector::resume() noexcept
-{
-
-}
-
 const std::vector<std::shared_ptr<RImage>> &SRMConnector::images() const noexcept
 {
     static const std::vector<std::shared_ptr<RImage>> dummy;
@@ -692,249 +684,6 @@ void SRMConnector::setContentType(RContentType type, bool force) noexcept
 
 
 #if 1 == 2
-
-
-UInt8 srmConnectorInitialize(SRMConnector *connector, SRMConnectorInterface *interface, void *userData)
-{
-    if (connector->state != SRM_CONNECTOR_STATE_UNINITIALIZED)
-        return 0;
-
-    connector->state = SRM_CONNECTOR_STATE_INITIALIZING;
-
-    // Find best config
-    SRMEncoder *bestEncoder;
-    SRMCrtc *bestCrtc;
-    SRMPlane *bestPrimaryPlane;
-    SRMPlane *bestCursorPlane;
-
-    if (!srmConnectorGetBestConfiguration(connector, &bestEncoder, &bestCrtc, &bestPrimaryPlane, &bestCursorPlane))
-    {
-        // Fails to get a valid encoder, crtc or primary plane
-        SRMWarning("[%s] [%s] Could not get a Encoder, Crtc and Primary Plane trio.",
-                   connector->device->shortName,
-                   connector->name);
-        return 0;
-    }
-
-    connector->currentEncoder = bestEncoder;
-    connector->currentCrtc = bestCrtc;
-    connector->currentPrimaryPlane = bestPrimaryPlane;
-
-    bestEncoder->currentConnector = connector;
-    bestCrtc->currentConnector = connector;
-    bestPrimaryPlane->currentConnector = connector;
-
-    // When using legacy cursor IOCTLs, the plane is choosen by the driver
-    if (!connector->device->core->forceLegacyCursor && connector->device->clientCapAtomic)
-    {
-        connector->currentCursorPlane = bestCursorPlane;
-
-        if (bestCursorPlane)
-            bestCursorPlane->currentConnector = connector;
-    }
-    else
-        connector->currentCursorPlane = NULL;
-
-    connector->fenceFD = -1;
-    connector->interfaceData = userData;
-    connector->interface = interface;
-
-    connector->renderInitResult = 0;
-    connector->firstPageFlip = 1;
-
-    srmConnectorInitGamma(connector);
-
-    if (pthread_create(&connector->renderThread, NULL, srmConnectorRenderThread, connector))
-    {
-        SRMError("[%s] [%s] Could not start rendering thread.", connector->device->shortName, connector->name);
-        goto fail;
-    }
-
-    while (!connector->renderInitResult) { usleep(1000); }
-
-    // If failed
-    if (connector->renderInitResult != 1)
-        goto fail;
-
-    connector->state = SRM_CONNECTOR_STATE_INITIALIZED;
-
-    SRMDebug("[%s] [%s] Initialized.", connector->device->shortName, connector->name);
-
-    return 1;
-
-fail:
-    connector->state = SRM_CONNECTOR_STATE_UNINITIALIZED;
-
-    if (bestCursorPlane)
-        bestCursorPlane->currentConnector = NULL;
-
-    srmConnectorRenderThreadCleanUp(connector);
-
-    return 0;
-}
-
-UInt8 srmConnectorRepaint(SRMConnector *connector)
-{
-    if (connector->lockCurrentBuffer)
-        return 0;
-
-    if (connector->state == SRM_CONNECTOR_STATE_INITIALIZING ||
-        connector->state == SRM_CONNECTOR_STATE_INITIALIZED ||
-        connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE)
-    {
-        srmConnectorUnlockRenderThread(connector, 1);
-        return 1;
-    }
-
-    return 0;
-}
-
-void srmConnectorUninitialize(SRMConnector *connector)
-{
-    // Wait for those states to change
-    while (connector->state == SRM_CONNECTOR_STATE_CHANGING_MODE ||
-           connector->state == SRM_CONNECTOR_STATE_INITIALIZING)
-    {
-        usleep(20000);
-    }
-
-    // Nothing to do
-    if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED ||
-        connector->state == SRM_CONNECTOR_STATE_UNINITIALIZING)
-    {
-        return;
-    }
-
-    // Unitialize
-    connector->state = SRM_CONNECTOR_STATE_UNINITIALIZING;
-
-    while (connector->state != SRM_CONNECTOR_STATE_UNINITIALIZED)
-    {
-        srmConnectorUnlockRenderThread(connector, 0);
-        usleep(1000);
-    }
-
-    srmConnectorRenderThreadCleanUp(connector);
-
-    SRMDebug("[%s] [%s] Uninitialized.", connector->device->shortName, connector->name);
-}
-
-UInt32 srmConnectorGetCurrentBufferAge(SRMConnector *connector)
-{
-    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
-        return 0;
-
-    UInt32 num = srmConnectorGetBuffersCount(connector);
-
-    if (connector->bufferAgeFrame >= num)
-        return num;
-
-    return 0;
-}
-
-UInt32 srmConnectorGetCurrentBufferIndex(SRMConnector *connector)
-{
-    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
-        return 0;
-
-    return connector->renderInterface.getCurrentBufferIndex(connector);
-}
-
-UInt8 srmConnectorSuspend(SRMConnector *connector)
-{
-    if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED)
-        return 0;
-
-    pthread_mutex_lock(&connector->stateMutex);
-
-    switch (connector->state)
-    {
-        case SRM_CONNECTOR_STATE_SUSPENDED:
-        {
-            pthread_mutex_unlock(&connector->stateMutex);
-            return 1;
-        }
-        case SRM_CONNECTOR_STATE_UNINITIALIZED:
-        case SRM_CONNECTOR_STATE_UNINITIALIZING:
-        {
-            pthread_mutex_unlock(&connector->stateMutex);
-            return 0;
-        }
-        case SRM_CONNECTOR_STATE_INITIALIZED:
-        {
-            connector->state = SRM_CONNECTOR_STATE_SUSPENDING;
-            connector->atomicChanges = 0;
-            pthread_mutex_unlock(&connector->stateMutex);
-            return srmConnectorSuspend(connector);
-        }
-        default:
-        {
-            srmConnectorUnlockRenderThread(connector, 1);
-            connector->atomicChanges = 0;
-            pthread_mutex_unlock(&connector->stateMutex);
-            usleep(10000);
-            return srmConnectorSuspend(connector);
-        }
-    }
-
-    pthread_mutex_unlock(&connector->stateMutex);
-    return 0;
-}
-
-UInt8 srmConnectorResume(SRMConnector *connector)
-{
-    if (connector->state == SRM_CONNECTOR_STATE_UNINITIALIZED)
-        return 0;
-
-    pthread_mutex_lock(&connector->stateMutex);
-
-    switch (connector->state)
-    {
-        case SRM_CONNECTOR_STATE_INITIALIZED:
-        {
-            pthread_mutex_unlock(&connector->stateMutex);
-            return 1;
-        }
-        case SRM_CONNECTOR_STATE_UNINITIALIZED:
-        case SRM_CONNECTOR_STATE_UNINITIALIZING:
-        {
-            pthread_mutex_unlock(&connector->stateMutex);
-            return 0;
-        }
-        case SRM_CONNECTOR_STATE_SUSPENDED:
-        {
-            connector->state = SRM_CONNECTOR_STATE_RESUMING;
-            pthread_mutex_unlock(&connector->stateMutex);
-            return srmConnectorResume(connector);
-        }
-        default:
-        {
-            srmConnectorUnlockRenderThread(connector, 0);
-            pthread_mutex_unlock(&connector->stateMutex);
-            usleep(10000);
-            return srmConnectorResume(connector);
-        }
-    }
-
-    pthread_mutex_unlock(&connector->stateMutex);
-    return 0;
-}
-
-UInt32 srmConnectorGetBuffersCount(SRMConnector *connector)
-{
-    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
-        return 0;
-
-    return connector->renderInterface.getBuffersCount(connector);
-}
-
-SRMBuffer *srmConnectorGetBuffer(SRMConnector *connector, UInt32 bufferIndex)
-{
-    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
-        return NULL;
-
-    return connector->renderInterface.getBuffer(connector, bufferIndex);
-}
 
 UInt8 srmConnectorHasBufferDamageSupport(SRMConnector *connector)
 {
@@ -1393,14 +1142,6 @@ UInt8 srmConnectorSetCustomScanoutBuffer(SRMConnector *connector, SRMBuffer *buf
 releaseAndFail:
     srmConnectorReleaseUserScanoutBuffer(connector, 0);
     return 0;
-}
-
-UInt32 srmConnectorGetFramebufferID(SRMConnector *connector)
-{
-    if (connector->state != SRM_CONNECTOR_STATE_INITIALIZED)
-        return 0;
-
-    return connector->renderInterface.getFramebufferID(connector);
 }
 
 void srmConnectorSetCurrentBufferLocked(SRMConnector *connector, UInt8 locked)

@@ -3,6 +3,7 @@
 
 #include <CZ/CZLogger.h>
 #include <CZ/CZSpFd.h>
+#include <CZ/CZWeak.h>
 #include <CZ/skia/core/SkPoint.h>
 #include <CZ/SRM/SRMPropertyBlob.h>
 #include <CZ/Ream/RPresentationTime.h>
@@ -179,8 +180,10 @@ public:
         std::vector<std::shared_ptr<RDumbBuffer>> dumbBuffers;
     } swapchain;
 
+    // Async communication
     std::optional<std::promise<bool>> unitPromise;
     std::promise<int> setModePromise;
+    CZWeak<SRMConnectorMode> pendingMode;
 };
 
 #endif // SRMRENDERER_H

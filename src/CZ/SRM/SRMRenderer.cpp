@@ -58,7 +58,7 @@ std::unique_ptr<SRMRenderer> SRMRenderer::Make(SRMConnector *conn, const SRMConn
     bestPrimaryPlane->m_currentConnector = conn;
 
     // When using legacy cursor IOCTLs, the plane is choosen by the driver
-    if (!conn->device()->core()->m_pf.has(SRMCore::pForceLegacyCursor) && conn->device()->clientCaps().Atomic)
+    if (!conn->device()->core()->m_forceLegacyCursor && conn->device()->clientCaps().Atomic)
     {
         rend->cursorPlane = bestCursorPlane;
 
@@ -108,11 +108,11 @@ void SRMRenderer::initGamma() noexcept
 
 void SRMRenderer::initCursor() noexcept
 {
-    if (device()->core()->m_pf.has(SRMCore::pDisableCursor))
+    if (device()->core()->m_disableCursor)
         return;
 
     const bool atomic = device()->clientCaps().Atomic &&
-                   !device()->core()->m_pf.has(SRMCore::pForceLegacyCursor) &&
+                   !device()->core()->m_forceLegacyCursor &&
                    cursorPlane &&
                    (cursorPlane->formats().has(DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR) ||
                     cursorPlane->formats().has(DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_INVALID));
@@ -251,11 +251,11 @@ bool SRMRenderer::startRenderThread() noexcept
             }
 
             // Set mode
-            if (conn->m_pendingMode)
+            if (pendingMode)
             {
                 auto modeBackup { conn->m_currentMode };
-                conn->m_currentMode = conn->m_pendingMode;
-                conn->m_pendingMode.reset();
+                conn->m_currentMode = pendingMode;
+                pendingMode.reset();
                 assert(conn->m_currentMode);
 
                 if (applyCrtcMode())
@@ -286,6 +286,7 @@ bool SRMRenderer::startRenderThread() noexcept
                 rendRender();
                 rendering = false;
                 flipPage();
+                conn->m_image = swapchain.image();
                 swapchain.advanceAge();
                 continue;
             }
@@ -352,7 +353,6 @@ bool SRMRenderer::init() noexcept
         return false;
 
     iface->initializeGL(conn, ifaceData);
-
     return true;
 }
 
@@ -360,6 +360,30 @@ void SRMRenderer::unit() noexcept
 {
     waitPendingPageFlip(-1);
     iface->uninitializeGL(conn, ifaceData);
+
+    if (device()->clientCaps().Atomic)
+    {
+        auto req { SRMAtomicRequest::Make(device()) };
+        req->addProperty(crtc->id(), crtc->m_propIDs.ACTIVE, 0);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.FB_ID, 0);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_ID, 0);
+
+        if (cursorPlane)
+        {
+            req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.FB_ID, 0);
+            req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_ID, 0);
+        }
+
+        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
+    }
+    else
+    {
+        drmModeSetCrtc(device()->fd(), crtc->id(), 0, 0, 0, NULL, 0, NULL);
+    }
+
+    if (!isDead)
+        conn->m_image = {};
+
     unitPromise.value().set_value(true);
 }
 
@@ -374,16 +398,27 @@ bool SRMRenderer::applyCrtcMode() noexcept
 
     if (device()->clientCaps().Atomic)
     {
+        // DPMS OFF
         auto req { SRMAtomicRequest::Make(device()) };
+        req->addProperty(crtc->id(), crtc->m_propIDs.ACTIVE, 0);
+        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
+
+        // SET MODE AND OTHER PROPS
+        req = SRMAtomicRequest::Make(device());
         auto modeBlob = SRMPropertyBlob::Make(device(), &conn->currentMode()->info(), sizeof(drmModeModeInfo));
         req->attachPropertyBlob(modeBlob);
         req->addProperty(crtc->id(), crtc->m_propIDs.MODE_ID, modeBlob->id());
-        req->addProperty(crtc->id(), crtc->m_propIDs.ACTIVE, 1);
         req->addProperty(conn->id(), conn->m_propIDs.CRTC_ID, crtc->id());
-        req->addProperty(conn->id(), conn->m_propIDs.link_status, DRM_MODE_LINK_STATUS_GOOD);
+        if (conn->m_propIDs.link_status)
+            req->addProperty(conn->id(), conn->m_propIDs.link_status, DRM_MODE_LINK_STATUS_GOOD);
         auto prevCursorIndex { cursorI };
         atomicReqAppendChanges(req, nullptr);
         ret = req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
+
+        // DPMS ON
+        req = SRMAtomicRequest::Make(device());
+        req->addProperty(crtc->id(), crtc->m_propIDs.ACTIVE, 1);
+        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
 
         if (ret)
         {
@@ -400,11 +435,7 @@ bool SRMRenderer::applyCrtcMode() noexcept
     }
     else
     {
-        drmModeConnectorSetProperty(
-            device()->fd(),
-            conn->m_id,
-            conn->m_propIDs.DPMS,
-            DRM_MODE_DPMS_ON);
+        drmModeConnectorSetProperty(device()->fd(), conn->m_id, conn->m_propIDs.DPMS, DRM_MODE_DPMS_OFF);
 
         ret = drmModeSetCrtc(device()->fd(),
                              crtc->id(),
@@ -414,6 +445,8 @@ bool SRMRenderer::applyCrtcMode() noexcept
                              &conn->m_id,
                              1,
                              &conn->currentMode()->m_info);
+
+        drmModeConnectorSetProperty(device()->fd(), conn->m_id, conn->m_propIDs.DPMS, DRM_MODE_DPMS_ON);
 
         if (ret)
         {
@@ -510,6 +543,8 @@ bool SRMRenderer::initSwapchainPrime() noexcept
 
     if (device()->reamDevice() == ream->mainDevice())
         return false;
+
+    conn->m_image = {};
 
     auto textureFormats { RDRMFormatSet::Intersect(device()->reamDevice()->dmaTextureFormats(), ream->mainDevice()->dmaRenderFormats()) };
     textureFormats.removeModifier(DRM_FORMAT_MOD_INVALID);
@@ -868,8 +903,6 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
             }
             else
                 atomicChanges = 0;
-
-            pendingPageFlip = true;
         }
         else
         {
@@ -895,12 +928,10 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
                 else
                     atomicChanges = 0;
             }
-
-            pendingPageFlip = true;
         }
 
-        if (ret)
-            logAtomic(CZError, CZLN, "Failed to page flip. DRM Error: {}", strerror(ret));
+        if (ret && ret != -13)
+            logAtomic(CZError, CZLN, "Failed to page flip. DRM Error: {}", strerror(-ret));
     }
     else
     {
@@ -916,17 +947,13 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
                 ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, this);
         }
 
-        pendingPageFlip = true;
-
-        if (ret)
-            logLegacy(CZError, CZLN, "Failed to page flip. DRM Error: {}", strerror(ret));
+        if (ret && ret != -13)
+            logLegacy(CZError, CZLN, "Failed to page flip. DRM Error: {}", strerror(-ret));
     }
 
 
     if (ret)
     {
-        pendingPageFlip = false;
-
         /*
         if (customScanoutBuffer && ret == -22)
         {
@@ -941,7 +968,10 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
         }*/
     }
     else
+    {
         currentFb = fb;
+        pendingPageFlip = true;
+    }
 
     if (/*customScanoutBuffer ||*/ swapchain.n == 2 || firstPageFlip)
     {

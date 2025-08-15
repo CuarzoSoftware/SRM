@@ -146,7 +146,7 @@ public:
      */
     const std::vector<SRMEncoder*> &encoders() const noexcept { return m_encoders; }
 
-    bool isBootVGA() const noexcept { return m_pf.has(pIsBootVGA); }
+    bool isBootVGA() const noexcept { return m_isBootVGA; }
 
     RDevice *reamDevice() const noexcept { return m_reamDevice; }
 
@@ -170,13 +170,6 @@ private:
 
     bool dispatchHotplugEvents() noexcept;
 
-    enum PF : UInt8
-    {
-        pEnabled             = static_cast<UInt8>(1) << 0,
-        pIsBootVGA           = static_cast<UInt8>(1) << 1,
-        pPendingUdevEvents   = static_cast<UInt8>(1) << 2
-    };
-
     enum class PDriver
     {
         unknown,
@@ -195,7 +188,8 @@ private:
     PDriver m_driver { PDriver::unknown };
 
     Caps m_caps {};
-    CZBitset<PF> m_pf { pEnabled };
+    bool m_isBootVGA {};
+    bool m_rescanConnectors {};
     ClientCaps m_clientCaps {};
     clockid_t m_clock { CLOCK_REALTIME };
 
@@ -204,7 +198,7 @@ private:
     std::vector<SRMCrtc*> m_crtcs;
     std::vector<SRMEncoder*> m_encoders;
 
-    // Prevents multiple threads calling drmModeHandleEvent
+    // Prevents multiple calls to drmModeHandleEvent
     std::recursive_mutex m_pageFlipMutex;
 };
 

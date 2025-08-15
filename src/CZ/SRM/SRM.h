@@ -1,7 +1,7 @@
 #ifndef SRMTYPES_H
 #define SRMTYPES_H
 
-#include <CZ/CZ.h>
+#include <CZ/Cuarzo.h>
 
 #define SRM_VERSION_MAJOR 1
 #define SRM_VERSION_MINOR 0

@@ -309,30 +309,6 @@ public:
     bool uninitialize() noexcept;
 
     /**
-     * @brief Locks the rendering thread until srmConnectorResume() is called.
-     *
-     * This function locks the rendering thread of the @ref SRMConnector until srmConnectorResume() is called to unlock it.
-     *
-     * @warning Do not call this function from any of the OpenGL events, as it may result in a deadlock.
-     *
-     * @param connector Pointer to the @ref SRMConnector to suspend.
-     * @return 1 if pausing is successful, 0 if an error occurs.
-     */
-    bool suspend() noexcept;
-
-    /**
-     * @brief Unlocks the rendering thread if previously locked with srmConnectorSuspend().
-     *
-     * This function unlocks the rendering thread of the @ref SRMConnector if it was previously locked with srmConnectorSuspend().
-     *
-     * @warning Do not call this function from any of the OpenGL events, as it may result in a deadlock.
-     *
-     * @param connector Pointer to the @ref SRMConnector to resume.
-     * @return 1 if resuming is successful, 0 if an error occurs.
-     */
-    bool resume() noexcept;
-
-    /**
      * @brief Returns the buffer of a specific framebuffer index, usable as a texture for rendering.
      *
      * This function returns the buffer of the specified framebuffer index of the given @ref SRMConnector.
@@ -610,6 +586,7 @@ public:
     CZLogger log { SRMLog };
 
 private:
+    friend class SRMCore;
     friend class SRMDevice;
     friend class SRMRenderer;
     static SRMConnector *Make(UInt32 id, SRMDevice *device) noexcept;
@@ -646,11 +623,11 @@ private:
     bool m_nonDesktop {};
 
     CZWeak<SRMConnectorMode> m_currentMode;
-    CZWeak<SRMConnectorMode> m_pendingMode;
     CZWeak<SRMConnectorMode> m_preferredMode;
     std::vector<SRMConnectorMode*> m_modes;
     std::vector<SRMCrtc*> m_crtcs;
     std::vector<SRMEncoder*> m_encoders;
+    std::shared_ptr<RImage> m_image;
 
     std::string m_name;
     std::string m_make;

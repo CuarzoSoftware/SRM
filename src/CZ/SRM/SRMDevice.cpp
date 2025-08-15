@@ -66,15 +66,16 @@ SRMDevice *SRMDevice::Make(SRMCore *core, const char *nodePath, bool isBootVGA) 
 }
 
 SRMDevice::SRMDevice(SRMCore *core, const char *nodePath, bool isBootVGA) noexcept :
-    m_nodePath(nodePath), m_core(core)
+    m_nodePath(nodePath),
+    m_core(core),
+    m_isBootVGA(isBootVGA)
 {
-    m_pf.setFlag(pIsBootVGA, isBootVGA);
     m_nodeName = CZStringUtils::SubStrAfterLastOf(m_nodePath, "/");
     if (m_nodeName.empty())
         m_nodeName = "Unknown Device";
 
     log = SRMLog.newWithContext(m_nodeName);
-    log(CZInfo, "Is Boot VGA: {}", m_pf.has(pIsBootVGA));
+    log(CZInfo, "Is Boot VGA: {}", isBootVGA);
 }
 
 SRMDevice::~SRMDevice() noexcept
@@ -286,14 +287,14 @@ bool SRMDevice::dispatchHotplugEvents() noexcept
 {
     if (drmIsMaster(fd()) == 0)
     {
-        m_pf.add(pPendingUdevEvents);
-        log(CZWarning, CZLN, "Hotplug event dispatching delayed. Device is not master");
+        m_rescanConnectors = true;
+        log(CZWarning, CZLN, "Hotplug event dispatching delayed (not master)");
         return false;
     }
 
     // TODO: Check if the kernel registered/unregistered connectors
 
-    m_pf.remove(pPendingUdevEvents);
+    m_rescanConnectors = false;
 
     for (auto *conn : connectors())
     {

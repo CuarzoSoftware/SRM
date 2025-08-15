@@ -45,9 +45,36 @@ public:
         Legacy
     };
 
-    struct Commit
+    struct Swapchain
     {
-        bool vSync;
+        UInt32 i {};
+        UInt32 age {};
+        UInt32 n { 2 };
+
+        void advanceAge() noexcept
+        {
+            if (++i == n) i = 0;
+            if (age < n) age++;
+        }
+
+        void resetAge() noexcept
+        {
+            i = age = 0;
+        }
+
+        auto fb() const noexcept { return fbs[i]; }
+        auto image() const noexcept { return images[i]; }
+        auto surface() const noexcept { return surfaces[i]; }
+        auto primeImage() const noexcept { return primeImages[i]; }
+        auto primeSurface() const noexcept { return primeSurfaces[i]; }
+        auto dumbBuffer() const noexcept { return dumbBuffers[i]; }
+
+        std::vector<std::shared_ptr<RDRMFramebuffer>> fbs;
+        std::vector<std::shared_ptr<RImage>> images;
+        std::vector<std::shared_ptr<RSurface>> surfaces;
+        std::vector<std::shared_ptr<RImage>> primeImages;
+        std::vector<std::shared_ptr<RSurface>> primeSurfaces;
+        std::vector<std::shared_ptr<RDumbBuffer>> dumbBuffers;
     };
 
     static std::string_view StrategyString(Strategy strategy) noexcept
@@ -91,6 +118,7 @@ public:
     // Appends AtomicChange flags to req
     void atomicReqAppendChanges(std::shared_ptr<SRMAtomicRequest> req, std::shared_ptr<RDRMFramebuffer> fb) noexcept;
     void atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> req, std::shared_ptr<RDRMFramebuffer> fb) noexcept;
+    void atomicReqAppendDisable(std::shared_ptr<SRMAtomicRequest> req) noexcept;
 
     void logInfo() noexcept;
 
@@ -108,7 +136,7 @@ public:
 
     struct Cursor
     {
-        std::shared_ptr<RImage> image;
+        std::shared_ptr<RGBMBo> bo;
         std::shared_ptr<RDRMFramebuffer> fb;
     } cursor[2] {};
     Int32 cursorI { 1 };
@@ -148,37 +176,7 @@ public:
     const SRMConnectorInterface *iface;
     void *ifaceData;
 
-    struct
-    {
-        UInt32 i {};
-        UInt32 age {};
-        UInt32 n { 2 };
-
-        void advanceAge() noexcept
-        {
-            if (++i == n) i = 0;
-            if (age < n) age++;
-        }
-
-        void resetAge() noexcept
-        {
-            i = age = 0;
-        }
-
-        auto fb() const noexcept { return fbs[i]; }
-        auto image() const noexcept { return images[i]; }
-        auto surface() const noexcept { return surfaces[i]; }
-        auto primeImage() const noexcept { return primeImages[i]; }
-        auto primeSurface() const noexcept { return primeSurfaces[i]; }
-        auto dumbBuffer() const noexcept { return dumbBuffers[i]; }
-
-        std::vector<std::shared_ptr<RDRMFramebuffer>> fbs;
-        std::vector<std::shared_ptr<RImage>> images;
-        std::vector<std::shared_ptr<RSurface>> surfaces;
-        std::vector<std::shared_ptr<RImage>> primeImages;
-        std::vector<std::shared_ptr<RSurface>> primeSurfaces;
-        std::vector<std::shared_ptr<RDumbBuffer>> dumbBuffers;
-    } swapchain;
+    Swapchain swapchain {};
 
     // Async communication
     std::optional<std::promise<bool>> unitPromise;

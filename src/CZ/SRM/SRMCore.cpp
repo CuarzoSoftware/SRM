@@ -1,3 +1,5 @@
+#include <CZ/SRM/SRMAtomicRequest.h>
+#include <CZ/SRM/SRMCrtc.h>
 #include <CZ/SRM/SRMConnector.h>
 #include <CZ/SRM/SRMCore.h>
 #include <CZ/SRM/SRMLog.h>
@@ -245,12 +247,32 @@ void SRMCore::unplugAllConnectors() noexcept
 {
     for (auto *dev : m_devices)
     {
-        for (auto *conn : dev->connectors())
+        if (dev->clientCaps().Atomic)
         {
-            if (!conn->isConnected() || !conn->m_rend)
-                continue;
+            auto req { SRMAtomicRequest::Make(dev) };
 
-            conn->m_rend->isDead = true;
+            for (auto *conn : dev->connectors())
+            {
+                if (!conn->isConnected() || !conn->m_rend)
+                    continue;
+
+                conn->m_rend->isDead = true;
+                conn->m_rend->atomicReqAppendDisable(req);
+            }
+
+            req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK, nullptr, false);
+        }
+        else
+        {
+            for (auto *conn : dev->connectors())
+            {
+                if (!conn->isConnected() || !conn->m_rend)
+                    continue;
+
+                conn->m_rend->isDead = true;
+                drmModeConnectorSetProperty(dev->fd(), conn->m_id, conn->m_propIDs.DPMS, DRM_MODE_DPMS_OFF);
+                drmModeSetCrtc(dev->fd(), conn->m_rend->crtc->id(), 0, 0, 0, NULL, 0, NULL);
+            }
         }
     }
 

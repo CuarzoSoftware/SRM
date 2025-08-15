@@ -627,7 +627,6 @@ private:
     std::vector<SRMConnectorMode*> m_modes;
     std::vector<SRMCrtc*> m_crtcs;
     std::vector<SRMEncoder*> m_encoders;
-    std::shared_ptr<RImage> m_image;
 
     std::string m_name;
     std::string m_make;

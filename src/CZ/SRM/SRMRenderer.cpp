@@ -17,6 +17,7 @@
 #include <CZ/Ream/RPainter.h>
 #include <CZ/Ream/DRM/RDRMFramebuffer.h>
 #include <CZ/Ream/DRM/RDumbBuffer.h>
+#include <CZ/Ream/GBM/RGBMBo.h>
 
 #include <CZ/Ream/GL/RGLMakeCurrent.h>
 
@@ -81,8 +82,6 @@ SRMRenderer::SRMRenderer(SRMConnector *connector, const SRMConnectorInterface *i
 
 SRMRenderer::~SRMRenderer() noexcept
 {
-    //     srmConnectorRenderThreadCleanUp(connector);
-
     if (encoder)
         encoder->m_currentConnector = nullptr;
 
@@ -127,16 +126,18 @@ void SRMRenderer::initCursor() noexcept
 
     for (size_t i = 0; i < 2; i++)
     {
-        cursor[i].image = RImage::Make(
-            { 64, 64 },
-            { DRM_FORMAT_ARGB8888, { DRM_FORMAT_MOD_LINEAR } },
-            &consts);
+        cursor[i].bo = RGBMBo::MakeCursor({ 64, 64 }, DRM_FORMAT_ARGB8888, device()->reamDevice());
 
-        if (!cursor[i].image)
+        if (!cursor[i].bo)
             goto fail;
 
         if (atomic)
-            cursor[i].fb = cursor[i].image->drmFb(device()->reamDevice());
+        {
+            cursor[i].fb = RDRMFramebuffer::MakeFromGBMBo(cursor[i].bo);
+
+            if (!cursor[i].fb)
+                goto fail;
+        }
     }
 
     cursorAPI = atomic ? CursorAPI::Atomic : CursorAPI::Legacy;
@@ -145,7 +146,7 @@ void SRMRenderer::initCursor() noexcept
 fail:
     for (size_t i = 0; i < 2; i++)
     {
-        cursor[i].image.reset();
+        cursor[i].bo.reset();
         cursor[i].fb.reset();
     }
     cursorAPI = CursorAPI::None;
@@ -246,6 +247,7 @@ bool SRMRenderer::startRenderThread() noexcept
             // E.g. if physically unplugged
             if (isDead)
             {
+                pendingRepaint = 0;
                 atomicChanges = 0;
                 continue;
             }
@@ -286,7 +288,6 @@ bool SRMRenderer::startRenderThread() noexcept
                 rendRender();
                 rendering = false;
                 flipPage();
-                conn->m_image = swapchain.image();
                 swapchain.advanceAge();
                 continue;
             }
@@ -358,31 +359,21 @@ bool SRMRenderer::init() noexcept
 
 void SRMRenderer::unit() noexcept
 {
-    waitPendingPageFlip(-1);
     iface->uninitializeGL(conn, ifaceData);
+
+    waitPendingPageFlip(1);
 
     if (device()->clientCaps().Atomic)
     {
         auto req { SRMAtomicRequest::Make(device()) };
-        req->addProperty(crtc->id(), crtc->m_propIDs.ACTIVE, 0);
-        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.FB_ID, 0);
-        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_ID, 0);
-
-        if (cursorPlane)
-        {
-            req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.FB_ID, 0);
-            req->addProperty(cursorPlane->id(), cursorPlane->m_propIDs.CRTC_ID, 0);
-        }
-
-        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
+        atomicReqAppendDisable(req);
+        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK, this, false);
     }
     else
     {
+        drmModeConnectorSetProperty(device()->fd(), conn->m_id, conn->m_propIDs.DPMS, DRM_MODE_DPMS_OFF);
         drmModeSetCrtc(device()->fd(), crtc->id(), 0, 0, 0, NULL, 0, NULL);
     }
-
-    if (!isDead)
-        conn->m_image = {};
 
     unitPromise.value().set_value(true);
 }
@@ -543,8 +534,6 @@ bool SRMRenderer::initSwapchainPrime() noexcept
 
     if (device()->reamDevice() == ream->mainDevice())
         return false;
-
-    conn->m_image = {};
 
     auto textureFormats { RDRMFormatSet::Intersect(device()->reamDevice()->dmaTextureFormats(), ream->mainDevice()->dmaRenderFormats()) };
     textureFormats.removeModifier(DRM_FORMAT_MOD_INVALID);
@@ -856,22 +845,32 @@ bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
     fds.fd = device()->fd();
     fds.events = POLLIN;
 
-    while (pendingPageFlip)
+    if (pendingPageFlip)
     {
-        if (iterLimit == 0)
-            return false;
+        while (pendingPageFlip)
+        {
+            if (iterLimit == 0)
+                return false;
 
+            const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
+
+            // Double check if the pageflip was notified in another thread
+            if (!pendingPageFlip)
+                return true;
+
+            poll(&fds, 1, iterLimit == -1 ? 500 : 1);
+            drmHandleEvent(fds.fd, &drmEventCtx);
+
+            if (iterLimit > 0)
+                iterLimit--;
+        }
+    }
+    else
+    {
         const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
 
-        // Double check if the pageflip was notified in another thread
-        if (!pendingPageFlip)
-            return true;
-
-        poll(&fds, 1, iterLimit == -1 ? 500 : 1);
-        drmHandleEvent(fds.fd, &drmEventCtx);
-
-        if (iterLimit > 0)
-            iterLimit--;
+        while (poll(&fds, 1, 0) > 0)
+            drmHandleEvent(fds.fd, &drmEventCtx);
     }
 
     return true;
@@ -973,7 +972,7 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
         pendingPageFlip = true;
     }
 
-    if (/*customScanoutBuffer ||*/ swapchain.n == 2 || firstPageFlip)
+    if (swapchain.n == 2 || firstPageFlip)
     {
         firstPageFlip = false;
         waitPendingPageFlip(-1);
@@ -1070,7 +1069,7 @@ void SRMRenderer::atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> 
 {
     // Note: Both fb and crtc must be set or neither
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.FB_ID, fb ? fb->id() : 0);
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_ID, crtc->id());
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_ID, fb ? crtc->id() : 0);
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_X, 0);
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_Y, 0);
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_W, conn->currentMode()->info().hdisplay);
@@ -1088,6 +1087,15 @@ void SRMRenderer::atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> 
     req->attachFd(inFence.release());
 }
 
+void SRMRenderer::atomicReqAppendDisable(std::shared_ptr<SRMAtomicRequest> req) noexcept
+{
+    req->addProperty(crtc->id(), crtc->m_propIDs.ACTIVE, 0);
+    req->addProperty(crtc->id(), crtc->m_propIDs.MODE_ID, 0);
+    req->addProperty(conn->id(), conn->m_propIDs.CRTC_ID, 0);
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_ID, 0);
+    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.FB_ID, 0);
+}
+
 void SRMRenderer::logInfo() noexcept
 {
     if (SRMLog.level() >= CZInfo)
@@ -1103,7 +1111,7 @@ void SRMRenderer::logInfo() noexcept
         SRMLog(CZInfo, "Renderer: {} - {}", ream->mainDevice()->srmDevice()->nodeName(), ream->mainDevice()->drmDriverName());
         SRMLog(CZInfo, "Surface Format: {} - {}", RDRMFormat::FormatName(swapchain.images[0]->formatInfo().format), RDRMFormat::ModifierName(swapchain.images[0]->modifier()));
         SRMLog(CZInfo, "Buffering: {}", swapchain.n);
-        SRMLog(CZInfo, "Cursor Plane: {}", cursor[0].image != nullptr);
+        SRMLog(CZInfo, "Cursor Plane: {}", cursor[0].bo != nullptr);
         SRMLog(CZInfo, "-------------------------------------------------------\n");
     }
 }

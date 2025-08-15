@@ -453,14 +453,9 @@ bool SRMConnector::setCursor(UInt8 *pixels) noexcept
     if (pixels)
     {
         const auto i { 1 - m_rend->cursorI };
-        auto image { m_rend->cursor[i].image };
-        RPixelBufferRegion info {};
-        info.pixels = pixels;
-        info.region.setRect(SkIRect::MakeWH(64, 64));
-        info.format = image->formatInfo().format;
-        info.stride = 64 * 4;
+        auto bo { m_rend->cursor[i].bo };
 
-        if (!image->writePixels(info))
+        if (gbm_bo_write(bo->bo(), pixels, 64 * 64 * 4) != 0)
             return false;
 
         m_rend->cursorVisible = true;
@@ -472,9 +467,7 @@ bool SRMConnector::setCursor(UInt8 *pixels) noexcept
         }
         else
         {
-            drmModeSetCursor(device()->fd(), m_rend->crtc->id(),
-                             image->gbmBo(device()->reamDevice())->planeHandle(0).u32,
-                             image->size().width(), image->size().height());
+            drmModeSetCursor(device()->fd(), m_rend->crtc->id(), bo->planeHandle(0).u32, bo->dmaInfo().width, bo->dmaInfo().height);
             m_rend->cursorI = i;
         }
     }

@@ -150,7 +150,6 @@ public:
     SRMPlane *cursorPlane {};
 
     bool currentVSync { true };
-    bool pendingVSync { true };
     bool firstPageFlip { true };
     bool pendingPageFlip { false };
     bool pendingRepaint { false };

@@ -421,18 +421,7 @@ public:
     // nullptr if not available or the connector is uninitialized
     std::shared_ptr<const RGammaLUT> gammaLUT() const noexcept;
 
-    /**
-     * @brief Checks if the driver supports the ability to turn off vsync.
-     *
-     * If the return value is 0, it indicates that vsync is always enabled.
-     *
-     * @note Disabling vsync for the atomic API is supported only starting from Linux version 6.8.
-     *       If you wish to enforce the use of the legacy API, set the **SRM_FORCE_LEGACY_API** environment variable to 1.
-     *
-     * @param connector The @ref SRMConnector instance.
-     * @return 1 if vsync control is supported, 0 otherwise.
-     */
-    bool supportsVSync() const noexcept;
+    bool canDisableVSync() const noexcept;
 
     /**
      * @brief Returns the current vsync status.
@@ -442,10 +431,10 @@ public:
      * @param connector The @ref SRMConnector instance.
      * @return 1 if vsync is enabled, 0 if not.
      */
-    bool isVSyncEnabled() const noexcept;
+    bool isVSyncEnabled() const noexcept { return m_vsync; }
 
     /**
-     * @brief Enable or disable vsync.
+     * @brief Toggles vsync.
      *
      * Disabling vsync is only allowed if srmConnectorHasVSyncControlSupport() returns 1.
      * VSync is enabled by default.
@@ -458,40 +447,6 @@ public:
      * @return 1 if the vsync change was successful, 0 otherwise.
      */
     bool enableVSync(bool enabled) noexcept;
-
-    /**
-     * @brief Sets the refresh rate limit when vsync is disabled.
-     *
-     * This function allows controlling the refresh rate limit when vsync is disabled
-     *
-     * @param connector A pointer to the @ref SRMConnector instance for which the refresh rate limit is to be set.
-     * @param hz The desired refresh rate limit in hertz.
-     *           If hz is less than 0, the refresh rate limit is disabled.
-     *           If hz is 0, the maximum refresh rate will be approximately twice the current display mode refresh rate.
-     *           The default value is 0.
-     *
-     * @note Using a value of 0 (twice the current mode refresh rate) provides a good balance between avoiding unnecessary undisplayed frames
-     *       and achieving snappier response times.
-     *
-     * @see srmConnectorGetRefreshRateLimit() to retrieve the current refresh rate limit.
-     *
-     * @warning Disabling the limit may result in visual artifacts and could potentially impact performance.
-     */
-    void setRefreshRateLimit(Int32 hz) noexcept;
-
-    /**
-     * @brief Retrieves the current refresh rate limit when vsync is disabled.
-     *
-     * This function allows you to query the refresh rate limit that has been previously set
-     * using the srmConnectorSetRefreshRateLimit() function.
-     *
-     * @param connector A pointer to the @ref SRMConnector instance for which the refresh rate limit is to be retrieved.
-     *
-     * @return The current refresh rate limit in hertz.
-     *         If the refresh rate limit is disabled, the returned value will be less than 0.
-     *         If the returned value is 0, means the limit is about twice the current display mode refresh rate.
-     */
-    Int32 refreshRateLimit() const noexcept;
 
     /**
      * @brief Gets the clock ID used for the timestamps returned by srmConnectorGetPresentationTime().
@@ -621,6 +576,7 @@ private:
 
     bool m_isConnected {};
     bool m_nonDesktop {};
+    bool m_vsync { true };
 
     CZWeak<SRMConnectorMode> m_currentMode;
     CZWeak<SRMConnectorMode> m_preferredMode;

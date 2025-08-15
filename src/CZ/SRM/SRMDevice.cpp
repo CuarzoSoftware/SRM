@@ -208,7 +208,6 @@ bool SRMDevice::initCaps() noexcept
     drmGetCap(fd(), DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP, &value);
     m_caps.AtomicAsyncPageFlip = value == 1;
 #endif
-
     return true;
 }
 

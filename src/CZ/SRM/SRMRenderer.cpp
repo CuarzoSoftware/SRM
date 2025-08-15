@@ -235,7 +235,7 @@ bool SRMRenderer::startRenderThread() noexcept
             // Blocks until repaint or unlock is called
             waitForRepaintRequest();
 
-            currentVSync = pendingVSync;
+            currentVSync = conn->m_vsync;
 
             // Uninitialize
             if (unitPromise.has_value())
@@ -399,9 +399,20 @@ bool SRMRenderer::applyCrtcMode() noexcept
         auto modeBlob = SRMPropertyBlob::Make(device(), &conn->currentMode()->info(), sizeof(drmModeModeInfo));
         req->attachPropertyBlob(modeBlob);
         req->addProperty(crtc->id(), crtc->m_propIDs.MODE_ID, modeBlob->id());
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.FB_ID, swapchain.fb()->id());
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_ID, crtc->id());
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_X, 0);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_Y, 0);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_W, conn->currentMode()->info().hdisplay);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_H, conn->currentMode()->info().vdisplay);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_X, 0);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_Y, 0);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_W, (UInt64)conn->currentMode()->info().hdisplay << 16);
+        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_H, (UInt64)conn->currentMode()->info().vdisplay << 16);
         req->addProperty(conn->id(), conn->m_propIDs.CRTC_ID, crtc->id());
         if (conn->m_propIDs.link_status)
             req->addProperty(conn->id(), conn->m_propIDs.link_status, DRM_MODE_LINK_STATUS_GOOD);
+
         auto prevCursorIndex { cursorI };
         atomicReqAppendChanges(req, nullptr);
         ret = req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
@@ -480,7 +491,7 @@ bool SRMRenderer::initSwapchainSelf() noexcept
         return false;
 
     std::vector<const RDRMFormat*> formats;
-    formats.reserve(inFormats.formats().size());
+    formats.reserve(inFormats.formats().size() + 1);
 
     auto it { inFormats.formats().find(DRM_FORMAT_XRGB8888) };
     if (it != inFormats.formats().end()) formats.emplace_back(&(*it));
@@ -547,7 +558,7 @@ bool SRMRenderer::initSwapchainPrime() noexcept
         return false;
 
     std::vector<const RDRMFormat*> formats;
-    formats.reserve(inFormats.formats().size());
+    formats.reserve(inFormats.formats().size() + 1);
 
     auto it { inFormats.formats().find(DRM_FORMAT_XRGB8888) };
     if (it != inFormats.formats().end()) formats.emplace_back(&(*it));
@@ -878,6 +889,8 @@ bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
 
 void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
 {
+    assert(fb);
+
     int ret { 0 };
 
     if (pendingPageFlip || swapchain.n == 1 || swapchain.n > 2)
@@ -887,12 +900,31 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
     {
         const std::lock_guard<std::recursive_mutex> lock { propsMutex };
 
-        if (currentVSync)
+        const bool asyncFlip { !currentVSync && atomicChanges.get() == 0 && !primaryPlane->m_syncOnlyModifiers.contains(fb->modifier()) };
+
+        // DRM_MODE_PAGE_FLIP_ASYNC only accepts changing the fb of the primary plane
+        if (asyncFlip)
         {
             auto req { SRMAtomicRequest::Make(device()) };
-            const auto prevCursorIndex { cursorI };
-            atomicReqAppendChanges(req, fb);
+            atomicReqAppendPrimaryPlane(req, fb);
+            ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK, this, false);
 
+            if (ret == -EINVAL)
+            {
+                if (fb->modifier() != DRM_FORMAT_MOD_INVALID)
+                {
+                    logAtomic(CZError, "Async pageflip failed: {}. Modifier {} added to sync-only list.", strerror(-ret), RDRMFormat::ModifierName(fb->modifier()));
+                    primaryPlane->m_syncOnlyModifiers.emplace(fb->modifier());
+                }
+            }
+        }
+
+        // Sync flip
+        if (!asyncFlip || ret)
+        {
+            auto req { SRMAtomicRequest::Make(device()) };
+            atomicReqAppendChanges(req, fb);
+            const auto prevCursorIndex { cursorI };
             ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, this, false);
 
             if (ret)
@@ -903,50 +935,33 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
             else
                 atomicChanges = 0;
         }
-        else
-        {
-            const bool primaryPlaneCommitOnly { atomicChanges.get() == 0 };
-            auto req { SRMAtomicRequest::Make(device()) };
-            atomicReqAppendChanges(req, fb);
 
-            // Sadly, we can only disable vsync if req only contains the primary plane
-            if (primaryPlaneCommitOnly)
-                ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK, this, false);
-
-            // If req contains more changes or failed, fallback to vsync
-            if (!primaryPlaneCommitOnly || ret == -22)
-            {
-                const auto prevCursorIndex { cursorI };
-                ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, this, false);
-
-                if (ret)
-                {
-                    if (cursorPlane)
-                        cursorI = prevCursorIndex;
-                }
-                else
-                    atomicChanges = 0;
-            }
-        }
-
-        if (ret && ret != -13)
+        if (ret && ret != -EACCES)
             logAtomic(CZError, CZLN, "Failed to page flip. DRM Error: {}", strerror(-ret));
     }
     else
     {
-        const auto primaryPlaneFb { fb ? fb->id() : 0 };
+        const auto primaryPlaneFb { fb->id() };
+        const bool asyncFlip { !currentVSync && !primaryPlane->m_syncOnlyModifiers.contains(fb->modifier()) };
 
-        if (currentVSync)
-            ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, this);
-        else
+        if (asyncFlip)
         {
             ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_PAGE_FLIP_EVENT, this);
 
-            if (ret == -22)
-                ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, this);
+            if (ret == -EINVAL)
+            {
+                if (fb->modifier() != DRM_FORMAT_MOD_INVALID)
+                {
+                    logLegacy(CZError, "Async pageflip failed: {}. Modifier {} added to sync-only list.", strerror(-ret), RDRMFormat::ModifierName(fb->modifier()));
+                    primaryPlane->m_syncOnlyModifiers.emplace(fb->modifier());
+                }
+            }
         }
 
-        if (ret && ret != -13)
+        if (!asyncFlip || ret)
+            ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, this);
+
+        if (ret && ret != -EACCES)
             logLegacy(CZError, CZLN, "Failed to page flip. DRM Error: {}", strerror(-ret));
     }
 
@@ -1069,18 +1084,9 @@ void SRMRenderer::atomicReqAppendPrimaryPlane(std::shared_ptr<SRMAtomicRequest> 
 {
     // Note: Both fb and crtc must be set or neither
     req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.FB_ID, fb ? fb->id() : 0);
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_ID, fb ? crtc->id() : 0);
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_X, 0);
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_Y, 0);
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_W, conn->currentMode()->info().hdisplay);
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.CRTC_H, conn->currentMode()->info().vdisplay);
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_X, 0);
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_Y, 0);
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_W, (UInt64)conn->currentMode()->info().hdisplay << 16);
-    req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.SRC_H, (UInt64)conn->currentMode()->info().vdisplay << 16);
 
     if (primaryPlane->m_propIDs.IN_FENCE_FD)
-        req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.IN_FENCE_FD, inFence.get());
+       req->addProperty(primaryPlane->id(), primaryPlane->m_propIDs.IN_FENCE_FD, inFence.get());
 
     // Apparently the kernel only uses the fd to access a dma fence but doesn't own it
     // so by attaching it here, it will be closed after the commit, when the request is destroyed

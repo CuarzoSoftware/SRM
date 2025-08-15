@@ -110,6 +110,9 @@ private:
     RDRMFormatSet m_formats;
     Type m_type;
 
+    // Modifiers that don't support async pageflips
+    std::unordered_set<RModifier> m_syncOnlyModifiers;
+
     struct PropIDs
     {
         UInt32

@@ -583,6 +583,28 @@ std::shared_ptr<const RGammaLUT> SRMConnector::gammaLUT() const noexcept
     return m_rend ? m_rend->gammaLUT : nullptr;
 }
 
+bool SRMConnector::canDisableVSync() const noexcept
+{
+    if (device()->clientCaps().Atomic)
+        return device()->caps().AtomicAsyncPageFlip;
+    return device()->caps().AsyncPageFlip;
+}
+
+bool SRMConnector::enableVSync(bool enabled) noexcept
+{
+    if (enabled)
+    {
+        m_vsync = true;
+        return true;
+    }
+
+    if (!canDisableVSync())
+        return false;
+
+    m_vsync = false;
+    return true;
+}
+
 bool SRMConnector::setGammaLUT(std::shared_ptr<const RGammaLUT> gammaLUT) noexcept
 {
     if (!m_rend)

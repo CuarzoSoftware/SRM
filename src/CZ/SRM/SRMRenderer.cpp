@@ -427,7 +427,7 @@ bool SRMRenderer::applyCrtcMode() noexcept
             if (cursorAPI == CursorAPI::Atomic)
                 cursorI = prevCursorIndex;
 
-            logAtomic(CZError, CZLN, "Failed to set CRTC mode. DRM Error: {}", strerror(ret));
+            logAtomic(CZError, CZLN, "Failed to set CRTC mode. DRM Error: {}", strerror(-ret));
             return false;
         }
         else
@@ -452,7 +452,7 @@ bool SRMRenderer::applyCrtcMode() noexcept
 
         if (ret)
         {
-            logLegacy(CZError, CZLN, "Failed to set CRTC mode. DRM Error: {}", ret);
+            logLegacy(CZError, CZLN, "Failed to set CRTC mode. DRM Error: {}", strerror(-ret));
             return false;
         }
     }
@@ -482,10 +482,10 @@ bool SRMRenderer::initSwapchainSelf() noexcept
 {
     auto ream { RCore::Get() };
 
-    if (device()->reamDevice() != ream->mainDevice())
+    if (ream->asRS() || device()->reamDevice() != ream->mainDevice())
         return false;
 
-    const auto inFormats { RDRMFormatSet::Intersect(primaryPlane->formats(), device()->reamDevice()->dmaRenderFormats()) };
+    const auto inFormats { RDRMFormatSet::Intersect(primaryPlane->formats(), device()->reamDevice()->renderFormats()) };
 
     if (inFormats.formats().empty())
         return false;
@@ -543,16 +543,16 @@ bool SRMRenderer::initSwapchainPrime() noexcept
 {
     auto ream { RCore::Get() };
 
-    if (device()->reamDevice() == ream->mainDevice())
+    if (ream->asRS() || device()->reamDevice() == ream->mainDevice())
         return false;
 
-    auto textureFormats { RDRMFormatSet::Intersect(device()->reamDevice()->dmaTextureFormats(), ream->mainDevice()->dmaRenderFormats()) };
+    auto textureFormats { RDRMFormatSet::Intersect(device()->reamDevice()->textureFormats(), ream->mainDevice()->renderFormats()) };
     textureFormats.removeModifier(DRM_FORMAT_MOD_INVALID);
 
     if (textureFormats.formats().empty())
         return false;
 
-    const auto inFormats { RDRMFormatSet::Intersect(primaryPlane->formats(), device()->reamDevice()->dmaRenderFormats()) };
+    const auto inFormats { RDRMFormatSet::Intersect(primaryPlane->formats(), device()->reamDevice()->renderFormats()) };
 
     if (inFormats.formats().empty())
         return false;
@@ -658,10 +658,10 @@ bool SRMRenderer::initSwapchainDumb() noexcept
 {
     auto ream { RCore::Get() };
 
-    if (device()->reamDevice() == ream->mainDevice() || !device()->reamDevice()->caps().DumbBuffer)
+    if (!device()->reamDevice()->caps().DumbBuffer)
         return false;
 
-    const auto inFormats { RDRMFormatSet::Intersect(primaryPlane->formats(), ream->mainDevice()->dmaRenderFormats()) };
+    const auto inFormats { RDRMFormatSet::Intersect(primaryPlane->formats(), ream->mainDevice()->renderFormats()) };
 
     if (inFormats.formats().empty())
         return false;
@@ -751,7 +751,6 @@ bool SRMRenderer::initSwapchainDumb() noexcept
 
     if (!ok)
         return false;
-
 
     return ok;
 }

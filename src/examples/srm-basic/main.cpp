@@ -88,16 +88,16 @@ static const SRMConnectorInterface connIface
         auto surface { RSurface::WrapImage(image) };
         surface->setGeometry(
             SkRect::MakeWH(image->size().width(), image->size().height()),
-            SkRect::MakeWH(image->size().width(), image->size().height()),
+            SkRect::MakeWH(image->size().width()/2, image->size().height()/2),
             CZTransform::Normal);
 
-        SkRegion clip { SkIRect::MakeSize(image->size()) };
+        SkRegion clip {  };
 
         conn->setCursorPos(SkIPoint::Make(phase * 2000, phase * 2000));
-        /*
+
         for (int y = 0; y < 20; y++)
             for (int x = 0; x < 20; x++)
-                clip.op(SkIRect::MakeXYWH(x * 400, y * 400, 300, 300), SkRegion::kUnion_Op);*/
+                clip.op(SkIRect::MakeXYWH(x * 100, y * 100, 50, 50), SkRegion::kUnion_Op);
 
         if (dx > 10.f)
         {
@@ -124,12 +124,21 @@ static const SRMConnectorInterface connIface
 
             RDrawImageInfo info {};
             info.image = imgNorm;
-            info.srcScale = 2.f;
+            info.srcScale = 1.f;
             info.srcTransform = CZTransform::Normal;
-            info.src = SkRect::MakeXYWH(100, 200, 40, 50);
-            info.dst = SkIRect::MakeXYWH(100, 100, 512, 512);
-            pass()->drawImage(info);
+            info.src = SkRect::MakeWH(info.image->size().width(), info.image->size().height());
+            info.dst = SkIRect::MakeXYWH(100, 100, 800, 800);
 
+            RDrawImageInfo mask {};
+            mask.image = img90;
+            mask.srcScale = 1.f;
+            mask.srcTransform = CZTransform::Rotated90;
+            mask.src = SkRect::MakeWH(mask.image->size().width(), mask.image->size().height());
+            mask.dst = SkIRect::MakeXYWH(200, 200, 500, 500);
+
+            pass()->drawImage(info, nullptr, &mask);
+
+            /*
             info.image = imgNorm;
             info.srcTransform = CZTransform::Normal;
             info.src = SkRect::MakeXYWH(0, 0, 1024, 1024);
@@ -153,6 +162,7 @@ static const SRMConnectorInterface connIface
             info.src = SkRect::MakeXYWH(100, 200, 40, 50);
             info.dst = SkIRect::MakeXYWH(700, 700, 512, 512);
             pass()->drawImage(info);
+            */
 
             pass()->restore();
         }
@@ -171,7 +181,7 @@ int main(void)
     setenv("CZ_SRM_LOG_LEVEL", "4", 0);
     setenv("CZ_REAM_LOG_LEVEL", "4", 0);
     setenv("CZ_REAM_EGL_LOG_LEVEL", "4", 0);
-    setenv("CZ_REAM_GAPI", "GL", 0);
+    setenv("CZ_REAM_GAPI", "RS", 0);
 
     /*
     std::thread([]{
@@ -191,7 +201,7 @@ int main(void)
 
     RDRMFormat fmt {DRM_FORMAT_ARGB8888 , { DRM_FORMAT_MOD_LINEAR }};
     imgNorm = RImage::LoadFile("/home/eduardo/Escritorio/atlas.png", fmt);
-    img90 = RImage::LoadFile("/home/eduardo/Escritorio/atlas90.png", fmt);
+    img90 = RImage::LoadFile("/usr/share/icons/Adwaita/scalable/devices/input-gaming.svg", fmt);
     img180 = RImage::LoadFile("/home/eduardo/Escritorio/atlas180.png", fmt);
     img270 = RImage::LoadFile("/home/eduardo/Escritorio/atlas270.png", fmt);
 

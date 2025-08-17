@@ -33,9 +33,7 @@ public:
     {
         Self,
         Prime,
-        Dumb,
-        Copy,
-        Raster
+        Dumb // Used by the raster GAPI and as a Prime fallback
     };
 
     enum class CursorAPI

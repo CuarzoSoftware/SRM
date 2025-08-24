@@ -803,17 +803,15 @@ bool SRMRenderer::flipPagePrime() noexcept
     if (!gpuSync)
         srcImage->allocator()->wait();
 
-    auto pass { swapchain.primeSurface()->beginPass(device()->reamDevice()) };
-
-    assert(pass.isValid());
-
-    pass()->setBlendMode(RBlendMode::Src);
+    auto pass { swapchain.primeSurface()->beginPass(RPassCap_Painter, device()->reamDevice()) };
+    auto *p { pass->getPainter() };
+    p->setBlendMode(RBlendMode::Src);
     RDrawImageInfo info {};
     info.image = srcImage;
     info.src = SkRect::Make(srcImage->size());
     info.dst = SkIRect::MakeSize(srcImage->size());
-    pass()->drawImage(info);
-    pass()->endPass();
+    p->drawImage(info);
+    pass.reset();
 
     auto primeImage { swapchain.primeImage() };
 

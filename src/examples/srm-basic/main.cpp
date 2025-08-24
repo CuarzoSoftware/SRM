@@ -9,8 +9,6 @@
 #include <RPainter.h>
 #include <RPass.h>
 
-#include <SK/RSKPass.h>
-
 #include <fcntl.h>
 #include <thread>
 #include <drm_fourcc.h>
@@ -22,10 +20,14 @@ extern "C" {
 using namespace CZ;
 
 static libseat *seat {};
+
+/*
 static std::shared_ptr<RImage> imgNorm;
 static std::shared_ptr<RImage> img90;
 static std::shared_ptr<RImage> img180;
-static std::shared_ptr<RImage> img270;
+static std::shared_ptr<RImage> img270;*/
+
+static std::shared_ptr<RSurface> tmpSurf;
 
 
 static int openRestricted(const char *path, int flags, void *userData)
@@ -71,6 +73,9 @@ static const SRMConnectorInterface connIface
 {
     .initializeGL = [](SRMConnector *conn, void *) {
 
+        tmpSurf = RSurface::Make({128, 128}, 2, true);
+        SRMLog(CZInfo, "Realloc {}", tmpSurf->resize({98, 98}, 1));
+        assert(tmpSurf);
         std::vector<UInt32> cursor;
         cursor.resize(64*64);
         for (size_t i = 0; i < cursor.size(); i++)
@@ -86,11 +91,12 @@ static const SRMConnectorInterface connIface
         float phase { 0.5f * (std::sin(dx) + 1.f) };
         auto image { conn->currentImage() };
         auto surface { RSurface::WrapImage(image) };
-        surface->setGeometry(
-            SkRect::MakeWH(image->size().width(), image->size().height()),
-            SkRect::MakeWH(image->size().width()/2, image->size().height()/2),
-            CZTransform::Normal);
+        surface->setGeometry({
+            .viewport = SkRect::MakeWH(image->size().width(), image->size().height()),
+            .dst = SkRect::MakeWH(image->size().width()/2, image->size().height()/2),
+            .transform = CZTransform::Normal});
 
+             /*
         SkRegion clip {  };
 
         conn->setCursorPos(SkIPoint::Make(phase * 2000, phase * 2000));
@@ -101,7 +107,6 @@ static const SRMConnectorInterface connIface
 
         if (dx > 10.f)
         {
-            /*
             auto pass { surface->beginSKPass(image->allocator()) };
             assert(pass.isValid());
             pass()->save();
@@ -112,7 +117,7 @@ static const SRMConnectorInterface connIface
             auto skImage { svg->skImage(image->allocator()) };
 
             pass()->drawImage(skImage.get(), 1000 * phase + 250, 250, SkSamplingOptions(SkFilterMode::kLinear), &p);
-            pass()->restore();*/
+            pass()->restore();
         }
         else
         {
@@ -138,7 +143,7 @@ static const SRMConnectorInterface connIface
 
             pass()->drawImage(info, nullptr, &mask);
 
-            /*
+
             info.image = imgNorm;
             info.srcTransform = CZTransform::Normal;
             info.src = SkRect::MakeXYWH(0, 0, 1024, 1024);
@@ -162,10 +167,21 @@ static const SRMConnectorInterface connIface
             info.src = SkRect::MakeXYWH(100, 200, 40, 50);
             info.dst = SkIRect::MakeXYWH(700, 700, 512, 512);
             pass()->drawImage(info);
-            */
+
 
             pass()->restore();
         }
+         */
+
+        auto pass { surface->beginPass() };
+        auto *p { pass->getPainter() };
+
+        RDrawImageInfo d {};
+        d.image = tmpSurf->image();
+        d.dst.setXYWH(600, 600, 800, 800);
+        d.src = tmpSurf->geometry().dst;
+        d.srcTransform = tmpSurf->geometry().transform;
+        p->drawImage(d);
 
         conn->repaint();
     },
@@ -179,9 +195,9 @@ static const SRMConnectorInterface connIface
 int main(void)
 {
     setenv("CZ_SRM_LOG_LEVEL", "4", 0);
-    setenv("CZ_REAM_LOG_LEVEL", "4", 0);
+    setenv("CZ_REAM_LOG_LEVEL", "6", 0);
     setenv("CZ_REAM_EGL_LOG_LEVEL", "4", 0);
-    setenv("CZ_REAM_GAPI", "RS", 0);
+    setenv("CZ_REAM_GAPI", "GL", 0);
 
     /*
     std::thread([]{
@@ -200,10 +216,11 @@ int main(void)
     }
 
     RDRMFormat fmt {DRM_FORMAT_ARGB8888 , { DRM_FORMAT_MOD_LINEAR }};
+    /*
     imgNorm = RImage::LoadFile("/home/eduardo/Escritorio/atlas.png", fmt);
     img90 = RImage::LoadFile("/usr/share/icons/Adwaita/scalable/devices/input-gaming.svg", fmt);
     img180 = RImage::LoadFile("/home/eduardo/Escritorio/atlas180.png", fmt);
-    img270 = RImage::LoadFile("/home/eduardo/Escritorio/atlas270.png", fmt);
+    img270 = RImage::LoadFile("/home/eduardo/Escritorio/atlas270.png", fmt);*/
 
     for (auto *dev : srm->devices())
     {
@@ -227,10 +244,12 @@ int main(void)
         for (auto *conn : dev->connectors())
                 conn->uninitialize();
 
+    /*
     imgNorm.reset();
     img90.reset();
     img180.reset();
-    img270.reset();
+    img270.reset();*/
+    tmpSurf.reset();
 
     return 0;
 }

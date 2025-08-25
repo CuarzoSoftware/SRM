@@ -345,36 +345,6 @@ public:
     std::shared_ptr<RImage> currentImage() const noexcept;
 
     /**
-     * @brief Checks if the connector benefits from providing it damage information generated during the last `paintGL()` call.
-     *
-     * This function checks if the given @ref SRMConnector benefits from receiving damage information generated during the last `paintGL()` call.
-     * Providing this information may improve performance, specifically when using **DUMB** or **CPU** render modes, as the connector will only copy the specified rectangles.
-     *
-     * @param connector Pointer to the @ref SRMConnector to check for buffer damage support.
-     * @return 1 if the connector supports buffer damage notifications, 0 otherwise.
-     */
-    bool supportsDamage() const noexcept;
-
-    /**
-     * @brief Notifies the connector of new damage generated during the last `paintGL()` call.
-     *
-     * This function notifies the given @ref SRMConnector of new damage areas generated during the last `paintGL()` call.\n
-     * Providing this damage information can considerably improve performance when using the **DUMB** or **CPU** render modes,
-     * as the connector will only copy the specified region.
-     * The damage specified is only valid during the current frame and is cleared in the next frame.
-     *
-     * @note Use srmConnectorHasBufferDamageSupport() to determine whether the connector can benefit from providing this information.
-     *
-     * @param connector Pointer to the @ref SRMConnector to notify of buffer damage.
-     * @param rects An array of @ref SRMRect structures representing the damaged area.
-     * @param n The number of rectangles in the array. Passing 0 unsets the current damage.
-     * @return 1 if the damage notification is successful, 0 if an error occurs.
-     *
-     * @warning It is important to ensure that the coordinates of the rectangles originate from the top-left corner of the framebuffer and do not extend beyond its boundaries to avoid segmentation errors.
-     */
-    bool setDamage(SkRegion *region) noexcept;
-
-    /**
      * @brief Get the subpixel layout associated with a connector.
      *
      * This function retrieves the subpixel layout associated with a given connector.
@@ -537,6 +507,16 @@ public:
      * @return          A value of 1 indicates the current buffer is locked, 0 indicates it is unlocked.
      */
     bool isCurrentBufferLocked() const noexcept;
+
+    /**
+     * @brief Damaged region during a paintGL event.
+     *
+     * Should be filled with the area updated during paintGL(), helping the graphics backend
+     * to minimize the number of pixels copied (raster backend, hybrid GPU setups, etc).
+     *
+     * Defined in image-local coordinates. Automatically reset to full damage ((0, 0), currentImage().size()) before each paintGL() call.
+     */
+    SkRegion damage;
 
     CZLogger log { SRMLog };
 

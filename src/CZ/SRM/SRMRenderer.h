@@ -47,17 +47,19 @@ public:
     {
         UInt32 i {};
         UInt32 age {};
+        UInt32 frame { 0 };
         UInt32 n { 2 };
 
         void advanceAge() noexcept
         {
             if (++i == n) i = 0;
-            if (age < n) age++;
+            age = frame < n ? 0 : n;
+            if (frame < n) frame++;
         }
 
         void resetAge() noexcept
         {
-            i = age = 0;
+            frame = i = age = 0;
         }
 
         auto fb() const noexcept { return fbs[i]; }

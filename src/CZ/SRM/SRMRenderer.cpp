@@ -794,7 +794,6 @@ bool SRMRenderer::flipPageSelf() noexcept
 
 bool SRMRenderer::flipPagePrime() noexcept
 {
-    // TODO: Use damage
     auto srcImage { swapchain.image() };
     auto ream { RCore::Get() };
 
@@ -810,7 +809,7 @@ bool SRMRenderer::flipPagePrime() noexcept
     info.image = srcImage;
     info.src = SkRect::Make(srcImage->size());
     info.dst = SkIRect::MakeSize(srcImage->size());
-    p->drawImage(info);
+    p->drawImage(info, &conn->damage);
     pass.reset();
 
     auto primeImage { swapchain.primeImage() };
@@ -826,13 +825,12 @@ bool SRMRenderer::flipPagePrime() noexcept
 
 bool SRMRenderer::flipPageDumb() noexcept
 {
-    // TODO: Use damage
     auto dumb { swapchain.dumbBuffer() };
     RPixelBufferRegion info {};
     info.pixels = dumb->pixels();
     info.stride = dumb->stride();
     info.format = dumb->formatInfo().format;
-    info.region.setRect(SkIRect::MakeSize(dumb->size()));
+    info.region = conn->damage;
     return swapchain.image()->readPixels(info);
 }
 
@@ -993,7 +991,10 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
 
 bool SRMRenderer::rendRender() noexcept
 {
+    const auto currentImageRect { SkIRect::MakeSize(swapchain.image()->size()) };
+    conn->damage.setRect(currentImageRect);
     iface->paintGL(conn, ifaceData);
+    conn->damage.op(currentImageRect, SkRegion::kIntersect_Op);
     return false;
 }
 

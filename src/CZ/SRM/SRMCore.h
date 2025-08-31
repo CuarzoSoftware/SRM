@@ -2,8 +2,8 @@
 #define SRMCORE_H
 
 #include <CZ/SRM/SRMObject.h>
-#include <CZ/CZSignal.h>
-#include <CZ/CZBitset.h>
+#include <CZ/Core/CZSignal.h>
+#include <CZ/Core/CZBitset.h>
 #include <memory>
 #include <thread>
 

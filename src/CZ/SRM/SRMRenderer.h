@@ -1,9 +1,9 @@
 #ifndef SRMRENDERER_H
 #define SRMRENDERER_H
 
-#include <CZ/CZLogger.h>
-#include <CZ/CZSpFd.h>
-#include <CZ/CZWeak.h>
+#include <CZ/Core/CZLogger.h>
+#include <CZ/Core/CZSpFd.h>
+#include <CZ/Core/CZWeak.h>
 #include <CZ/skia/core/SkPoint.h>
 #include <CZ/SRM/SRMPropertyBlob.h>
 #include <CZ/Ream/RPresentationTime.h>

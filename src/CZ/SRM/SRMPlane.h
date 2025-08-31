@@ -4,7 +4,7 @@
 #include <CZ/Ream/DRM/RDRMFormat.h>
 #include <CZ/Ream/Ream.h>
 #include <CZ/SRM/SRMObject.h>
-#include <CZ/CZWeak.h>
+#include <CZ/Core/CZWeak.h>
 #include <algorithm>
 #include <string_view>
 #include <unordered_set>

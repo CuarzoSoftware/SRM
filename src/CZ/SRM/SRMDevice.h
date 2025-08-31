@@ -4,7 +4,7 @@
 #include <CZ/SRM/SRMObject.h>
 #include <CZ/SRM/SRMLog.h>
 #include <CZ/Ream/RDevice.h>
-#include <CZ/CZBitset.h>
+#include <CZ/Core/CZBitset.h>
 #include <mutex>
 #include <string>
 #include <xf86drmMode.h>

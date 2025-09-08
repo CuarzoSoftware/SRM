@@ -2,7 +2,7 @@
 #define SRMTYPES_H
 
 #include <CZ/Ream/RPresentationTime.h>
-#include <CZ/Cuarzo.h>
+#include <CZ/Core/Cuarzo.h>
 
 #define SRM_VERSION_MAJOR 1
 #define SRM_VERSION_MINOR 0

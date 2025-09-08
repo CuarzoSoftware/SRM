@@ -12,7 +12,7 @@
 
 #include <CZ/skia/core/SkRegion.h>
 
-#include <CZ/CZWeak.h>
+#include <CZ/Core/CZWeak.h>
 
 #include <memory>
 #include <string>

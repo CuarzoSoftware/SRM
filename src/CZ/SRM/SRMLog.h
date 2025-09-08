@@ -1,7 +1,7 @@
 #ifndef SRMLOG_H
 #define SRMLOG_H
 
-#include <CZ/CZLogger.h>
+#include <CZ/Core/CZLogger.h>
 
 #define SRMLog SRMLogger()
 

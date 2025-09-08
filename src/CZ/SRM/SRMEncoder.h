@@ -2,7 +2,7 @@
 #define SRMENCODER_H
 
 #include <CZ/SRM/SRMObject.h>
-#include <CZ/CZWeak.h>
+#include <CZ/Core/CZWeak.h>
 #include <xf86drmMode.h>
 
 /**

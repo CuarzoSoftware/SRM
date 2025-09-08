@@ -68,14 +68,12 @@ public:
         bool AtomicAsyncPageFlip;
 
         /**
-         * @brief Retrieve the driver's support for monotonic timestamps.
+         * @brief Driver's support for monotonic timestamps.
          *
-         * @see srmConnectorGetPresentationClock()
-         * @see srmConnectorGetPresentationTime()
+         * @see SRMConnector::presentationClock()
+         * @see SRMConnector::presentationTime()
          *
-         * @param device A pointer to the @ref SRMDevice instance.
-         *
-         * @return 1 if the DRM device reports vblank timestamps with CLOCK_MONOTONIC, 0 if it uses CLOCK_REALTIME.
+         * @return true if the DRM device reports vblank timestamps with CLOCK_MONOTONIC, false if it uses CLOCK_REALTIME.
          */
         bool TimestampMonotonic;
     };

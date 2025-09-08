@@ -43,6 +43,12 @@ public:
         Legacy
     };
 
+    struct Frame
+    {
+        SRMRenderer *rend;
+        RPresentationTime info;
+    };
+
     struct Swapchain
     {
         UInt32 i {};
@@ -106,9 +112,13 @@ public:
     bool flipPagePrime() noexcept;
     bool flipPageDumb() noexcept;
 
+    static void PageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec, void *data) noexcept;
     void waitForRepaintRequest() noexcept;
     bool waitPendingPageFlip(int iterLimit) noexcept;
-    void commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept;
+    void commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexcept;
+
+    // Adds the current paint event to a "to be presented" frame queue
+    std::list<Frame>::iterator enqueueCurrentFrame(CZBitset<RPresentationTime::Flags> flags) noexcept;
 
     bool rendRender() noexcept;
     bool rendUpdateMode() noexcept;
@@ -166,8 +176,6 @@ public:
     std::recursive_mutex propsMutex; // Protect stuff like cursor and gamma updates
     std::unique_ptr<SkRegion> m_damage;
     RFormat m_currentFormat {};
-    RPresentationTime presentationTime {};
-    Int32 tearingLimit { -1 };
     std::shared_ptr<RImage> m_userScanoutBuffers[2] {};
 
     std::shared_ptr<RDRMFramebuffer> currentFb; // Currently being presented
@@ -176,6 +184,8 @@ public:
     void *ifaceData;
 
     Swapchain swapchain {};
+    UInt64 paintEventId { 0 };
+    std::list<Frame> frameQueue;
 
     // Async communication
     std::optional<std::promise<bool>> unitPromise;

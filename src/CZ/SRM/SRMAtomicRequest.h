@@ -1,17 +1,17 @@
 #ifndef CZ_SRMATOMICREQUEST_H
 #define CZ_SRMATOMICREQUEST_H
 
-#include <CZ/SRM/SRMObject.h>
-#include <memory>
-#include <unordered_set>
+#include <CZ/SRM/SRMRenderer.h>
 #include <xf86drmMode.h>
+#include <unordered_set>
+#include <memory>
 
 class CZ::SRMAtomicRequest final : public SRMObject
 {
 public:
     static std::shared_ptr<SRMAtomicRequest> Make(SRMDevice *device) noexcept;
     int addProperty(UInt32 objectId, UInt32 propertyId, UInt64 value) noexcept;
-    int commit(UInt32 flags, void *data, bool forceRetry) noexcept;
+    int commit(UInt32 flags, SRMRenderer::Frame *frame, bool forceRetry) noexcept;
 
     void attachPropertyBlob(std::shared_ptr<SRMPropertyBlob> blob) noexcept;
     void attachFd(int fd) noexcept;

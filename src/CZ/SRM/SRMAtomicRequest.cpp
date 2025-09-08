@@ -17,17 +17,17 @@ std::shared_ptr<SRMAtomicRequest> SRMAtomicRequest::Make(SRMDevice *device) noex
     return std::shared_ptr<SRMAtomicRequest>(new SRMAtomicRequest(device, req));
 }
 
-int SRMAtomicRequest::commit(UInt32 flags, void *data, bool forceRetry) noexcept
+int SRMAtomicRequest::commit(UInt32 flags, SRMRenderer::Frame *frame, bool forceRetry) noexcept
 {
     if (!forceRetry)
-        return drmModeAtomicCommit(device()->fd(), m_req, flags, data);
+        return drmModeAtomicCommit(device()->fd(), m_req, flags, frame);
 
     int ret;
 
     // EVENT + TEST is not allowed
     const UInt32 testFlags { (flags & ~DRM_MODE_PAGE_FLIP_EVENT) | DRM_MODE_ATOMIC_TEST_ONLY };
 retry:
-    ret = drmModeAtomicCommit(device()->fd(), m_req, testFlags, data);
+    ret = drmModeAtomicCommit(device()->fd(), m_req, testFlags, frame);
 
     if (ret == -16) // -EBUSY
     {
@@ -35,7 +35,7 @@ retry:
         goto retry;
     }
 
-    return drmModeAtomicCommit(device()->fd(), m_req, flags, data);
+    return drmModeAtomicCommit(device()->fd(), m_req, flags, frame);
 }
 
 void SRMAtomicRequest::attachPropertyBlob(std::shared_ptr<SRMPropertyBlob> blob) noexcept

@@ -31,7 +31,7 @@ using namespace CZ;
 
 std::unique_ptr<SRMRenderer> SRMRenderer::Make(SRMConnector *conn, const SRMConnectorInterface *iface, void *ifaceData) noexcept
 {
-    if (!iface || !iface->initializeGL || !iface->uninitializeGL || !iface->pageFlipped || !iface->paintGL || !iface->resizeGL)
+    if (!iface || !iface->initializeGL || !iface->uninitializeGL || !iface->presented || !iface->discarded || !iface->paintGL || !iface->resizeGL)
     {
         conn->log(CZError, CZLN, "Invalid SRMConnectorInterface");
         return {};
@@ -152,58 +152,6 @@ fail:
     cursorAPI = CursorAPI::None;
 }
 
-static void drmPageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec, void *data)
-{
-    CZ_UNUSED(fd);
-
-    if (data)
-    {
-        SRMRenderer *rend { static_cast<SRMRenderer*>(data) };
-        rend->pendingPageFlip = false;
-
-        if (rend->currentVSync)
-        {
-            rend->presentationTime.flags.set(RPresentationTime::HWClock | RPresentationTime::HWCompletion | RPresentationTime::VSync);
-            rend->presentationTime.frame = seq;
-            rend->presentationTime.time.tv_sec = sec;
-            rend->presentationTime.time.tv_nsec = usec * 1000;
-            rend->presentationTime.period = rend->conn->currentMode()->info().vrefresh == 0 ? 0 : 1000000000/rend->conn->currentMode()->info().vrefresh;
-        }
-        else
-        {
-            rend->presentationTime.flags = 0;
-            rend->presentationTime.frame = 0;
-            rend->presentationTime.period = 0;
-
-            Int64 prevUsec = (rend->presentationTime.time.tv_sec * 1000000LL) + (rend->presentationTime.time.tv_nsec / 1000LL);
-            clock_gettime(rend->device()->caps().TimestampMonotonic ? CLOCK_MONOTONIC : CLOCK_REALTIME, &rend->presentationTime.time);
-
-            if (rend->tearingLimit < 0)
-                return;
-
-            Int64 currUsec = (rend->presentationTime.time.tv_sec * 1000000LL) + (rend->presentationTime.time.tv_nsec / 1000LL);
-            Int64 periodUsec;
-
-            // Limit FPS to 2 * vrefresh
-            if (rend->tearingLimit == 0)
-                periodUsec = (rend->conn->currentMode()->info().vrefresh == 0 ? 0 : 490000/(rend->conn->currentMode()->info().vrefresh));
-            else
-                periodUsec = (rend->conn->currentMode()->info().vrefresh == 0 ? 0 : 1000000/(rend->tearingLimit));
-
-            if (periodUsec > 0)
-            {
-                Int64 diffUsec = currUsec - prevUsec;
-
-                if (diffUsec >= 0 && diffUsec < periodUsec)
-                {
-                    usleep(periodUsec - diffUsec);
-                    clock_gettime(rend->device()->caps().TimestampMonotonic ? CLOCK_MONOTONIC : CLOCK_REALTIME, &rend->presentationTime.time);
-                }
-            }
-        }
-    }
-}
-
 bool SRMRenderer::startRenderThread() noexcept
 {
     std::promise<bool> initPromise;
@@ -214,7 +162,7 @@ bool SRMRenderer::startRenderThread() noexcept
         threadId = std::this_thread::get_id();
         drmEventCtx.version = DRM_EVENT_CONTEXT_VERSION,
         drmEventCtx.vblank_handler = NULL,
-        drmEventCtx.page_flip_handler = &drmPageFlipHandler,
+        drmEventCtx.page_flip_handler = &PageFlipHandler,
         drmEventCtx.page_flip_handler2 = NULL;
         drmEventCtx.sequence_handler = NULL;
 
@@ -294,7 +242,7 @@ bool SRMRenderer::startRenderThread() noexcept
             // Only updates the cursor, gamma, etc
             else if (atomicChanges && currentFb)
             {
-                commit(currentFb);
+                commit(currentFb, false);
             }
 
 
@@ -367,7 +315,7 @@ void SRMRenderer::unit() noexcept
     {
         auto req { SRMAtomicRequest::Make(device()) };
         atomicReqAppendDisable(req);
-        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK, this, false);
+        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_NONBLOCK, nullptr, false);
     }
     else
     {
@@ -392,7 +340,7 @@ bool SRMRenderer::applyCrtcMode() noexcept
         // DPMS OFF
         auto req { SRMAtomicRequest::Make(device()) };
         req->addProperty(crtc->id(), crtc->m_propIDs.ACTIVE, 0);
-        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
+        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, nullptr, true);
 
         // SET MODE AND OTHER PROPS
         req = SRMAtomicRequest::Make(device());
@@ -415,12 +363,12 @@ bool SRMRenderer::applyCrtcMode() noexcept
 
         auto prevCursorIndex { cursorI };
         atomicReqAppendChanges(req, nullptr);
-        ret = req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
+        ret = req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, nullptr, true);
 
         // DPMS ON
         req = SRMAtomicRequest::Make(device());
         req->addProperty(crtc->id(), crtc->m_propIDs.ACTIVE, 1);
-        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, this, true);
+        req->commit(DRM_MODE_ATOMIC_ALLOW_MODESET, nullptr, true);
 
         if (ret)
         {
@@ -770,8 +718,7 @@ bool SRMRenderer::flipPage() noexcept
         break;
     }
 
-    commit(swapchain.fb());
-    iface->pageFlipped(conn, ifaceData);
+    commit(swapchain.fb(), true);
     return true;
 }
 
@@ -834,6 +781,53 @@ bool SRMRenderer::flipPageDumb() noexcept
     return swapchain.image()->readPixels(info);
 }
 
+void SRMRenderer::PageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec, void *data) noexcept
+{
+    CZ_UNUSED(fd);
+
+    if (data)
+    {
+        Frame *frame { static_cast<Frame*>(data) };
+        auto *rend { frame->rend };
+        rend->pendingPageFlip = false;
+
+        for (auto it = rend->frameQueue.begin(); it != rend->frameQueue.end();)
+        {
+            if ((*it).info.paintEventId != frame->info.paintEventId)
+            {
+                if ((*it).info.flags != 0)
+                    rend->iface->discarded(rend->conn, (*it).info.paintEventId, frame->rend->ifaceData);
+
+                it = rend->frameQueue.erase(it);
+            }
+            else
+            {
+                if (frame->info.flags.get() != 0)
+                {
+                    frame->info.seq = seq;
+
+                    if (frame->info.flags.has(RPresentationTime::VSync))
+                    {
+                        frame->info.time.tv_sec = sec;
+                        frame->info.time.tv_nsec = usec * 1000;
+                        frame->info.period = rend->conn->currentMode()->info().vrefresh == 0 ? 0 : 1000000000/rend->conn->currentMode()->info().vrefresh;
+                    }
+                    else
+                    {
+                        frame->info.period = 0;
+                        clock_gettime(rend->device()->caps().TimestampMonotonic ? CLOCK_MONOTONIC : CLOCK_REALTIME, &frame->info.time);
+                    }
+
+                    rend->iface->presented(rend->conn, (*it).info, frame->rend->ifaceData);
+                }
+
+                it = rend->frameQueue.erase(it);
+                break;
+            }
+        }
+    }
+}
+
 void SRMRenderer::waitForRepaintRequest() noexcept
 {
     const bool needsWait { (!pendingRepaint && atomicChanges == 0) || device()->core()->isSuspended() };
@@ -882,7 +876,7 @@ bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
     return true;
 }
 
-void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
+void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexcept
 {
     assert(fb);
 
@@ -902,13 +896,17 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
         {
             auto req { SRMAtomicRequest::Make(device()) };
             atomicReqAppendPrimaryPlane(req, fb);
-            ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK, this, false);
+            auto frame { enqueueCurrentFrame(notify ? RPresentationTime::HWClock | RPresentationTime::HWCompletion : 0) };
+            ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK, &(*frame), false);
 
-            if (ret == -EINVAL)
+            if (ret)
             {
-                if (fb->modifier() != DRM_FORMAT_MOD_INVALID)
+                frameQueue.erase(frame);
+
+                // Even if async flips are supported some drivers may not handle specific modifiers and report EINVAL
+                if (ret == -EINVAL && fb->modifier() != DRM_FORMAT_MOD_INVALID)
                 {
-                    logAtomic(CZError, "Async pageflip failed: {}. Modifier {} added to sync-only list.", strerror(-ret), RDRMFormat::ModifierName(fb->modifier()));
+                    logAtomic(CZTrace, "Async pageflip failed: {}. Modifier {} added to sync-only list.", strerror(-ret), RDRMFormat::ModifierName(fb->modifier()));
                     primaryPlane->m_syncOnlyModifiers.emplace(fb->modifier());
                 }
             }
@@ -920,19 +918,20 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
             auto req { SRMAtomicRequest::Make(device()) };
             atomicReqAppendChanges(req, fb);
             const auto prevCursorIndex { cursorI };
-            ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, this, false);
+            auto frame { enqueueCurrentFrame(notify ? RPresentationTime::HWClock | RPresentationTime::HWCompletion | RPresentationTime::VSync : 0) };
+            ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, &(*frame), false);
 
             if (ret)
             {
+                frameQueue.erase(frame);
                 if (cursorPlane)
                     cursorI = prevCursorIndex;
+
+                logAtomic(CZTrace, CZLN, "Failed to page flip. DRM Error: {}", strerror(-ret));
             }
             else
                 atomicChanges = 0;
         }
-
-        if (ret && ret != -EACCES)
-            logAtomic(CZError, CZLN, "Failed to page flip. DRM Error: {}", strerror(-ret));
     }
     else
     {
@@ -941,40 +940,39 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
 
         if (asyncFlip)
         {
-            ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_PAGE_FLIP_EVENT, this);
+            auto frame { enqueueCurrentFrame(notify ? RPresentationTime::HWClock | RPresentationTime::HWCompletion : 0) };
+            ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_PAGE_FLIP_EVENT, &(*frame));
 
-            if (ret == -EINVAL)
+            if (ret)
             {
-                if (fb->modifier() != DRM_FORMAT_MOD_INVALID)
+                frameQueue.erase(frame);
+
+                // Even if async flips are supported some drivers may not handle specific modifiers and report EINVAL
+                if (ret == -EINVAL && fb->modifier() != DRM_FORMAT_MOD_INVALID)
                 {
-                    logLegacy(CZError, "Async pageflip failed: {}. Modifier {} added to sync-only list.", strerror(-ret), RDRMFormat::ModifierName(fb->modifier()));
+                    logLegacy(CZTrace, "Async pageflip failed: {}. Modifier {} added to sync-only list.", strerror(-ret), RDRMFormat::ModifierName(fb->modifier()));
                     primaryPlane->m_syncOnlyModifiers.emplace(fb->modifier());
                 }
             }
         }
 
         if (!asyncFlip || ret)
-            ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, this);
+        {
+            auto frame { enqueueCurrentFrame(notify ? RPresentationTime::HWClock | RPresentationTime::HWCompletion | RPresentationTime::VSync : 0) };
+            ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, &(*frame));
 
-        if (ret && ret != -EACCES)
-            logLegacy(CZError, CZLN, "Failed to page flip. DRM Error: {}", strerror(-ret));
+            if (ret)
+            {
+                frameQueue.erase(frame);
+                logLegacy(CZTrace, CZLN, "Failed to page flip. DRM Error: {}", strerror(-ret));
+            }
+        }
     }
-
 
     if (ret)
     {
-        /*
-        if (customScanoutBuffer && ret == -22)
-        {
-            if (!srmFormatIsInList(
-                    connector->currentPrimaryPlane->inFormatsBlacklist,
-                    connector->userScanoutBufferRef[0]->scanout.fmt.format,
-                    connector->userScanoutBufferRef[0]->scanout.fmt.modifier))
-                srmFormatsListAddFormat(
-                    connector->currentPrimaryPlane->inFormatsBlacklist,
-                    connector->userScanoutBufferRef[0]->scanout.fmt.format,
-                    connector->userScanoutBufferRef[0]->scanout.fmt.modifier);
-        }*/
+        if (notify)
+            iface->discarded(conn, paintEventId, ifaceData);
     }
     else
     {
@@ -989,10 +987,19 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb) noexcept
     }
 }
 
+std::list<SRMRenderer::Frame>::iterator SRMRenderer::enqueueCurrentFrame(CZBitset<RPresentationTime::Flags> flags) noexcept
+{
+    frameQueue.emplace_back(Frame{.rend = this, .info = {}});
+    frameQueue.back().info.flags = flags;
+    frameQueue.back().info.paintEventId = paintEventId;
+    return std::prev(frameQueue.end());
+}
+
 bool SRMRenderer::rendRender() noexcept
 {
     const auto currentImageRect { SkIRect::MakeSize(swapchain.image()->size()) };
     conn->damage.setRect(currentImageRect);
+    paintEventId++;
     iface->paintGL(conn, ifaceData);
     conn->damage.op(currentImageRect, SkRegion::kIntersect_Op);
     return false;

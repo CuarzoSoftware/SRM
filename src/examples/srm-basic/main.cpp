@@ -21,8 +21,8 @@ using namespace CZ;
 
 static libseat *seat {};
 
-/*
 static std::shared_ptr<RImage> imgNorm;
+/*
 static std::shared_ptr<RImage> img90;
 static std::shared_ptr<RImage> img180;
 static std::shared_ptr<RImage> img270;*/
@@ -82,6 +82,7 @@ static const SRMConnectorInterface connIface
             cursor[i] = 0xFFFF00FF;
         conn->setCursor((UInt8*)cursor.data());
         conn->setCursorPos({200, 200});
+        conn->enableVSync(false);
         conn->repaint();
     },
     .paintGL = [](SRMConnector *conn, void *)
@@ -91,101 +92,38 @@ static const SRMConnectorInterface connIface
         float phase { 0.5f * (std::sin(dx) + 1.f) };
         auto image { conn->currentImage() };
         auto surface { RSurface::WrapImage(image) };
+        conn->setCursorPos({Int32(phase*1000), 200});
+
         surface->setGeometry({
             .viewport = SkRect::MakeWH(image->size().width(), image->size().height()),
             .dst = SkRect::MakeWH(image->size().width()/2, image->size().height()/2),
             .transform = CZTransform::Normal});
 
-             /*
+
         SkRegion clip {  };
 
         conn->setCursorPos(SkIPoint::Make(phase * 2000, phase * 2000));
-
-        for (int y = 0; y < 20; y++)
-            for (int x = 0; x < 20; x++)
-                clip.op(SkIRect::MakeXYWH(x * 100, y * 100, 50, 50), SkRegion::kUnion_Op);
-
-        if (dx > 10.f)
-        {
-            auto pass { surface->beginSKPass(image->allocator()) };
-            assert(pass.isValid());
-            pass()->save();
-            SkPaint p;
-            p.setBlendMode(SkBlendMode::kSrcOver);
-            pass()->clear(SK_ColorWHITE);
-            pass()->clipRegion(clip);
-            auto skImage { svg->skImage(image->allocator()) };
-
-            pass()->drawImage(skImage.get(), 1000 * phase + 250, 250, SkSamplingOptions(SkFilterMode::kLinear), &p);
-            pass()->restore();
-        }
-        else
-        {
-            auto pass { surface->beginPass(image->allocator()) };
-            pass()->save();
-            pass()->setColor(SkColorSetARGB(255, 255, 255, 200));
-            pass()->clearSurface();
-            pass()->setBlendMode(RBlendMode::SrcOver);
-
-            RDrawImageInfo info {};
-            info.image = imgNorm;
-            info.srcScale = 1.f;
-            info.srcTransform = CZTransform::Normal;
-            info.src = SkRect::MakeWH(info.image->size().width(), info.image->size().height());
-            info.dst = SkIRect::MakeXYWH(100, 100, 800, 800);
-
-            RDrawImageInfo mask {};
-            mask.image = img90;
-            mask.srcScale = 1.f;
-            mask.srcTransform = CZTransform::Rotated90;
-            mask.src = SkRect::MakeWH(mask.image->size().width(), mask.image->size().height());
-            mask.dst = SkIRect::MakeXYWH(200, 200, 500, 500);
-
-            pass()->drawImage(info, nullptr, &mask);
-
-
-            info.image = imgNorm;
-            info.srcTransform = CZTransform::Normal;
-            info.src = SkRect::MakeXYWH(0, 0, 1024, 1024);
-            info.dst = SkIRect::MakeXYWH(1800, 100, 1024, 1024);
-            pass()->drawImage(info);
-
-            info.image = img90;
-            info.srcTransform = CZTransform::Rotated90;
-            info.src = SkRect::MakeXYWH(100, 200, 40, 50);
-            info.dst = SkIRect::MakeXYWH(700, 100, 512, 512);
-            pass()->drawImage(info);
-
-            info.image = img180;
-            info.srcTransform = CZTransform::Rotated180;
-            info.src = SkRect::MakeXYWH(100, 200, 40, 50);
-            info.dst = SkIRect::MakeXYWH(100, 700, 512, 512);
-            pass()->drawImage(info);
-
-            info.image = img270;
-            info.srcTransform = CZTransform::Rotated270;
-            info.src = SkRect::MakeXYWH(100, 200, 40, 50);
-            info.dst = SkIRect::MakeXYWH(700, 700, 512, 512);
-            pass()->drawImage(info);
-
-
-            pass()->restore();
-        }
-         */
 
         auto pass { surface->beginPass() };
         auto *p { pass->getPainter() };
 
         RDrawImageInfo d {};
-        d.image = tmpSurf->image();
-        d.dst.setXYWH(600, 600, 800, 800);
-        d.src = tmpSurf->geometry().dst;
-        d.srcTransform = tmpSurf->geometry().transform;
+        d.image = imgNorm;
+        d.dst.setXYWH(phase * 600, 600, 800, 800);
+        d.src = SkRect::Make(imgNorm->size());
         p->drawImage(d);
-
         conn->repaint();
+
+        SRMLog(CZInfo, "Paint event id: {}", conn->paintEventId());
     },
-    .pageFlipped = [](SRMConnector *, void *) {},
+    .presented = [](SRMConnector *, const RPresentationTime &info, void *)
+    {
+        SRMLog(CZInfo, "Frame presented id: {} VSYNC: {}", info.paintEventId, info.flags.has(RPresentationTime::VSync));
+    },
+    .discarded = [](SRMConnector *, UInt64 paintEventId, void *)
+    {
+        SRMLog(CZError, "Frame discarded id: {}", paintEventId);
+    },
     .resizeGL = [](SRMConnector *, void *) {},
     .uninitializeGL = [](SRMConnector *, void *)
     {
@@ -194,6 +132,7 @@ static const SRMConnectorInterface connIface
 
 int main(void)
 {
+    setenv("SRM_FORCE_LEGACY_API", "1", 0);
     setenv("CZ_SRM_LOG_LEVEL", "4", 0);
     setenv("CZ_REAM_LOG_LEVEL", "6", 0);
     setenv("CZ_REAM_EGL_LOG_LEVEL", "4", 0);
@@ -216,8 +155,9 @@ int main(void)
     }
 
     RDRMFormat fmt {DRM_FORMAT_ARGB8888 , { DRM_FORMAT_MOD_LINEAR }};
-    /*
-    imgNorm = RImage::LoadFile("/home/eduardo/Escritorio/atlas.png", fmt);
+
+    imgNorm = RImage::LoadFile("/home/eduardo/tower.jpg", fmt);
+      /*
     img90 = RImage::LoadFile("/usr/share/icons/Adwaita/scalable/devices/input-gaming.svg", fmt);
     img180 = RImage::LoadFile("/home/eduardo/Escritorio/atlas180.png", fmt);
     img270 = RImage::LoadFile("/home/eduardo/Escritorio/atlas270.png", fmt);*/
@@ -244,8 +184,9 @@ int main(void)
         for (auto *conn : dev->connectors())
                 conn->uninitialize();
 
-    /*
+
     imgNorm.reset();
+        /*
     img90.reset();
     img180.reset();
     img270.reset();*/

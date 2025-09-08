@@ -419,22 +419,14 @@ public:
     bool enableVSync(bool enabled) noexcept;
 
     /**
-     * @brief Gets the clock ID used for the timestamps returned by srmConnectorGetPresentationTime().
+     * @brief Paint event id.
      *
-     * The clock ID can be either CLOCK_MONOTONIC or CLOCK_REALTIME.
+     * This ID can be used to detect which specific paintGL() event corresponds
+     * to a given presentation time.
      *
-     * @param connector A pointer to the @ref SRMConnector instance.
-     * @return The clock ID used for timestamps.
+     * @return Always returns 0 if the connector is uninitialized.
      */
-    clockid_t presentationClock() const noexcept;
-
-    /**
-     * @brief Retrieves information about how and when the current framebuffer displayed on the screen was presented.
-     *
-     * @param connector A pointer to the @ref SRMConnector instance.
-     * @return Pointer to the structure containing presentation time information, see @ref SRMPresentationTime.
-     */
-    const RPresentationTime &presentationTime() const noexcept;
+    UInt64 paintEventId() const noexcept;
 
     /**
      * @brief Sets a hint of the content type being displayed.

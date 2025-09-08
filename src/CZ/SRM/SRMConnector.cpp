@@ -605,6 +605,11 @@ bool SRMConnector::enableVSync(bool enabled) noexcept
     return true;
 }
 
+UInt64 SRMConnector::paintEventId() const noexcept
+{
+    return m_rend ? m_rend->paintEventId : 0;
+}
+
 bool SRMConnector::setGammaLUT(std::shared_ptr<const RGammaLUT> gammaLUT) noexcept
 {
     if (!m_rend)

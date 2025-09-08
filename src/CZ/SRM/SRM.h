@@ -1,6 +1,7 @@
 #ifndef SRMTYPES_H
 #define SRMTYPES_H
 
+#include <CZ/Ream/RPresentationTime.h>
 #include <CZ/Cuarzo.h>
 
 #define SRM_VERSION_MAJOR 1
@@ -44,24 +45,42 @@ namespace CZ
         void (*initializeGL)(SRMConnector *connector, void *data);
 
         /**
-         * @brief Render event.
+         * @brief Rendering callback for the current frame.
          *
-         * During this event, you should handle all rendering for the current frame.
+         * This function is invoked some time after repaint() is called.
+         * Implement this callback to perform all rendering operations for a frame.
          *
-         * @param connector Pointer to the @ref SRMConnector.
-         * @param data User data passed in srmConnectorInitialize().
+         * For each invocation of this callback, a corresponding notification
+         * either @ref presented or @ref discarded will be issued later, in submission order.
+         *
+         * @param connector Pointer to the @ref SRMConnector instance.
+         * @param data      User-defined data passed during srmConnectorInitialize().
          */
         void (*paintGL)(SRMConnector *connector, void *data);
 
         /**
-         * @brief Notifies a page flip.
+         * @brief Notification that the rendered frame has been presented.
          *
-         * This event is triggered when the framebuffer being displayed on the screen changes.
+         * Called after the content submitted in a recent @ref paintGL
+         * callback has been successfully presented to the display.
          *
-         * @param connector Pointer to the @ref SRMConnector.
-         * @param data User data passed in srmConnectorInitialize().
+         * @param connector Pointer to the @ref SRMConnector instance.
+         * @param info      Presentation timing information.
+         * @param data      User-defined data passed during srmConnectorInitialize().
          */
-        void (*pageFlipped)(SRMConnector *connector, void *data);
+        void (*presented)(SRMConnector *connector, const RPresentationTime &info, void *data);
+
+        /**
+         * @brief Notification that a rendered frame was not presented.
+         *
+         * Called when the content submitted in a previous @ref paintGL callback
+         * could not be presented (e.g., due to driver issues).
+         *
+         * @param connector     Pointer to the @ref SRMConnector instance.
+         * @param paintEventId  Identifier of the discarded paintGL event.
+         * @param data          User-defined data passed during srmConnectorInitialize().
+         */
+        void (*discarded)(SRMConnector *connector, UInt64 paintEventId, void *data);
 
         /**
          * @brief Notifies a change in the framebuffer's dimensions.

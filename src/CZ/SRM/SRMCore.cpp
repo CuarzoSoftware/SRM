@@ -22,25 +22,6 @@ std::shared_ptr<SRMCore> SRMCore::Make(const SRMInterface *iface, void *data) no
         return {};
     }
 
-    // Default env values
-    setenv("SRM_FORCE_LEGACY_API",              "0", 0);
-    setenv("SRM_FORCE_LEGACY_CURSOR",           "0", 0);
-    setenv("SRM_FORCE_GL_ALLOCATION",           "0", 0);
-    setenv("SRM_RENDER_MODE_SELF_FB_COUNT",     "2", 0);
-    setenv("SRM_RENDER_MODE_PRIME_FB_COUNT",    "2", 0);
-    setenv("SRM_RENDER_MODE_DUMB_FB_COUNT",     "2", 0);
-    setenv("SRM_RENDER_MODE_CPU_FB_COUNT",      "2", 0);
-    setenv("SRM_ENABLE_WRITEBACK_CONNECTORS",   "0", 0);
-    setenv("SRM_DISABLE_CUSTOM_SCANOUT",        "0", 0);
-    setenv("SRM_DISABLE_CURSOR",                "0", 0);
-    setenv("SRM_NVIDIA_CURSOR",                 "1", 0);
-
-    SRMLog(CZInfo, "SRM version {}.{}.{}-{}.",
-             SRM_VERSION_MAJOR,
-             SRM_VERSION_MINOR,
-             SRM_VERSION_PATCH,
-             SRM_VERSION_BUILD);
-
     if (RCore::Get())
     {
         SRMLog(CZFatal, CZLN, "The RCore instance must be created by SRM.");
@@ -48,6 +29,36 @@ std::shared_ptr<SRMCore> SRMCore::Make(const SRMInterface *iface, void *data) no
     }
 
     auto core { std::shared_ptr<SRMCore>(new SRMCore(iface, data)) };
+
+    if (core->init())
+        return core;
+
+    return {};
+}
+
+std::shared_ptr<CZ::SRMCore> SRMCore::Make(std::unordered_set<CZSpFd> &&fds) noexcept
+{
+    for (auto it = fds.begin(); it != fds.end();)
+    {
+        if ((*it).get() < 0)
+            it = fds.erase(it);
+        else
+            it++;
+    }
+
+    if (fds.empty())
+    {
+        SRMLog(CZFatal, CZLN, "The fd set is empty");
+        return {};
+    }
+
+    if (RCore::Get())
+    {
+        SRMLog(CZFatal, CZLN, "The RCore instance must be created by SRM.");
+        return {};
+    }
+
+    auto core { std::shared_ptr<SRMCore>(new SRMCore(std::move(fds))) };
 
     if (core->init())
         return core;
@@ -81,15 +92,30 @@ SRMCore::~SRMCore() noexcept
 
 bool SRMCore::init() noexcept
 {
-    const char *env { getenv("SRM_DISABLE_CUSTOM_SCANOUT") };
+    // Default env values
+    setenv("CZ_SRM_FORCE_LEGACY_API",              "0", 0);
+    setenv("CZ_SRM_FORCE_LEGACY_CURSOR",           "0", 0);
+    setenv("CZ_SRM_FORCE_GL_ALLOCATION",           "0", 0);
+    setenv("CZ_SRM_ENABLE_WRITEBACK_CONNECTORS",   "0", 0);
+    setenv("CZ_SRM_DISABLE_CUSTOM_SCANOUT",        "0", 0);
+    setenv("CZ_SRM_DISABLE_CURSOR",                "0", 0);
+    setenv("CZ_SRM_NVIDIA_CURSOR",                 "1", 0);
+
+    SRMLog(CZInfo, "SRM version {}.{}.{}-{}.",
+           SRM_VERSION_MAJOR,
+           SRM_VERSION_MINOR,
+           SRM_VERSION_PATCH,
+           SRM_VERSION_BUILD);
+
+    const char *env { getenv("CZ_SRM_DISABLE_DIRECT_SCANOUT") };
     m_disableScanout = env && atoi(env) == 1;
     SRMLog(CZInfo, "Direct Scanout Enabled: {}.", !m_disableScanout);
 
-    env = getenv("SRM_DISABLE_CURSOR");
-    m_disableCursor =env && atoi(env) == 1;
+    env = getenv("CZ_SRM_DISABLE_CURSOR");
+    m_disableCursor = env && atoi(env) == 1;
     SRMLog(CZInfo, "Cursor Planes Enabled: {}.", !m_disableCursor);
 
-    env = getenv("SRM_FORCE_LEGACY_CURSOR");
+    env = getenv("CZ_SRM_FORCE_LEGACY_CURSOR");
     m_forceLegacyCursor = env && atoi(env) == 1;
     SRMLog(CZInfo, "Forcing Legacy Cursor IOCTLs: {}.", m_forceLegacyCursor);
 
@@ -118,47 +144,61 @@ bool SRMCore::initUdev() noexcept
 
 bool SRMCore::initDevices() noexcept
 {
-    udev_enumerate *enumerate;
-    udev_list_entry *devices, *list;
-    udev_device *dev;
-    udev_device *pci;
-    const char *path;
-    const char *bootVGA;
-    SRMDevice *device;
-
-    enumerate = udev_enumerate_new(m_udev);
-
-    if (!enumerate)
+    if (m_fds.empty())
     {
-        SRMLog(CZFatal, CZLN, "Failed to create udev_enumerate.");
-        return false;
+        udev_enumerate *enumerate;
+        udev_list_entry *devices, *list;
+        udev_device *dev;
+        udev_device *pci;
+        const char *path;
+        const char *bootVGA;
+        SRMDevice *device;
+
+        enumerate = udev_enumerate_new(m_udev);
+
+        if (!enumerate)
+        {
+            SRMLog(CZFatal, CZLN, "Failed to create udev_enumerate.");
+            return false;
+        }
+
+        udev_enumerate_add_match_is_initialized(enumerate);
+        udev_enumerate_add_match_sysname(enumerate, "card[0-9]*");
+        udev_enumerate_add_match_property(enumerate, "DEVTYPE", "drm_minor");
+        udev_enumerate_scan_devices(enumerate);
+        devices = udev_enumerate_get_list_entry(enumerate);
+
+        udev_list_entry_foreach(list, devices)
+        {
+            path = udev_list_entry_get_name(list);
+            dev = udev_device_new_from_syspath(m_udev, path);
+            pci = udev_device_get_parent_with_subsystem_devtype(dev, "pci", NULL);
+            bootVGA = nullptr;
+
+            if (pci)
+                bootVGA = udev_device_get_sysattr_value(pci, "boot_vga");
+
+            device = SRMDevice::Make(this, udev_device_get_devnode(dev), bootVGA && strcmp(bootVGA, "1") == 0);
+
+            if (device)
+                m_devices.emplace_back(device);
+
+            udev_device_unref(dev);
+        }
+
+        udev_enumerate_unref(enumerate);
+    }
+    else
+    {
+        for (auto &fd : m_fds)
+        {
+            auto *dev { SRMDevice::Make(this, fd.get()) };
+
+            if (dev)
+                m_devices.emplace_back(dev);
+        }
     }
 
-    udev_enumerate_add_match_is_initialized(enumerate);
-    udev_enumerate_add_match_sysname(enumerate, "card[0-9]*");
-    udev_enumerate_add_match_property(enumerate, "DEVTYPE", "drm_minor");
-    udev_enumerate_scan_devices(enumerate);
-    devices = udev_enumerate_get_list_entry(enumerate);
-
-    udev_list_entry_foreach(list, devices)
-    {
-        path = udev_list_entry_get_name(list);
-        dev = udev_device_new_from_syspath(m_udev, path);
-        pci = udev_device_get_parent_with_subsystem_devtype(dev, "pci", NULL);
-        bootVGA = nullptr;
-
-        if (pci)
-            bootVGA = udev_device_get_sysattr_value(pci, "boot_vga");
-
-        device = SRMDevice::Make(this, udev_device_get_devnode(dev), bootVGA && strcmp(bootVGA, "1") == 0);
-
-        if (device)
-            m_devices.emplace_back(device);
-
-        udev_device_unref(dev);
-    }
-
-    udev_enumerate_unref(enumerate);
     return !m_devices.empty();
 }
 

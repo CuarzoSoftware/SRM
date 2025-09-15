@@ -6,13 +6,13 @@
 #include <CZ/SRM/SRMLog.h>
 
 #include <CZ/Ream/Ream.h>
-#include <CZ/Ream/RSubPixel.h>
+#include <CZ/Ream/RSubpixel.h>
 #include <CZ/Ream/RContentType.h>
-#include <CZ/Ream/RPresentationTime.h>
 
 #include <CZ/skia/core/SkRegion.h>
 
 #include <CZ/Core/CZWeak.h>
+#include <CZ/Core/CZPresentationTime.h>
 
 #include <memory>
 #include <string>
@@ -193,6 +193,11 @@ public:
     SRMConnectorMode *currentMode() const noexcept { return m_currentMode; }
 
     /**
+     * @brief Compatible CRTCs.
+     */
+    const std::vector<SRMCrtc*> &crtcs() const noexcept { return m_crtcs; }
+
+    /**
      * @brief Sets the current mode of the connector.
      *
      * If the connector is initialized the `resizeGL()` event is invoked.
@@ -271,6 +276,11 @@ public:
      * @return 1 if the cursor position was successfully set, 0 if an error occurred.
      */
     bool setCursorPos(SkIPoint pos) noexcept;
+
+    /**
+     * @brief Checks if the connector is being leased.
+     */
+    bool leased() const noexcept { return m_leased; }
 
     /**
      * @brief Initializes a connector, creating its rendering thread and invoking `initializeGL()` once initialized.
@@ -359,7 +369,7 @@ public:
      * @return The subpixel layout associated with the connector.
      *
      */
-    RSubPixel subPixel() const noexcept;
+    RSubpixel subpixel() const noexcept { return m_subpixel; }
 
     /**
      * @brief Gets the number of elements used to represent each RGB gamma correction curve.
@@ -478,7 +488,7 @@ public:
      *
      * @return 1 if not meant for desktop usage, 0 if meant for desktop or if disconnected.
      */
-    bool isNonDesktop() const noexcept;
+    bool isNonDesktop() const noexcept { return m_nonDesktop; };
 
     /**
      * @brief Locks the buffer currently being displayed and ignores srmConnectorRepaint() calls.
@@ -501,6 +511,21 @@ public:
     bool isCurrentBufferLocked() const noexcept;
 
     /**
+     * @brief Finds a compatible display configuration for the connector.
+     *
+     * Attempts to find an encoder, CRTC, primary plane, and cursor plane
+     * suitable for this connector. The search may succeed even if
+     * a cursor plane is not found.
+     *
+     * @param[out] bestEncoder       Chosen encoder.
+     * @param[out] bestCrtc          Chosen CRTC.
+     * @param[out] bestPrimaryPlane  Chosen primary plane.
+     * @param[out] bestCursorPlane   Chosen cursor plane, or nullptr if none.
+     * @return true if a valid configuration was found, false otherwise.
+     */
+    bool findConfiguration(SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane) noexcept;
+
+    /**
      * @brief Damaged region during a paintGL event.
      *
      * Should be filled with the area updated during paintGL(), helping the graphics backend
@@ -516,6 +541,8 @@ private:
     friend class SRMCore;
     friend class SRMDevice;
     friend class SRMRenderer;
+    friend class SRMLease;
+
     static SRMConnector *Make(UInt32 id, SRMDevice *device) noexcept;
     SRMConnector(UInt32 id, SRMDevice *device) noexcept :
         m_id(id),
@@ -531,8 +558,6 @@ private:
 
     SRMConnectorMode *findPreferredMode() const noexcept;
 
-    // Could succeed even if besCursorPlane is nullptr
-    bool findConfiguration(SRMEncoder **bestEncoder, SRMCrtc **bestCrtc, SRMPlane **bestPrimaryPlane, SRMPlane **bestCursorPlane) noexcept;
     void destroyModes() noexcept;
 
     std::unique_ptr<SRMRenderer> m_rend;
@@ -542,13 +567,14 @@ private:
     UInt32 m_type {}; // DRM connector type
 
     SRMDevice *m_device { nullptr };
-    RSubPixel m_subPixel { RSubPixel::Unknown };
+    RSubpixel m_subpixel { RSubpixel::Unknown };
     RContentType m_contentType { RContentType::Graphics };
     SkISize m_mmSize {};
 
     bool m_isConnected {};
     bool m_nonDesktop {};
     bool m_vsync { true };
+    bool m_leased {};
 
     CZWeak<SRMConnectorMode> m_currentMode;
     CZWeak<SRMConnectorMode> m_preferredMode;

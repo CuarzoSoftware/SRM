@@ -308,6 +308,7 @@ bool SRMRenderer::init() noexcept
 void SRMRenderer::unit() noexcept
 {
     iface->uninitializeGL(conn, ifaceData);
+    conn->setCursor(nullptr);
 
     waitPendingPageFlip(1);
 
@@ -806,7 +807,7 @@ void SRMRenderer::PageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec,
                 {
                     frame->info.seq = seq;
 
-                    if (frame->info.flags.has(RPresentationTime::VSync))
+                    if (frame->info.flags.has(CZPresentationTime::VSync))
                     {
                         frame->info.time.tv_sec = sec;
                         frame->info.time.tv_nsec = usec * 1000;
@@ -896,7 +897,7 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
         {
             auto req { SRMAtomicRequest::Make(device()) };
             atomicReqAppendPrimaryPlane(req, fb);
-            auto frame { enqueueCurrentFrame(notify ? RPresentationTime::HWClock | RPresentationTime::HWCompletion : 0) };
+            auto frame { enqueueCurrentFrame(notify ? CZPresentationTime::HWClock | CZPresentationTime::HWCompletion : 0) };
             ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK, &(*frame), false);
 
             if (ret)
@@ -918,7 +919,7 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
             auto req { SRMAtomicRequest::Make(device()) };
             atomicReqAppendChanges(req, fb);
             const auto prevCursorIndex { cursorI };
-            auto frame { enqueueCurrentFrame(notify ? RPresentationTime::HWClock | RPresentationTime::HWCompletion | RPresentationTime::VSync : 0) };
+            auto frame { enqueueCurrentFrame(notify ? CZPresentationTime::HWClock | CZPresentationTime::HWCompletion | CZPresentationTime::VSync : 0) };
             ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, &(*frame), false);
 
             if (ret)
@@ -940,7 +941,7 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
 
         if (asyncFlip)
         {
-            auto frame { enqueueCurrentFrame(notify ? RPresentationTime::HWClock | RPresentationTime::HWCompletion : 0) };
+            auto frame { enqueueCurrentFrame(notify ? CZPresentationTime::HWClock | CZPresentationTime::HWCompletion : 0) };
             ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_PAGE_FLIP_EVENT, &(*frame));
 
             if (ret)
@@ -958,7 +959,7 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
 
         if (!asyncFlip || ret)
         {
-            auto frame { enqueueCurrentFrame(notify ? RPresentationTime::HWClock | RPresentationTime::HWCompletion | RPresentationTime::VSync : 0) };
+            auto frame { enqueueCurrentFrame(notify ? CZPresentationTime::HWClock | CZPresentationTime::HWCompletion | CZPresentationTime::VSync : 0) };
             ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, &(*frame));
 
             if (ret)
@@ -987,7 +988,7 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
     }
 }
 
-std::list<SRMRenderer::Frame>::iterator SRMRenderer::enqueueCurrentFrame(CZBitset<RPresentationTime::Flags> flags) noexcept
+std::list<SRMRenderer::Frame>::iterator SRMRenderer::enqueueCurrentFrame(CZBitset<CZPresentationTime::Flags> flags) noexcept
 {
     frameQueue.emplace_back(Frame{.rend = this, .info = {}});
     frameQueue.back().info.flags = flags;

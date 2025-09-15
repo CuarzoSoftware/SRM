@@ -1,7 +1,6 @@
 #ifndef SRMTYPES_H
 #define SRMTYPES_H
 
-#include <CZ/Ream/RPresentationTime.h>
 #include <CZ/Core/Cuarzo.h>
 
 #define SRM_VERSION_MAJOR 1
@@ -24,6 +23,7 @@ namespace CZ
 
     class SRMAtomicRequest;
     class SRMPropertyBlob;
+    class SRMLease;
 
     /**
      * @brief Interface for OpenGL events handling.
@@ -68,7 +68,7 @@ namespace CZ
          * @param info      Presentation timing information.
          * @param data      User-defined data passed during srmConnectorInitialize().
          */
-        void (*presented)(SRMConnector *connector, const RPresentationTime &info, void *data);
+        void (*presented)(SRMConnector *connector, const CZPresentationTime &info, void *data);
 
         /**
          * @brief Notification that a rendered frame was not presented.

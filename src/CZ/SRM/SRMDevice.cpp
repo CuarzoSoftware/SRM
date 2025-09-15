@@ -19,7 +19,7 @@ using namespace CZ;
 
 static bool DeviceInBlacklist(const char *nodePath)
 {
-    const char *blacklist { getenv("SRM_DEVICES_BLACKLIST") };
+    const char *blacklist { getenv("CZ_SRM_DEVICE_BLACKLIST") };
 
     if (!blacklist)
         return false;
@@ -48,9 +48,6 @@ static bool DeviceInBlacklist(const char *nodePath)
 
 SRMDevice *SRMDevice::Make(SRMCore *core, const char *nodePath, bool isBootVGA) noexcept
 {
-    //if (isBootVGA)
-    //    return {};
-
     if (DeviceInBlacklist(nodePath))
     {
         SRMLog(CZWarning, "SRMDevice {} is blacklisted. Ignoring it...", nodePath);
@@ -58,6 +55,26 @@ SRMDevice *SRMDevice::Make(SRMCore *core, const char *nodePath, bool isBootVGA) 
     }
 
     std::unique_ptr<SRMDevice> obj { new SRMDevice(core, nodePath, isBootVGA) };
+
+    if (obj->init())
+        return obj.release();
+
+    return {};
+}
+
+SRMDevice *SRMDevice::Make(SRMCore *core, int fd) noexcept
+{
+    const char *name { drmGetDeviceNameFromFd2(fd) };
+
+    if (!name)
+    {
+        SRMLog(CZError, CZLN, "Failed to get node name (drmGetDeviceNameFromFd2)");
+        return {};
+    }
+
+    std::unique_ptr<SRMDevice> obj { new SRMDevice(core, name, false) };
+    obj->m_fd = fd;
+    free((void*)name);
 
     if (obj->init())
         return obj.release();
@@ -78,6 +95,115 @@ SRMDevice::SRMDevice(SRMCore *core, const char *nodePath, bool isBootVGA) noexce
     log(CZInfo, "Is Boot VGA: {}", isBootVGA);
 }
 
+std::shared_ptr<SRMLease> SRMDevice::createLease(SRMLease::Resources &&resources) noexcept
+{
+    if (!clientCaps().Atomic)
+    {
+        log(CZError, CZLN, "SRM doesn't implement leasing for the legacy API");
+        return {};
+    }
+
+    std::vector<UInt32> ids;
+    ids.reserve(resources.connectors.size() + resources.crtcs.size() + resources.planes.size());
+
+    for (auto &conn : resources.connectors)
+    {
+        if (!conn)
+        {
+            log(CZError, CZLN, "Invalid connector (nullptr)");
+            return {};
+        }
+
+        if (conn->device() != this)
+        {
+            log(CZError, CZLN, "Invalid connector (belongs to another device)");
+            return {};
+        }
+
+        if (conn->isInitialized() || conn->leased())
+        {
+            log(CZError, CZLN, "The connector can't be leased (initialized or already leased)");
+            return {};
+        }
+
+        ids.emplace_back(conn->id());
+    }
+
+    for (auto &crtc : resources.crtcs)
+    {
+        if (!crtc)
+        {
+            log(CZError, CZLN, "Invalid CRTC (nullptr)");
+            return {};
+        }
+
+        if (crtc->device() != this)
+        {
+            log(CZError, CZLN, "Invalid crtc (belongs to another device)");
+            return {};
+        }
+
+        if (crtc->currentConnector() || crtc->leased())
+        {
+            log(CZError, CZLN, "The CRTC can't be leased (in use or already leased)");
+            return {};
+        }
+
+        ids.emplace_back(crtc->id());
+    }
+
+    for (auto it = resources.planes.begin(); it != resources.planes.end();)
+    {
+        auto &plane { *it };
+
+        if (!plane)
+        {
+            log(CZError, CZLN, "Invalid plane (nullptr)");
+            return {};
+        }
+
+        if (plane->device() != this)
+        {
+            log(CZError, CZLN, "Invalid plane (belongs to another device)");
+            return {};
+        }
+
+        if (plane->currentConnector() || plane->leased())
+        {
+            log(CZError, CZLN, "The plane can't be leased (in use or already leased)");
+            return {};
+        }
+
+        if (core()->forcingLegacyCursor() && plane->type() == SRMPlane::Cursor)
+        {
+            log(CZWarning, CZLN, "Cursor planes can't be leased when the SRMCore::forcingLegacyCursor() is enabled. Skipping it...");
+            it = resources.planes.erase(it);
+            continue;
+        }
+
+        ids.emplace_back(plane->id());
+        it++;
+    }
+
+    if (ids.empty())
+    {
+        log(CZError, CZLN, "Failed to create lease (the list of resources is empty)");
+        return {};
+    }
+
+    UInt32 lessee;
+    int leaseFd { drmModeCreateLease(fd(), ids.data(), ids.size(), O_CLOEXEC, &lessee) };
+
+    if (leaseFd < 0)
+    {
+        log(CZError, CZLN, "Failed to create lease (drmModeCreateLease)");
+        return {};
+    }
+
+    log(CZTrace, "Lease {} created", lessee);
+    return std::shared_ptr<SRMLease>(new SRMLease(std::move(resources), this, leaseFd, lessee));
+}
+
 SRMDevice::~SRMDevice() noexcept
 {
     CZVectorUtils::DeleteAndPopBackAll(m_connectors);
@@ -85,7 +211,7 @@ SRMDevice::~SRMDevice() noexcept
     CZVectorUtils::DeleteAndPopBackAll(m_encoders);
     CZVectorUtils::DeleteAndPopBackAll(m_crtcs);
 
-    if (fd() >= 0)
+    if (fd() >= 0 && core()->m_fds.empty())
     {
         core()->m_iface->closeRestricted(fd(), core()->m_ifaceData);
         m_fd = -1;
@@ -94,12 +220,15 @@ SRMDevice::~SRMDevice() noexcept
 
 bool SRMDevice::init() noexcept
 {
-    m_fd = core()->m_iface->openRestricted(m_nodePath.c_str(), O_RDWR | O_CLOEXEC, core()->m_ifaceData);
-
-    if (fd() < 0)
+    if (core()->m_fds.empty())
     {
-        log(CZError, CZLN, "Failed to open DRM device");
-        return false;
+        m_fd = core()->m_iface->openRestricted(m_nodePath.c_str(), O_RDWR | O_CLOEXEC, core()->m_ifaceData);
+
+        if (fd() < 0)
+        {
+            log(CZError, CZLN, "Failed to open DRM device");
+            return false;
+        }
     }
 
     log(CZInfo, "Is DRM Master: {}", drmIsMaster(fd()) != 0);
@@ -149,12 +278,12 @@ bool SRMDevice::init() noexcept
 
 bool SRMDevice::initClientCaps() noexcept
 {
-    const char *envStereo3D { getenv("SRM_ENABLE_STEREO_3D") };
+    const char *envStereo3D { getenv("CZ_SRM_ENABLE_STEREO_3D") };
 
     if (envStereo3D && atoi(envStereo3D))
         m_clientCaps.Stereo3D = drmSetClientCap(fd(), DRM_CLIENT_CAP_STEREO_3D, 1) == 0;
 
-    const char *envForceLegacyAPI { getenv("SRM_FORCE_LEGACY_API") };
+    const char *envForceLegacyAPI { getenv("CZ_SRM_FORCE_LEGACY_API") };
 
     if (!envForceLegacyAPI || atoi(envForceLegacyAPI) != 1)
         m_clientCaps.Atomic = drmSetClientCap(fd(), DRM_CLIENT_CAP_ATOMIC, 1) == 0;
@@ -165,7 +294,7 @@ bool SRMDevice::initClientCaps() noexcept
         m_clientCaps.AspectRatio = true;
         m_clientCaps.UniversalPlanes = true;
 
-        const char *envWriteback { getenv("SRM_ENABLE_WRITEBACK_CONNECTORS") };
+        const char *envWriteback { getenv("CZ_SRM_ENABLE_WRITEBACK_CONNECTORS") };
 
         if (envWriteback && atoi(envWriteback) == 1)
             m_clientCaps.WritebackConnectors = drmSetClientCap(fd(), DRM_CLIENT_CAP_WRITEBACK_CONNECTORS, 1) == 0;
@@ -305,7 +434,7 @@ bool SRMDevice::dispatchHotplugEvents() noexcept
             continue;
         }
 
-        const bool isConnected { res->connection ==  DRM_MODE_CONNECTED };
+        const bool isConnected { res->connection == DRM_MODE_CONNECTED };
 
         if (conn->isConnected() != isConnected)
         {

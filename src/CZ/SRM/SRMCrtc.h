@@ -56,10 +56,17 @@ public:
      *         if the driver does not support gamma correction.
      */
     UInt64 gammaSize() const noexcept;
+
+    /**
+     * @brief Checks if the CRTC is being leased.
+     */
+    bool leased() const noexcept { return m_leased; }
 private:
     friend class SRMDevice;
     friend class SRMConnector;
     friend class SRMRenderer;
+    friend class SRMLease;
+
     static SRMCrtc *Make(UInt32 id, SRMDevice *device) noexcept;
     SRMCrtc(UInt32 id, SRMDevice *device) noexcept :
         m_id(id),
@@ -72,6 +79,7 @@ private:
     SRMConnector *m_currentConnector { nullptr };
     UInt64 m_gammaSizeLegacy { 0 };
     UInt64 m_gammaSize { 0 };
+    bool m_leased {};
     struct PropIDs
     {
         UInt32

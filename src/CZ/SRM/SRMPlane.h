@@ -88,10 +88,17 @@ public:
      * @return A list of DRM formats/modifiers supported by the plane.
      */
     const RDRMFormatSet &formats() const noexcept { return m_formats; }
+
+    /**
+     * @brief Checks if the CRTC is being leased.
+     */
+    bool leased() const noexcept { return m_leased; }
+
 private:
     friend class SRMDevice;
     friend class SRMConnector;
     friend class SRMRenderer;
+    friend class SRMLease;
 
     static SRMPlane *Make(UInt32 id, SRMDevice *device) noexcept;
     SRMPlane(UInt32 id, SRMDevice *device) noexcept :
@@ -109,6 +116,7 @@ private:
     std::vector<SRMCrtc*> m_crtcs;
     RDRMFormatSet m_formats;
     Type m_type;
+    bool m_leased {};
 
     // Modifiers that don't support async pageflips
     std::unordered_set<RModifier> m_syncOnlyModifiers;

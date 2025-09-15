@@ -4,8 +4,10 @@
 #include <CZ/SRM/SRMObject.h>
 #include <CZ/Core/CZSignal.h>
 #include <CZ/Core/CZBitset.h>
+#include <CZ/Core/CZSpFd.h>
 #include <memory>
 #include <thread>
+#include <unordered_set>
 
 struct udev;
 struct udev_monitor;
@@ -40,19 +42,18 @@ class CZ::SRMCore final : public SRMObject
 {
 public:
     /**
-     * @brief Creates a new @ref SRMCore instance.
+     * @brief Creates an SRMCore instance.
      *
-     * Creates a new @ref SRMCore instance, which will scan and open all available DRM devices
-     * using the provided interface, find the best allocator device, and configure its rendering modes.
+     * Creates a new SRMCore instance, which will scan and open all available DRM devices
+     * using the provided interface.
      *
      * @param interface A pointer to the @ref SRMInterface that provides access to DRM devices.
      * @param userData  A pointer to the user data to associate with the @ref SRMCore instance.
      *
      * @return A pointer to the newly created @ref SRMCore instance on success, or `NULL` on failure.
-     *
-     * @note The caller is responsible for releasing the @ref SRMCore instance using srmCoreDestroy() when no longer needed.
      */
     static std::shared_ptr<SRMCore> Make(const SRMInterface *iface, void *userData) noexcept;
+    static std::shared_ptr<SRMCore> Make(std::unordered_set<CZSpFd> &&fds) noexcept;
 
     /**
      * @brief Temporarily suspends SRM.
@@ -125,6 +126,8 @@ public:
      */
     const std::vector<SRMDevice*> &devices() const noexcept { return m_devices; }
 
+    bool forcingLegacyCursor() const noexcept { return m_forceLegacyCursor; }
+
     /**
      * @brief Registers a new listener to be invoked when a new connector is plugged.
      *
@@ -156,6 +159,9 @@ private:
     SRMCore(const SRMInterface *iface, void *userData) noexcept :
         m_iface(iface), m_ifaceData(userData) {}
 
+    SRMCore(std::unordered_set<CZSpFd> &&fds) noexcept :
+        m_fds(std::move(fds)) {}
+
     bool init() noexcept;
     bool initUdev() noexcept;
     bool initDevices() noexcept;
@@ -173,8 +179,11 @@ private:
     bool m_disableCursor {};
     bool m_disableScanout {};
     std::shared_ptr<RCore> m_ream;
+
     const SRMInterface *m_iface { nullptr };
     void *m_ifaceData { nullptr };
+
+    std::unordered_set<CZSpFd> m_fds;
 };
 
 #endif // SRMCORE_H

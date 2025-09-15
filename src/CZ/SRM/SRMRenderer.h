@@ -4,9 +4,10 @@
 #include <CZ/Core/CZLogger.h>
 #include <CZ/Core/CZSpFd.h>
 #include <CZ/Core/CZWeak.h>
+#include <CZ/Core/CZPresentationTime.h>
 #include <CZ/skia/core/SkPoint.h>
 #include <CZ/SRM/SRMPropertyBlob.h>
-#include <CZ/Ream/RPresentationTime.h>
+#include <CZ/Ream/Ream.h>
 
 #include <future>
 #include <mutex>
@@ -46,7 +47,7 @@ public:
     struct Frame
     {
         SRMRenderer *rend;
-        RPresentationTime info;
+        CZPresentationTime info;
     };
 
     struct Swapchain
@@ -118,7 +119,7 @@ public:
     void commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexcept;
 
     // Adds the current paint event to a "to be presented" frame queue
-    std::list<Frame>::iterator enqueueCurrentFrame(CZBitset<RPresentationTime::Flags> flags) noexcept;
+    std::list<Frame>::iterator enqueueCurrentFrame(CZBitset<CZPresentationTime::Flags> flags) noexcept;
 
     bool rendRender() noexcept;
     bool rendUpdateMode() noexcept;

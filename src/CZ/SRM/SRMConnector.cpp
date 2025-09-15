@@ -50,7 +50,7 @@ SRMConnector *SRMConnector::Make(UInt32 id, SRMDevice *device) noexcept
 
 bool SRMConnector::updateProperties(drmModeConnectorPtr res) noexcept
 {
-    m_subPixel = (RSubPixel)res->subpixel;
+    m_subpixel = (RSubpixel)res->subpixel;
     m_mmSize.set(res->mmWidth, res->mmHeight);
     m_isConnected = res->connection == DRM_MODE_CONNECTED;
     m_type = res->connector_type;
@@ -268,7 +268,7 @@ bool SRMConnector::findConfiguration(SRMEncoder **bestEncoder, SRMCrtc **bestCrt
     {
         for (auto *crtc : encoder->crtcs())
         {
-            if (crtc->currentConnector())
+            if (crtc->currentConnector() || crtc->leased())
                 continue;
 
             int score { 0 };
@@ -277,14 +277,11 @@ bool SRMConnector::findConfiguration(SRMEncoder **bestEncoder, SRMCrtc **bestCrt
 
             for (auto *plane : device()->planes())
             {
-                if (plane->type() == SRMPlane::Overlay)
+                if (plane->type() == SRMPlane::Overlay || plane->currentConnector() || plane->leased())
                     continue;
 
                 for (auto *planeCrtc : plane->crtcs())
                 {
-                    if (planeCrtc->currentConnector())
-                        continue;
-
                     if (planeCrtc->id() == crtc->id())
                     {
                         if (plane->type() == SRMPlane::Primary)
@@ -473,9 +470,6 @@ bool SRMConnector::setCursor(UInt8 *pixels) noexcept
     }
     else
     {
-        if (!m_rend->cursorVisible)
-            return true;
-
         m_rend->cursorVisible = false;
 
         if (m_rend->cursorAPI == SRMRenderer::CursorAPI::Atomic)
@@ -495,9 +489,6 @@ bool SRMConnector::setCursorPos(SkIPoint pos) noexcept
     if (!hasCursor())
         return false;
 
-    if (m_rend->cursorPos.x() == pos.x() && m_rend->cursorPos.y() == pos.y())
-        return true;
-
     std::lock_guard<std::recursive_mutex> lock { m_rend->propsMutex };
 
     m_rend->cursorPos = pos;
@@ -515,6 +506,12 @@ bool SRMConnector::setCursorPos(SkIPoint pos) noexcept
 
 bool SRMConnector::initialize(const SRMConnectorInterface *iface, void *data) noexcept
 {
+    if (leased())
+    {
+        log(CZError, CZLN, "Failed to initialize (the connector is being leased)");
+        return false;
+    }
+
     if (isInitialized() || !isConnected())
         return false;
 

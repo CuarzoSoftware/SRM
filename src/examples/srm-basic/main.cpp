@@ -116,9 +116,9 @@ static const SRMConnectorInterface connIface
 
         SRMLog(CZInfo, "Paint event id: {}", conn->paintEventId());
     },
-    .presented = [](SRMConnector *, const RPresentationTime &info, void *)
+    .presented = [](SRMConnector *, const CZPresentationTime &info, void *)
     {
-        SRMLog(CZInfo, "Frame presented id: {} VSYNC: {}", info.paintEventId, info.flags.has(RPresentationTime::VSync));
+        SRMLog(CZInfo, "Frame presented id: {} VSYNC: {}", info.paintEventId, info.flags.has(CZPresentationTime::VSync));
     },
     .discarded = [](SRMConnector *, UInt64 paintEventId, void *)
     {

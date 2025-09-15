@@ -2,6 +2,7 @@
 #define SRMDEVICE_H
 
 #include <CZ/SRM/SRMObject.h>
+#include <CZ/SRM/SRMLease.h>
 #include <CZ/SRM/SRMLog.h>
 #include <CZ/Ream/RDevice.h>
 #include <CZ/Core/CZBitset.h>
@@ -70,8 +71,7 @@ public:
         /**
          * @brief Driver's support for monotonic timestamps.
          *
-         * @see SRMConnector::presentationClock()
-         * @see SRMConnector::presentationTime()
+         * @see presentationClock()
          *
          * @return true if the DRM device reports vblank timestamps with CLOCK_MONOTONIC, false if it uses CLOCK_REALTIME.
          */
@@ -88,6 +88,17 @@ public:
     SRMCore *core() const noexcept { return m_core; }
 
     /**
+     * @brief Create a DRM/KMS lease for a set of resources.
+     *
+     * All resources must belong to this device and must not be
+     * currently in use or already leased, otherwise, this call will fail.
+     *
+     * @param resources The set of resources to lease.
+     * @return std::shared_ptr<SRMLease> Lease object on success, nullptr on failure
+     */
+    std::shared_ptr<SRMLease> createLease(SRMLease::Resources &&resources) noexcept;
+
+    /**
      * @brief Get the DRM device name (e.g., `/dev/dri/card0`) associated with this device.
      *
      * @param device A pointer to the @ref SRMDevice instance.
@@ -98,6 +109,11 @@ public:
     const std::string &nodeName() const noexcept { return m_nodeName; }
     const ClientCaps &clientCaps() const noexcept { return m_clientCaps; }
     const Caps &caps() const noexcept { return m_caps; }
+
+    /**
+     * @brief Clock type used for timestamps of SRMConnector `presented()` events.
+     */
+    clockid_t presentationClock() const noexcept { return m_clock; }
 
     /**
      * @brief Get the file descriptor of the DRM device associated with this device.
@@ -156,7 +172,9 @@ private:
     friend class SRMCore;
     friend class SRMRenderer;
     friend class SRMConnector;
+    friend class SRMLease;
     static SRMDevice *Make(SRMCore *core, const char *nodePath, bool isBootVGA) noexcept;
+    static SRMDevice *Make(SRMCore *core, int fd) noexcept;
     SRMDevice(SRMCore *core, const char *nodePath, bool isBootVGA) noexcept;
     bool init() noexcept;
     bool initClientCaps() noexcept;

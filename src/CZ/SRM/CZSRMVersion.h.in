@@ -1,0 +1,14 @@
+#ifndef CZ_SRMVERSION_H
+#define CZ_SRMVERSION_H
+
+#define CZ_SRM_VERSION_MAJOR @VERSION_MAJOR@
+#define CZ_SRM_VERSION_MINOR @VERSION_MINOR@
+#define CZ_SRM_VERSION_PATCH @VERSION_PATCH@
+
+// Pack into a 64-bit version integer (Major:32 | Minor:16 | Patch:16)
+#define CZ_SRM_VERSION \
+    ((static_cast<uint64_t>(CZ_SRM_VERSION_MAJOR) << 32) | \
+     (static_cast<uint64_t>(CZ_SRM_VERSION_MINOR) << 16) | \
+     (static_cast<uint64_t>(CZ_SRM_VERSION_PATCH)))
+
+#endif // CZ_SRMVERSION_H

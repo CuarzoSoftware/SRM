@@ -7,6 +7,7 @@
 #include <CZ/Ream/RCore.h>
 #include <CZ/Ream/DRM/RDRMPlatformHandle.h>
 #include <CZ/Utils/CZVectorUtils.h>
+#include <CZSRMVersion.h>
 #include <cstring>
 #include <libudev.h>
 #include <sys/epoll.h>
@@ -101,11 +102,10 @@ bool SRMCore::init() noexcept
     setenv("CZ_SRM_DISABLE_CURSOR",                "0", 0);
     setenv("CZ_SRM_NVIDIA_CURSOR",                 "1", 0);
 
-    SRMLog(CZInfo, "SRM version {}.{}.{}-{}.",
-           SRM_VERSION_MAJOR,
-           SRM_VERSION_MINOR,
-           SRM_VERSION_PATCH,
-           SRM_VERSION_BUILD);
+    SRMLog(CZInfo, "SRM version {}.{}.{}.",
+           CZ_SRM_VERSION_MAJOR,
+           CZ_SRM_VERSION_MINOR,
+           CZ_SRM_VERSION_PATCH);
 
     const char *env { getenv("CZ_SRM_DISABLE_DIRECT_SCANOUT") };
     m_disableScanout = env && atoi(env) == 1;
@@ -244,7 +244,7 @@ bool SRMCore::initReam() noexcept
 
     if (!platformHandle)
     {
-        SRMLog(CZFatal, CZLN, "Failed to create RDRMPlatformHandle.");
+        SRMLog(CZFatal, CZLN, "Failed to create RDRMPlatformHandle");
         return false;
     }
 
@@ -252,7 +252,7 @@ bool SRMCore::initReam() noexcept
 
     if (!m_ream)
     {
-        SRMLog(CZFatal, CZLN, "Failed to create RCore.");
+        SRMLog(CZFatal, CZLN, "Failed to create RCore");
         return false;
     }
 

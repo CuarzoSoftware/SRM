@@ -34,7 +34,7 @@ public:
     /// The set of leased resources
     const Resources &resources() const noexcept { return m_resources; }
 
-    /// DRM file descriptor for the lessee process
+    /// DRM file descriptor for the lessee process (owned by the SRMLease)
     int fd() const noexcept { return m_fd.get(); }
 private:
     friend class SRMDevice;

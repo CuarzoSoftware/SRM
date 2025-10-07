@@ -1,3 +1,4 @@
+#include <CZ/SRM/SRMConnectorInterface.h>
 #include <CZ/SRM/SRMConnectorMode.h>
 #include <CZ/SRM/SRMDevice.h>
 #include <CZ/SRM/SRMLog.h>
@@ -21,9 +22,7 @@
 
 #include <CZ/Ream/GL/RGLMakeCurrent.h>
 
-#include <GLES2/gl2.h>
 #include <future>
-
 #include <drm_fourcc.h>
 #include <sys/poll.h>
 
@@ -31,7 +30,7 @@ using namespace CZ;
 
 std::unique_ptr<SRMRenderer> SRMRenderer::Make(SRMConnector *conn, const SRMConnectorInterface *iface, void *ifaceData) noexcept
 {
-    if (!iface || !iface->initializeGL || !iface->uninitializeGL || !iface->presented || !iface->discarded || !iface->paintGL || !iface->resizeGL)
+    if (!iface || !iface->initialized || !iface->uninitialized || !iface->presented || !iface->discarded || !iface->paint || !iface->resized)
     {
         conn->log(CZError, CZLN, "Invalid SRMConnectorInterface");
         return {};
@@ -210,7 +209,7 @@ bool SRMRenderer::startRenderThread() noexcept
 
                 if (applyCrtcMode())
                 {
-                    iface->resizeGL(conn, ifaceData);
+                    iface->resized(conn, ifaceData);
                     setModePromise.set_value(1); // Ok
                 }
                 else
@@ -301,13 +300,13 @@ bool SRMRenderer::init() noexcept
     if (!applyCrtcMode())
         return false;
 
-    iface->initializeGL(conn, ifaceData);
+    iface->initialized(conn, ifaceData);
     return true;
 }
 
 void SRMRenderer::unit() noexcept
 {
-    iface->uninitializeGL(conn, ifaceData);
+    iface->uninitialized(conn, ifaceData);
     conn->setCursor(nullptr);
 
     waitPendingPageFlip(1);
@@ -1001,7 +1000,7 @@ bool SRMRenderer::rendRender() noexcept
     const auto currentImageRect { SkIRect::MakeSize(swapchain.image()->size()) };
     conn->damage.setRect(currentImageRect);
     paintEventId++;
-    iface->paintGL(conn, ifaceData);
+    iface->paint(conn, ifaceData);
     conn->damage.op(currentImageRect, SkRegion::kIntersect_Op);
     return false;
 }

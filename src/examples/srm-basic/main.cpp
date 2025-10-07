@@ -1,16 +1,17 @@
-#include <GLES2/gl2.h>
-#include <SRMLog.h>
-#include <SRMCore.h>
-#include <SRMDevice.h>
-#include <SRMConnector.h>
+#include <CZ/SRM/SRMLog.h>
+#include <CZ/SRM/SRMCore.h>
+#include <CZ/SRM/SRMDevice.h>
+#include <CZ/SRM/SRMConnector.h>
 
-#include <RImage.h>
-#include <RSurface.h>
-#include <RPainter.h>
-#include <RPass.h>
+#include <CZ/Ream/RImage.h>
+#include <CZ/Ream/RSurface.h>
+#include <CZ/Ream/RPainter.h>
+#include <CZ/Ream/RPass.h>
+
+#include <CZ/Core/CZCore.h>
+#include <CZ/Core/CZTimer.h>
 
 #include <fcntl.h>
-#include <thread>
 #include <drm_fourcc.h>
 
 extern "C" {
@@ -19,115 +20,115 @@ extern "C" {
 
 using namespace CZ;
 
-static libseat *seat {};
+static bool Running { true };
+static std::shared_ptr<CZCore> Core;
+static std::shared_ptr<SRMCore> SRM;
+static std::shared_ptr<CZEventSource> SRMSrc;
+static std::shared_ptr<CZEventSource> LibseatSrc;
+static libseat *Seat {};
+static std::mutex Mutex;
+static std::unordered_map<int, int> SeatDevices; // FD => ID
 
-static std::shared_ptr<RImage> imgNorm;
-/*
-static std::shared_ptr<RImage> img90;
-static std::shared_ptr<RImage> img180;
-static std::shared_ptr<RImage> img270;*/
-
-static std::shared_ptr<RSurface> tmpSurf;
-
-
-static int openRestricted(const char *path, int flags, void *userData)
+static int OpenRestricted(const char *path, int flags, void *userData)
 {
-    CZ_UNUSED(userData);
+    CZ_UNUSED(userData)
+    CZ_UNUSED(flags)
 
-    //int fd;
-    //libseat_open_device(seat, path, &fd);
-    return open(path, flags);
+    int fd;
+    int id { libseat_open_device(Seat, path, &fd) };
+
+    if (id != -1)
+        SeatDevices[fd] = id;
+
+    return fd;
 }
 
-static void closeRestricted(int fd, void *userData)
+static void CloseRestricted(int fd, void *userData)
 {
-    CZ_UNUSED(userData);
-    close(fd);
+    CZ_UNUSED(userData)
+
+    auto it { SeatDevices.find(fd) };
+
+    if (it != SeatDevices.end())
+    {
+        libseat_close_device(Seat, it->second);
+        SeatDevices.erase(it);
+    }
 }
 
 static const SRMInterface iface
 {
-    .openRestricted = &openRestricted,
-    .closeRestricted = &closeRestricted
+    .openRestricted = &OpenRestricted,
+    .closeRestricted = &CloseRestricted
 };
 
-static void enableSeat(libseat *seat, void *userdata)
+static void EnableSeat(libseat *, void *)
 {
-
+    if (SRM)
+        SRM->resume();
 }
 
-static void disableSeat(libseat *seat, void *userdata)
+static void DisableSeat(libseat *seat, void *)
 {
+    if (SRM)
+        SRM->suspend();
+
     libseat_disable_seat(seat);
 }
 
-static libseat_seat_listener libseatIface
+static libseat_seat_listener LibseatIface
 {
-    .enable_seat = &enableSeat,
-    .disable_seat = &disableSeat
+    .enable_seat = &EnableSeat,
+    .disable_seat = &DisableSeat
 };
 
-static std::mutex mtx;
-
-static const SRMConnectorInterface connIface
+static const SRMConnectorInterface ConnIface
 {
-    .initializeGL = [](SRMConnector *conn, void *) {
-
-        tmpSurf = RSurface::Make({128, 128}, 2, true);
-        SRMLog(CZInfo, "Realloc {}", tmpSurf->resize({98, 98}, 1));
-        assert(tmpSurf);
-        std::vector<UInt32> cursor;
-        cursor.resize(64*64);
-        for (size_t i = 0; i < cursor.size(); i++)
-            cursor[i] = 0xFFFF00FF;
-        conn->setCursor((UInt8*)cursor.data());
-        conn->setCursorPos({200, 200});
-        conn->enableVSync(false);
+    .initialized = [](SRMConnector *conn, void *)
+    {
         conn->repaint();
     },
-    .paintGL = [](SRMConnector *conn, void *)
+    .paint = [](SRMConnector *conn, void *)
     {
-        std::lock_guard g {mtx};
-        static float dx { 0.f }; dx += 0.01f;
-        float phase { 0.5f * (std::sin(dx) + 1.f) };
+        std::lock_guard lock { Mutex };
         auto image { conn->currentImage() };
         auto surface { RSurface::WrapImage(image) };
-        conn->setCursorPos({Int32(phase*1000), 200});
-
-        surface->setGeometry({
-            .viewport = SkRect::MakeWH(image->size().width(), image->size().height()),
-            .dst = SkRect::MakeWH(image->size().width()/2, image->size().height()/2),
-            .transform = CZTransform::Normal});
-
-
-        SkRegion clip {  };
-
-        conn->setCursorPos(SkIPoint::Make(phase * 2000, phase * 2000));
-
         auto pass { surface->beginPass() };
-        auto *p { pass->getPainter() };
+        auto *c { pass->getCanvas() };
 
-        RDrawImageInfo d {};
-        d.image = imgNorm;
-        d.dst.setXYWH(phase * 600, 600, 800, 800);
-        d.src = SkRect::Make(imgNorm->size());
-        p->drawImage(d);
+        static bool colorToggle { true };
+
+        if (conn->paintEventId() % 64 == 0)
+            colorToggle = !colorToggle;
+
+        SkPaint paint;
+        paint.setAntiAlias(true);
+        paint.setBlendMode(SkBlendMode::kSrc);
+
+        const auto center { SkPoint(image->size().width() / 2, image->size().height() / 2) };
+        const auto rad { 256.f };
+        const SkIRect circleBounds(
+            center.x() - rad,
+            center.y() - rad,
+            center.x() + rad,
+            center.y() + rad);
+
+        paint.setColor(SK_ColorBLACK);
+        c->drawIRect(circleBounds, paint);
+
+        paint.setColor(colorToggle ? SK_ColorBLUE : SK_ColorRED);
+        c->drawCircle(center, rad, paint);
+
+        conn->damage.setRect(circleBounds);
         conn->repaint();
-
-        SRMLog(CZInfo, "Paint event id: {}", conn->paintEventId());
     },
-    .presented = [](SRMConnector *, const CZPresentationTime &info, void *)
-    {
-        SRMLog(CZInfo, "Frame presented id: {} VSYNC: {}", info.paintEventId, info.flags.has(CZPresentationTime::VSync));
-    },
+    .presented = [](SRMConnector *, const CZPresentationTime &, void *) {},
     .discarded = [](SRMConnector *, UInt64 paintEventId, void *)
     {
-        SRMLog(CZError, "Frame discarded id: {}", paintEventId);
+        SRMLog(CZError, "Frame {} discarded", paintEventId);
     },
-    .resizeGL = [](SRMConnector *, void *) {},
-    .uninitializeGL = [](SRMConnector *, void *)
-    {
-    }
+    .resized = [](SRMConnector *, void *) {},
+    .uninitialized = [](SRMConnector *, void *) {}
 };
 
 int main(void)
@@ -138,59 +139,35 @@ int main(void)
     setenv("CZ_REAM_EGL_LOG_LEVEL", "4", 0);
     setenv("CZ_REAM_GAPI", "GL", 0);
 
-    /*
-    std::thread([]{
-        usleep(10000000);
-        abort();
-    }).detach();*/
+    Core = CZCore::Get();
+    assert(Core && "Failed to create CZCore");
+    Seat = libseat_open_seat(&LibseatIface, NULL);
+    assert(Seat && "Failed to open seat");
+    SRM = SRMCore::Make(&iface, nullptr);
+    assert(SRM && "Failed to create SRMCore");
 
-    seat = libseat_open_seat(&libseatIface, NULL);
+    LibseatSrc = CZEventSource::Make(libseat_get_fd(Seat), EPOLLIN, CZOwn::Borrow, [](auto, auto){
+        libseat_dispatch(Seat, 0);
+    });
 
-    auto srm { SRMCore::Make(&iface, nullptr) };
+    SRMSrc = CZEventSource::Make(SRM->fd(), EPOLLIN, CZOwn::Borrow, [](auto, auto){
+        SRM->dispatch(0);
+    });
 
-    if (!srm)
-    {
-        SRMLog(CZFatal, "[srm-basic] Failed to initialize SRM core.");
-        return 1;
-    }
-
-    RDRMFormat fmt {DRM_FORMAT_ARGB8888 , { DRM_FORMAT_MOD_LINEAR }};
-
-    imgNorm = RImage::LoadFile("/home/eduardo/tower.jpg", fmt);
-      /*
-    img90 = RImage::LoadFile("/usr/share/icons/Adwaita/scalable/devices/input-gaming.svg", fmt);
-    img180 = RImage::LoadFile("/home/eduardo/Escritorio/atlas180.png", fmt);
-    img270 = RImage::LoadFile("/home/eduardo/Escritorio/atlas270.png", fmt);*/
-
-    for (auto *dev : srm->devices())
-    {
-        //if (dev->isBootVGA())
-        //    continue;
-
+    for (auto *dev : SRM->devices())
         for (auto *conn : dev->connectors())
-        {
             if (conn->isConnected())
-            {
-                conn->initialize(&connIface, nullptr);
-            }
-        }
-    }
+                conn->initialize(&ConnIface, nullptr);
 
-    //while (srm->dispatch(-1) >= 0) { };
+    CZTimer::OneShot(5000, [](auto){
+        SRMSrc.reset();
+        LibseatSrc.reset();
+        SRM.reset();
+        libseat_close_seat(Seat);
+        Running = false;
+    });
 
-    usleep(4000000);
-
-    for (auto *dev : srm->devices())
-        for (auto *conn : dev->connectors())
-                conn->uninitialize();
-
-
-    imgNorm.reset();
-        /*
-    img90.reset();
-    img180.reset();
-    img270.reset();*/
-    tmpSurf.reset();
+    while (Running) { Core->dispatch(-1); };
 
     return 0;
 }

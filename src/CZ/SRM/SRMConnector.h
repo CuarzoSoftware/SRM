@@ -1,6 +1,7 @@
 #ifndef SRMCONNECTOR_H
 #define SRMCONNECTOR_H
 
+#include <CZ/SRM/SRMConnectorInterface.h>
 #include <CZ/SRM/SRMRenderer.h>
 #include <CZ/SRM/SRMObject.h>
 #include <CZ/SRM/SRMLog.h>
@@ -20,66 +21,49 @@
 #include <xf86drmMode.h>
 
 /**
- * @brief Display with associated rendering capabilities and modes.
+ * @brief Represents a screen.
  *
- * An @ref SRMConnector represents a screen where content is displayed, such as a laptop display, an HDMI monitor, and more.
- * 
+ * An @ref SRMConnector abstracts a real or virtual screen where content is shown, such as a laptop panel, HDMI monitor, virtual machine display, etc.
+ *
  * ### Rendering
- * 
- * Each connector has its own dedicated rendering thread, which triggers common OpenGL events like `initializeGL()`, 
- * `paintGL()`, `resizeGL()` through an @ref SRMConnectorInterface.
- * You can initialize a connector using the srmConnectorInitialize() method.
  *
- * ### Modes
- * 
- * Connectors usually support multiple display modes (@ref SRMConnectorMode), which define their refresh rate and resolution.\n
- * These modes can be enumerated using srmConnectorGetModes() and selected using srmConnectorSetMode().
+ * Each connector operates on its own dedicated rendering thread, which invokes the callbacks defined in the SRMConnectorInterface passed to initialize().
+ *
+ * ### Display Modes
+ *
+ * Most connectors support multiple display modes (@ref SRMConnectorMode), defining resolution and refresh rate.
+ * These can be queried via modes() and changed using setMode().
  */
 class CZ::SRMConnector : public SRMObject
 {
 public:
 
+    /**
+     * @brief Destructor.
+     */
     ~SRMConnector() noexcept;
 
     /**
-     * @brief Get the DRM connector ID.
+     * @brief Returns the DRM connector ID.
      *
-     * This function returns the DRM connector ID associated with the connector.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the connector ID.
-     * @return The DRM connector ID of the connector.
+     * IDs are unique per device, but not globally unique across multiple devices.
      */
     UInt32 id() const noexcept { return m_id; }
 
     /**
-     * @brief Get the current state of the connector.
-     *
-     * This function returns the current state for the given @ref SRMConnector.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the state.
-     * @return The current rendering state (e.g., initialized, uninitialized, etc).
+     * @brief Checks if the connector is initialized.
      */
     bool isInitialized() const noexcept { return m_rend != nullptr; }
 
     /**
-     * @brief Check if the connector is connected.
-     *
-     * This function checks whether the given @ref SRMConnector is connected.
-     *
-     * @note Only connected connectors can be initialized. Calling srmConnectorInitialize() on a disconnected connector has no effect.
-     *
-     * @param connector Pointer to the @ref SRMConnector to check for connection.
-     * @return 1 if the connector is connected, 0 otherwise.
+     * @brief Check if the connector is available.
      */
     bool isConnected() const noexcept { return m_isConnected; }
 
     /**
-     * @brief Get the physical width of the connector in millimeters.
+     * @brief Returns the physical size of the connector in millimeters.
      *
-     * This function returns the physical width of the connector in millimeters.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the width.
-     * @return The physical width of the connector in millimeters.
+     * The dimensions may be zero, for example, on virtual machine displays.
      */
     SkISize mmSize() const noexcept { return m_mmSize; }
 
@@ -96,19 +80,14 @@ public:
     /**
      * @brief Get a string representation of a connector type.
      *
-     * @param type The connector type to retrieve the string for.
+     * @see type()
      *
-     * @return A pointer to the string representation of the connector type.
+     * @return A pointer to the string representation of the connector type or 'unknown'.
      */
     static std::string_view TypeString(UInt32 type) noexcept;
 
     /**
      * @brief Get the device this connector belongs to.
-     *
-     * This function returns the device to which the connector belongs.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the device.
-     * @return Pointer to the @ref SRMDevice to which the connector belongs.
      *
      * @note The device may not always be the same as the renderer device.
      */
@@ -138,73 +117,58 @@ public:
     const std::string &model() const noexcept { return m_model; }
 
     /**
-     * @brief Get the serial number or string of the connected display.
+     * @brief Get the serial number of the connected display.
      *
      * @return The serial number of the connected display or an empty string if not available.
      */
     const std::string &serial() const noexcept { return m_serial; }
 
     /**
-     * @brief Get a list of available connector encoders.
-     *
-     * @return A list of available connector encoders (@ref SRMEncoder).
+     * @brief Vector of compatible encoders.
      */
     const std::vector<SRMEncoder*> &encoders() const noexcept { return m_encoders; }
 
     /**
      * @brief Get the currently used encoder for the connector.
      *
-     * This function returns the currently used @ref SRMEncoder associated with the given @ref SRMConnector.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the current encoder.
-     * @return The currently used @ref SRMEncoder for the connector.
+     * @return The current encoder or nullptr if uninitialized.
      */
     SRMEncoder *currentEncoder() const noexcept;
 
     /**
-     * @brief Get a list of available connector modes.
-     *
-     * This function returns a list of available modes (resolutions and refresh rates) for the given @ref SRMConnector.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the modes.
-     * @return A list of available connector modes (@ref SRMConnectorMode).
+     * @brief Vecor of available connector modes.
      */
     const std::vector<SRMConnectorMode*> &modes() const noexcept { return m_modes; }
 
     /**
      * @brief Get the preferred connector mode.
      *
-     * This function returns the preferred @ref SRMConnectorMode for the given @ref SRMConnector .\n
      * This mode typically has the higher resolution and refresh rate.
      *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the preferred mode.
-     * @return The preferred @ref SRMConnectorMode for the connector.
+     * @return The preferred mode or nullptr if disconnected.
      */
     SRMConnectorMode *preferredMode() const noexcept { return m_preferredMode; }
 
     /**
      * @brief Get the current connector mode.
      *
-     * This function returns the current @ref SRMConnectorMode for the given @ref SRMConnector.
+     * Set to preferredMode() by default.
      *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the current mode.
-     * @return The current @ref SRMConnectorMode for the connector.
+     * @return The current mode or nullptr if disconnected.
      */
     SRMConnectorMode *currentMode() const noexcept { return m_currentMode; }
 
     /**
-     * @brief Compatible CRTCs.
+     * @brief Vector of compatible CRTCs.
      */
     const std::vector<SRMCrtc*> &crtcs() const noexcept { return m_crtcs; }
 
     /**
      * @brief Sets the current mode of the connector.
      *
-     * If the connector is initialized the `resizeGL()` event is invoked.
+     * If the connector is initialized the `resized()` event is invoked.
      *
-     * @see srmConnectorGetModes() to obtain a list of all available modes.
-     *
-     * @note This method will fail if called from the connector's render thread.
+     * @note This method will fail if called from the SRMConnectorInterface callbacks.
      *
      * @return 1 on success, 0 if failed and rolled back to the previous mode and -1 if
      *         rollback also failed (e.g. because the connector was unplugged during the change)
@@ -212,68 +176,47 @@ public:
     int setMode(SRMConnectorMode *mode) noexcept;
 
     /**
-     * @brief Get the currently used CRT controller (CRTC) for the connector.
+     * @brief Get the current CRTC used by the connector.
      *
-     * This function returns the currently used @ref SRMCrtc associated with the given @ref SRMConnector.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the current CRTC.
-     * @return The currently used @ref SRMCrtc for the connector.
+     * @return The current crtc or nullptr if uninitialized.
      */
     SRMCrtc *currentCrtc() const noexcept;
 
     /**
-     * @brief Get the currently used primary plane for the connector.
+     * @brief Get the currently used primary plane.
      *
-     * This function returns the currently used @ref SRMPlane associated with the primary display plane for the given @ref SRMConnector.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the current primary plane.
-     * @return The currently used @ref SRMPlane for the primary display or NULL if not assigned.
+     * @return The current primary plane or nullptr if uninitialized.
      */
     SRMPlane *currentPrimaryPlane() const noexcept;
 
     /**
-     * @brief Get the currently used cursor plane for the connector.
+     * @brief Get the current cursor plane.
      *
-     * This function returns the currently used @ref SRMPlane associated with the cursor display plane for the given @ref SRMConnector.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the current cursor plane.
-     * @return The currently used @ref SRMPlane for the cursor display or NULL if not assigned.
+     * @return The current cursor plane or nullptr if uninitialized or not available.
      */
     SRMPlane *currentCursorPlane() const noexcept;
 
     /**
-     * @brief Check if there is an available cursor plane for hardware cursor compositing.
+     * @brief Checks whether the cursor plane is available and enabled.
      *
-     * This function checks if there is an available cursor plane for hardware cursor compositing on the given @ref SRMConnector.
-     *
-     * @param connector Pointer to the @ref SRMConnector to check for hardware cursor support.
-     * @return 1 if hardware cursor support is available, 0 otherwise.
+     * If false, setCursor() and setCursorPos() will fail.
      */
     bool hasCursor() const noexcept;
 
     /**
-     * @brief Set the pixels of the hardware cursor.
+     * @brief Set the pixels of the cursor plane.
      *
      * This function sets the pixels of the hardware cursor for the given @ref SRMConnector.
      *
      * The format of the buffer must be **ARGB8888** with a size of 64x64 pixels.
-     * Passing `NULL` as the buffer hides the cursor.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to set the hardware cursor.
-     * @param pixels Pointer to the **ARGB8888** pixel buffer for the cursor image.
-     * @return 1 if the hardware cursor was successfully set, 0 if an error occurred.
+     * Passing `nullptr` as the buffer hides the cursor.
      */
     bool setCursor(UInt8 *pixels) noexcept;
 
     /**
-     * @brief Set the position of the hardware cursor relative to the connector's top-left origin.
+     * @brief Set the cursor position.
      *
-     * This function sets the position of the hardware cursor relative to the top-left origin of the connector.
-     *
-     * @param connector Pointer to the @ref SRMConnector for which to set the cursor position.
-     * @param x The X-coordinate of the cursor's position.
-     * @param y The Y-coordinate of the cursor's position.
-     * @return 1 if the cursor position was successfully set, 0 if an error occurred.
+     * @param po Position in pixel coords relative to the top-left origin of the connector image.
      */
     bool setCursorPos(SkIPoint pos) noexcept;
 

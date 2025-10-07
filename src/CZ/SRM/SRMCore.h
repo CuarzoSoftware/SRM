@@ -16,6 +16,11 @@ namespace CZ
 {
     class RCore;
 
+    /**
+     * @brief SRMCore interface.
+     *
+     * @see SRMCore::Make()
+     */
     struct SRMInterface
     {
         /**
@@ -38,118 +43,111 @@ namespace CZ
     };
 };
 
+/**
+ * @brief Core class.
+ *
+ * Manages and provides access to all available DRM devices.
+ */
 class CZ::SRMCore final : public SRMObject
 {
 public:
     /**
      * @brief Creates an SRMCore instance.
      *
-     * Creates a new SRMCore instance, which will scan and open all available DRM devices
+     * Creates a new SRMCore instance, which will scan and open all available primary DRM devices
      * using the provided interface.
      *
      * @param interface A pointer to the @ref SRMInterface that provides access to DRM devices.
      * @param userData  A pointer to the user data to associate with the @ref SRMCore instance.
      *
-     * @return A pointer to the newly created @ref SRMCore instance on success, or `NULL` on failure.
+     * @return A shared pointer to the created @ref SRMCore instance, or `nullptr` on failure.
      */
     static std::shared_ptr<SRMCore> Make(const SRMInterface *iface, void *userData) noexcept;
+
+    /**
+     * @brief Creates an SRMCore instance from a set of already opened DRM device file descriptors.
+     *
+     * @return A shared pointer to the created @ref SRMCore instance, or `nullptr` on failure.
+     */
     static std::shared_ptr<SRMCore> Make(std::unordered_set<CZSpFd> &&fds) noexcept;
 
     /**
-     * @brief Temporarily suspends SRM.
+     * @brief Suspends SRMCore.
      *
-     * This function temporarily suspends all connector rendering threads and evdev events within SRM.\n
-     * It should be used when switching to another session in a multi-session system.\n
-     * While the core is suspended, SRM no longer acts as the DRM master, and KMS operations cannot be performed.\n
-     * For guidance on enabling multi-session functionality using libseat, please refer to the [srm-multi-session](md_md__examples.html) example.
+     * This function should be called when devices lose DRM master status
+     * (e.g., due to a TTY switch). It emits synthetic `onConnectorUnplugged` events
+     * for each currently available connector to simulate disconnection.
      *
-     * @note Pending hotplugging events will be emitted once the core is resumed.
+     * While suspended, no KMS operations can be performed.
      *
      * @param core A pointer to the @ref SRMCore instance.
-     * @return Returns 1 on success and 0 if the operation fails.
+     * @return true on success or if already suspended, false on failure.
      */
     bool suspend() noexcept;
 
     /**
-     * @brief Resumes SRM.
+     * @brief Resumes SRMCore.
      *
-     * This function resumes a previously suspended @ref SRMCore, allowing connectors rendering threads
-     * and evdev events to continue processing. It should be used after calling srmCoreSuspend()
-     * to bring the @ref SRMCore back to an active state.
+     * This function should be called when devices regain DRM master status.
+     * It also emits `onConnectorPlugged` for each available connector.
      *
-     * @param core A pointer to the @ref SRMCore instance to resume.
-     * @return Returns 1 on success and 0 if the operation fails.
+     * @return true if the core was successfully resumed or was already active, false if the operation failed.
      */
     bool resume() noexcept;
 
     /**
-     * @brief Check if @ref SRMCore is currently suspended.
-     *
-     * This function checks whether an @ref SRMCore instance is currently in a suspended state,
-     * meaning that connector rendering threads and evdev events are temporarily halted.
-     *
-     * @param core A pointer to the @ref SRMCore instance to check.
-     * @return Returns 1 if the @ref SRMCore is suspended, and 0 if it is active.
+     * @brief Check if SRMCore is currently suspended.
      */
     bool isSuspended() noexcept { return m_isSuspended; }
 
     /**
-     * @brief Get a pollable udev monitor file descriptor for listening to hotplugging events.
+     * @brief Get a pollable udev monitor file descriptor for listening to hotplug events.
      *
-     * The returned fd can be used to monitor devices and connectors hotplugging events using polling mechanisms.\n
-     * Use srmCoreProcessMonitor() to dispatch pending events.
+     * @see dispatch()
      *
-     * @param core A pointer to the @ref SRMCore instance.
-     *
-     * @return The file descriptor for monitoring hotplugging events.
+     * @note The fd is owned by SRM, do not close it.
      */
     int fd() const noexcept;
 
     /**
-     * @brief Dispatch pending udev monitor events or block until an event occurs or a timeout is reached.
+     * @brief Dispatch pending udev monitor events or block until an event occurs or the timeout is reached.
      *
      * Passing a timeout value of -1 makes the function block indefinitely until an event occurs.
-     *
-     * @param core       A pointer to the @ref SRMCore instance.
-     * @param msTimeout  The timeout value in milliseconds. Use -1 to block indefinitely.
      *
      * @return (>= 0) on success, or -1 on error.
      */
     int dispatch(int timeoutMs) noexcept;
 
     /**
-     * @brief Get a list of all available devices (@ref SRMDevice).
-     *
-     * @param core A pointer to the @ref SRMCore instance.
-     *
-     * @return A list containing all available @ref SRMDevice instances.
+     * @brief Vector of available devices.
      */
     const std::vector<SRMDevice*> &devices() const noexcept { return m_devices; }
 
+    /**
+     * @brief Determines whether legacy IOCTLs are forcibly used to drive cursors.
+     *
+     * This behavior is controlled by the environment variable
+     * `CZ_SRM_FORCE_LEGACY_CURSOR`, which accepts values `0` (disabled) or `1` (enabled).
+     *
+     * @return true if legacy IOCTLs are being forced, false otherwise.
+     */
     bool forcingLegacyCursor() const noexcept { return m_forceLegacyCursor; }
 
     /**
-     * @brief Registers a new listener to be invoked when a new connector is plugged.
-     *
-     * @param core     A pointer to the @ref SRMCore instance.
-     * @param callback A callback function to be called when a new connector is plugged.
-     * @param userData A pointer to user-defined data to be passed to the callback.
-     *
-     * @return A pointer to the newly registered @ref SRMListener instance for connector plugged events.
+     * @brief Emitted when a connector is plugged in.
      */
     CZSignal<SRMConnector*> onConnectorPlugged;
 
     /**
-     * @brief Registers a new listener to be invoked when an already plugged connector is unplugged.
-     *
-     * @param core     A pointer to the @ref SRMCore instance.
-     * @param callback A callback function to be called when a connector is unplugged.
-     * @param userData A pointer to user-defined data to be passed to the callback.
-     *
-     * @return A pointer to the newly registered @ref SRMListener instance for connector unplugged events.
+     * @brief Emitted when a connector is unplugged.
      */
     CZSignal<SRMConnector*> onConnectorUnplugged;
 
+    /**
+     * @brief Destructor.
+     *
+     * All connectors are automatically uninitialized before destruction.
+     */
     ~SRMCore() noexcept;
 
 private:

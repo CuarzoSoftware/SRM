@@ -6,7 +6,8 @@
 #include <CZ/SRM/SRMDevice.h>
 #include <CZ/Ream/RCore.h>
 #include <CZ/Ream/DRM/RDRMPlatformHandle.h>
-#include <CZ/Utils/CZVectorUtils.h>
+#include <CZ/Core/Utils/CZVectorUtils.h>
+#include <CZ/Core/CZCore.h>
 #include <CZSRMVersion.h>
 #include <cstring>
 #include <libudev.h>
@@ -19,13 +20,21 @@ std::shared_ptr<SRMCore> SRMCore::Make(const SRMInterface *iface, void *data) no
 {
     if (!iface || !iface->closeRestricted || !iface->openRestricted)
     {
-        SRMLog(CZFatal, CZLN, "Invalid interface.");
+        SRMLog(CZFatal, CZLN, "Invalid interface");
+        return {};
+    }
+
+    auto cuarzo { CZCore::Get() };
+
+    if (!cuarzo || cuarzo.use_count() == 1)
+    {
+        SRMLog(CZFatal, CZLN, "Missing CZCore instance");
         return {};
     }
 
     if (RCore::Get())
     {
-        SRMLog(CZFatal, CZLN, "The RCore instance must be created by SRM.");
+        SRMLog(CZFatal, CZLN, "The RCore instance must be created by SRM");
         return {};
     }
 
@@ -50,6 +59,14 @@ std::shared_ptr<CZ::SRMCore> SRMCore::Make(std::unordered_set<CZSpFd> &&fds) noe
     if (fds.empty())
     {
         SRMLog(CZFatal, CZLN, "The fd set is empty");
+        return {};
+    }
+
+    auto cuarzo { CZCore::Get() };
+
+    if (!cuarzo || cuarzo.use_count() == 1)
+    {
+        SRMLog(CZFatal, CZLN, "Missing CZCore instance");
         return {};
     }
 
@@ -89,6 +106,8 @@ SRMCore::~SRMCore() noexcept
 
     if (m_ream)
         m_ream->clearGarbage();
+
+    SRMLog(CZInfo, CZLN, "SRMCore destroyed");
 }
 
 bool SRMCore::init() noexcept
@@ -230,6 +249,11 @@ bool SRMCore::initMonitor() noexcept
         return false;
     }
 
+    m_source = CZEventSource::Make(udev_monitor_get_fd(m_monitor), EPOLLIN, CZOwn::Borrow, [this](auto, auto){
+        dispatch(0);
+    });
+
+    assert(m_source);
     return true;
 }
 

@@ -6,7 +6,7 @@
 #include <CZ/SRM/SRMLog.h>
 #include <CZ/SRM/SRMConnector.h>
 #include <CZ/SRM/SRMConnectorMode.h>
-#include <CZ/Utils/CZVectorUtils.h>
+#include <CZ/Core/Utils/CZVectorUtils.h>
 #include <CZ/Ream/GBM/RGBMBo.h>
 #include <CZ/Ream/RImage.h>
 #include <CZ/Ream/RGammaLUT.h>
@@ -546,6 +546,7 @@ bool SRMConnector::uninitialize() noexcept
     unlockRenderer(false);
     assert(future.get());
     m_rend.reset();
+    log(CZInfo, CZLN, "Uninitialized");
     return true;
 }
 

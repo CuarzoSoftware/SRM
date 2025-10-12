@@ -23,7 +23,6 @@ using namespace CZ;
 static bool Running { true };
 static std::shared_ptr<CZCore> Core;
 static std::shared_ptr<SRMCore> SRM;
-static std::shared_ptr<CZEventSource> SRMSrc;
 static std::shared_ptr<CZEventSource> LibseatSrc;
 static libseat *Seat {};
 static std::mutex Mutex;
@@ -137,7 +136,6 @@ int main(void)
     setenv("CZ_SRM_LOG_LEVEL", "4", 0);
     setenv("CZ_REAM_LOG_LEVEL", "6", 0);
     setenv("CZ_REAM_EGL_LOG_LEVEL", "4", 0);
-    setenv("CZ_REAM_GAPI", "GL", 0);
 
     Core = CZCore::Get();
     assert(Core && "Failed to create CZCore");
@@ -150,17 +148,12 @@ int main(void)
         libseat_dispatch(Seat, 0);
     });
 
-    SRMSrc = CZEventSource::Make(SRM->fd(), EPOLLIN, CZOwn::Borrow, [](auto, auto){
-        SRM->dispatch(0);
-    });
-
     for (auto *dev : SRM->devices())
         for (auto *conn : dev->connectors())
             if (conn->isConnected())
                 conn->initialize(&ConnIface, nullptr);
 
     CZTimer::OneShot(5000, [](auto){
-        SRMSrc.reset();
         LibseatSrc.reset();
         SRM.reset();
         libseat_close_seat(Seat);

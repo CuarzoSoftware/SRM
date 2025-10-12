@@ -6,8 +6,8 @@
 #include <CZ/SRM/SRMCore.h>
 #include <CZ/SRM/SRMConnector.h>
 
-#include <CZ/Utils/CZStringUtils.h>
-#include <CZ/Utils/CZVectorUtils.h>
+#include <CZ/Core/Utils/CZStringUtils.h>
+#include <CZ/Core/Utils/CZVectorUtils.h>
 
 #include <cstring>
 #include <fcntl.h>

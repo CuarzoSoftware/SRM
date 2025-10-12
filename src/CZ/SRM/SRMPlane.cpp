@@ -1,7 +1,7 @@
 #include <CZ/SRM/SRMLog.h>
 #include <CZ/SRM/SRMPlane.h>
 #include <CZ/SRM/SRMDevice.h>
-#include <CZ/Utils/CZVectorUtils.h>
+#include <CZ/Core/Utils/CZVectorUtils.h>
 #include <cstring>
 #include <memory>
 #include <xf86drmMode.h>

@@ -57,6 +57,10 @@ public:
      * Creates a new SRMCore instance, which will scan and open all available primary DRM devices
      * using the provided interface.
      *
+     * @note A CZCore instance must exist before calling this method,
+     *       as SRM relies on it to register its event source.
+     *       Use CZCore::dispatch() to process hotplug events.
+     *
      * @param interface A pointer to the @ref SRMInterface that provides access to DRM devices.
      * @param userData  A pointer to the user data to associate with the @ref SRMCore instance.
      *
@@ -66,6 +70,10 @@ public:
 
     /**
      * @brief Creates an SRMCore instance from a set of already opened DRM device file descriptors.
+     *
+     * @note A CZCore instance must exist before calling this method,
+     *       as SRM relies on it to register its event source.
+     *       Use CZCore::dispatch() to process hotplug events.
      *
      * @return A shared pointer to the created @ref SRMCore instance, or `nullptr` on failure.
      */
@@ -99,24 +107,6 @@ public:
      * @brief Check if SRMCore is currently suspended.
      */
     bool isSuspended() noexcept { return m_isSuspended; }
-
-    /**
-     * @brief Get a pollable udev monitor file descriptor for listening to hotplug events.
-     *
-     * @see dispatch()
-     *
-     * @note The fd is owned by SRM, do not close it.
-     */
-    int fd() const noexcept;
-
-    /**
-     * @brief Dispatch pending udev monitor events or block until an event occurs or the timeout is reached.
-     *
-     * Passing a timeout value of -1 makes the function block indefinitely until an event occurs.
-     *
-     * @return (>= 0) on success, or -1 on error.
-     */
-    int dispatch(int timeoutMs) noexcept;
 
     /**
      * @brief Vector of available devices.
@@ -166,9 +156,13 @@ private:
     bool initMonitor() noexcept;
     bool initReam() noexcept;
 
+    // UDEV monitor file descriptor
+    int fd() const noexcept;
+    int dispatch(int timeoutMs) noexcept;
     void unplugAllConnectors() noexcept;
     bool isRenderThread(std::thread::id threadId) noexcept;
 
+    std::shared_ptr<CZEventSource> m_source;
     udev *m_udev {};
     udev_monitor *m_monitor {};
     std::vector<SRMDevice*> m_devices;
@@ -176,6 +170,7 @@ private:
     bool m_forceLegacyCursor {};
     bool m_disableCursor {};
     bool m_disableScanout {};
+
     std::shared_ptr<RCore> m_ream;
 
     const SRMInterface *m_iface { nullptr };

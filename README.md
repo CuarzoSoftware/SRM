@@ -9,7 +9,9 @@
   </a>
 </p>
 
-SRM is a C library that simplifies the development of Linux DRM/KMS applications.
+SRM is a C++ library that simplifies the development of Linux DRM/KMS applications.
+
+> Check the releases section for stable versions. The web documentation corresponds to the latest release.
 
 ### Links
 

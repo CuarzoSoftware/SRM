@@ -1,5 +1,5 @@
 project(
-    'SRM',
+    'cz-srm',
     'c', 'cpp',
     version : run_command('cat', 'VERSION', check : false).stdout(),
     meson_version: '>= 0.59.0',
@@ -9,19 +9,20 @@ project(
         'cpp_std=c++20']
 )
 
+NAME='SRM'
 VERSION_MAJOR = meson.project_version().split('.')[0]
 VERSION_MINOR = meson.project_version().split('.')[1]
 VERSION_PATCH = meson.project_version().split('.')[2]
 VERSION_BUILD = run_command('cat', './BUILD', check : false).stdout()
-HEADERS_INSTALL_PATH = join_paths(get_option('prefix'), get_option('includedir'), 'CZ/', meson.project_name())
-CONF_FILE_NAME = 'CZ' + meson.project_name() + 'Version.h'
+HEADERS_INSTALL_PATH = join_paths(get_option('prefix'), get_option('includedir'), 'CZ/', NAME)
+CONF_FILE_NAME = 'CZ' + NAME + 'Version.h'
 
 conf = configuration_data()
 conf.set('VERSION_MAJOR', VERSION_MAJOR)
 conf.set('VERSION_MINOR', VERSION_MINOR)
 conf.set('VERSION_PATCH', VERSION_PATCH)
 conf_file = configure_file(
-    input : 'src/CZ/' + meson.project_name() + '/' + CONF_FILE_NAME +'.in',
+    input : 'src/CZ/' + NAME + '/' + CONF_FILE_NAME +'.in',
     output : CONF_FILE_NAME,
     configuration : conf)
 
@@ -43,8 +44,8 @@ endforeach
 # ------------ DEPENDENCIES ------------
 
 pkg              = import('pkgconfig')
-cz_core_dep      = dependency('cz-ream')
-cz_ream_dep      = dependency('cz-ream')
+cz_core_dep      = dependency('cz-core')
+cz_ream_dep      = dependency('cz-ream', fallback:['cz-ream', 'cz_ream_dep'])
 udev_dep         = dependency('libudev', version: '>= 249')
 drm_dep          = dependency('libdrm', version: '>= 2.4.113')
 gbm_dep          = dependency('gbm', version: '>= 23.2.1')
@@ -69,7 +70,7 @@ cz_srm = library(
     install : true)
 
 cz_srm_dep = declare_dependency(
-    dependencies: [cz_ream_dep, drm_headers_dep],
+    dependencies: [cz_core_dep, cz_ream_dep, drm_headers_dep],
     include_directories : ['src', 'src/CZ/SRM'],
     link_with : cz_srm)
 
@@ -83,14 +84,6 @@ pkg.generate(
 
 if get_option('build_examples')
     libseat_dep = dependency('libseat', version: '>= 0.6.4')
-    subdir('src/examples/srm-basic')
-
-#    libinput_dep = dependency('libinput', version: '>= 1.20.0')
-#    m_dep = c.find_library('m')
-#
-#    subdir('examples/srm-display-info')
-#    subdir('examples/srm-all-connectors')
-#    subdir('examples/srm-multi-session')
-#    subdir('examples/srm-direct-scanout')
+    subdir('src/examples/cz-srm-basic')
 endif
 

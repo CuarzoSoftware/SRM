@@ -1,5 +1,5 @@
 executable(
-    'srm-basic',
+    'cz-srm-basic',
     sources : ['main.cpp'],
     dependencies : [
         cz_srm_dep,

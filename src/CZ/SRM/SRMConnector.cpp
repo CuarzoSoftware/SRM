@@ -464,7 +464,8 @@ bool SRMConnector::setCursor(UInt8 *pixels) noexcept
         }
         else
         {
-            drmModeSetCursor(device()->fd(), m_rend->crtc->id(), bo->planeHandle(0).u32, bo->dmaInfo().width, bo->dmaInfo().height);
+            auto size { bo->size() };
+            drmModeSetCursor(device()->fd(), m_rend->crtc->id(), bo->planeHandle(0).u32, size.width(), size.height());
             m_rend->cursorI = i;
         }
     }

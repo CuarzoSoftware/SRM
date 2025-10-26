@@ -293,6 +293,21 @@ bool SRMCore::initReam() noexcept
         }
     }
 
+    // Filter devices without a ream device
+    for (size_t i = 0; i < m_devices.size();)
+    {
+        if (!m_devices[i]->m_reamDevice)
+        {
+            auto *dev { m_devices[i] };
+            m_devices[i] = m_devices.back();
+            m_devices.pop_back();
+            dev->log(CZWarning, CZLN, "No Ream device found for this SRMDevice. Ignoring it...");
+            delete dev;
+        }
+        else
+            i++;
+    }
+
     SRMDevice *bestDev { nullptr };
 
     for (auto *dev : devices())

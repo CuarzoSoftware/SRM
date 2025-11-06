@@ -26,7 +26,7 @@ std::shared_ptr<SRMCore> SRMCore::Make(const SRMInterface *iface, void *data) no
 
     auto cuarzo { CZCore::Get() };
 
-    if (!cuarzo || cuarzo.use_count() == 1)
+    if (!cuarzo)
     {
         SRMLog(CZFatal, CZLN, "Missing CZCore instance");
         return {};
@@ -64,7 +64,7 @@ std::shared_ptr<CZ::SRMCore> SRMCore::Make(std::unordered_set<CZSpFd> &&fds) noe
 
     auto cuarzo { CZCore::Get() };
 
-    if (!cuarzo || cuarzo.use_count() == 1)
+    if (!cuarzo)
     {
         SRMLog(CZFatal, CZLN, "Missing CZCore instance");
         return {};

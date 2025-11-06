@@ -137,7 +137,7 @@ int main(void)
     setenv("CZ_REAM_LOG_LEVEL", "6", 0);
     setenv("CZ_REAM_EGL_LOG_LEVEL", "4", 0);
 
-    Core = CZCore::Get();
+    Core = CZCore::GetOrMake();
     assert(Core && "Failed to create CZCore");
     Seat = libseat_open_seat(&LibseatIface, NULL);
     assert(Seat && "Failed to open seat");

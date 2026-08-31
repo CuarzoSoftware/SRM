@@ -44,7 +44,7 @@ endforeach
 # ------------ DEPENDENCIES ------------
 
 pkg              = import('pkgconfig')
-cz_core_dep      = dependency('cz-core')
+cz_core_dep      = dependency('cz-core', fallback:['cz-core', 'cz_core_dep'])
 cz_ream_dep      = dependency('cz-ream', fallback:['cz-ream', 'cz_ream_dep'])
 udev_dep         = dependency('libudev', version: '>= 249')
 drm_dep          = dependency('libdrm', version: '>= 2.4.113')

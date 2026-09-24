@@ -228,6 +228,44 @@ bool SRMConnector::unlockRenderer(bool repaint) noexcept
     return true;
 }
 
+bool SRMConnector::refreshModes(drmModeConnectorPtr res) noexcept
+{
+    const auto find = [this](const drmModeModeInfo &info) -> SRMConnectorMode* {
+        for (auto *mode : m_modes)
+        {
+            const auto &m { mode->info() };
+            if (m.hdisplay == info.hdisplay && m.vdisplay == info.vdisplay && m.vrefresh == info.vrefresh && m.flags == info.flags)
+                return mode;
+        }
+        return nullptr;
+    };
+
+    const size_t before { m_modes.size() };
+    SRMConnectorMode *preferred {};
+
+    for (int i = 0; i < res->count_modes; i++)
+    {
+        drmModeModeInfo info { res->modes[i] };
+        auto *mode { find(info) };
+
+        if (!mode)
+        {
+            m_modes.emplace_back(new SRMConnectorMode(this, &info));
+            mode = m_modes.back();
+        }
+
+        if (!preferred && (info.type & DRM_MODE_TYPE_PREFERRED))
+            preferred = mode;
+    }
+
+    if (!preferred)
+        return false;
+
+    const bool changed { m_modes.size() != before || preferred != m_preferredMode.get() };
+    m_preferredMode = preferred;
+    return changed;
+}
+
 SRMConnectorMode *SRMConnector::findPreferredMode() const noexcept
 {
     SRMConnectorMode *preferredMode {};

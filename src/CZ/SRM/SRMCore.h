@@ -134,6 +134,14 @@ public:
     CZSignal<SRMConnector*> onConnectorUnplugged;
 
     /**
+     * @brief Emitted when a connected connector's modes change (e.g. a VM's display was resized).
+     *
+     * New modes are appended to SRMConnector::modes() (existing ones stay valid) and
+     * SRMConnector::preferredMode() may change. The current mode is left as is.
+     */
+    CZSignal<SRMConnector*> onConnectorModesChanged;
+
+    /**
      * @brief Destructor.
      *
      * All connectors are automatically uninitialized before destruction.

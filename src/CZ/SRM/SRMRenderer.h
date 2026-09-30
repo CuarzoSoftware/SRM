@@ -9,6 +9,7 @@
 #include <CZ/SRM/SRMPropertyBlob.h>
 #include <CZ/Ream/Ream.h>
 
+#include <atomic>
 #include <future>
 #include <mutex>
 #include <memory>
@@ -174,6 +175,7 @@ public:
 
     drmEventContext drmEventCtx {};
     std::binary_semaphore repaintSemaphore { 0 };
+    std::atomic<bool> repaintWakePending { false };
     std::recursive_mutex propsMutex; // Protect stuff like cursor and gamma updates
     std::unique_ptr<SkRegion> m_damage;
     RFormat m_currentFormat {};

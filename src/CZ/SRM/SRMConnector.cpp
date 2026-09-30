@@ -224,7 +224,9 @@ bool SRMConnector::unlockRenderer(bool repaint) noexcept
         return false;
 
     m_rend->pendingRepaint |= repaint;
-    m_rend->repaintSemaphore.release();
+
+    if (!m_rend->repaintWakePending.exchange(true))
+        m_rend->repaintSemaphore.release();
     return true;
 }
 

@@ -859,6 +859,7 @@ void SRMRenderer::waitForRepaintRequest() noexcept
     {
         atomicChanges.set(0);
         repaintSemaphore.acquire();
+        repaintWakePending.store(false);
     }
 }
 

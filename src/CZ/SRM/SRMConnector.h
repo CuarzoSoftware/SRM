@@ -496,6 +496,7 @@ private:
     bool updateNames(drmModeConnectorPtr res) noexcept;
     bool updateEncoders(drmModeConnectorPtr res) noexcept;
     bool updateModes(drmModeConnectorPtr res) noexcept;
+    bool refreshModes(drmModeConnectorPtr res) noexcept;
 
     bool unlockRenderer(bool repaint) noexcept;
 

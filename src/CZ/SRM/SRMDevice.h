@@ -6,8 +6,12 @@
 #include <CZ/SRM/SRMLog.h>
 #include <CZ/Ream/RDevice.h>
 #include <CZ/Core/CZBitset.h>
+#include <CZ/Core/CZSpFd.h>
 #include <mutex>
+#include <thread>
+#include <unordered_set>
 #include <string>
+#include <xf86drm.h>
 #include <xf86drmMode.h>
 
 /**
@@ -186,6 +190,28 @@ private:
 
     bool dispatchHotplugEvents() noexcept;
 
+    // Sole drmHandleEvent caller. Dispatching flip completions from one
+    // dedicated thread removes the poll/read races of the old per-renderer
+    // wait loops, whose waiters could drain each other's events, block on
+    // an empty-queue read while holding m_pageFlipMutex, or sleep through
+    // a completion already dispatched by a peer.
+    void startEventThread() noexcept;
+    void stopEventThread() noexcept;
+    void eventThread() noexcept;
+
+    // The SRMDevice whose event thread is executing on the calling thread.
+    // drmEventContext callbacks carry no user context, so PageFlipHandler
+    // resolves the device this way (it only ever runs on event threads).
+    static SRMDevice *eventThreadDevice() noexcept;
+
+    // PageFlipHandler must validate a frame pointer without dereferencing
+    // it: a renderer destroyed before its flip event arrived leaves a
+    // disarmed pointer whose Frame memory is already freed.
+    bool isFrameArmed(const void *frame) const noexcept
+    {
+        return m_armedFrames.find(frame) != m_armedFrames.end();
+    }
+
     enum class PDriver
     {
         unknown,
@@ -214,8 +240,19 @@ private:
     std::vector<SRMCrtc*> m_crtcs;
     std::vector<SRMEncoder*> m_encoders;
 
-    // Prevents multiple calls to drmModeHandleEvent
+    // Prevents multiple calls to drmModeHandleEvent. Also guards m_armedFrames
+    // and every frameQueue mutation, keeping flip dispatch serial with the
+    // commit paths that arm frames and with renderer teardown.
     std::recursive_mutex m_pageFlipMutex;
+
+    std::thread m_eventThread;
+    CZSpFd m_eventStopFd;
+    drmEventContext m_eventCtx {};
+
+    // Frame pointers registered for a flip completion event. The kernel
+    // event carries the raw pointer as user_data, so membership here is
+    // what makes it safe to dereference.
+    std::unordered_set<const void *> m_armedFrames;
 };
 
 #endif // SRMDEVICE_H

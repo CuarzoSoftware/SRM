@@ -10,12 +10,21 @@
 #include <CZ/Core/Utils/CZVectorUtils.h>
 
 #include <cstring>
+#include <cerrno>
 #include <fcntl.h>
 #include <memory>
+#include <poll.h>
+#include <sys/eventfd.h>
+#include <unistd.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
 using namespace CZ;
+
+// Flip completions are dispatched exclusively by SRMDevice event threads,
+// so a thread-local is enough for the libdrm callback (which carries no
+// user context) to find the owning device.
+static thread_local SRMDevice *t_eventDevice { nullptr };
 
 static bool DeviceInBlacklist(const char *nodePath)
 {
@@ -204,8 +213,109 @@ std::shared_ptr<SRMLease> SRMDevice::createLease(SRMLease::Resources &&resources
     return std::shared_ptr<SRMLease>(new SRMLease(std::move(resources), this, leaseFd, lessee));
 }
 
+SRMDevice *SRMDevice::eventThreadDevice() noexcept
+{
+    return t_eventDevice;
+}
+
+void SRMDevice::startEventThread() noexcept
+{
+    m_eventStopFd.reset(eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK));
+
+    if (m_eventStopFd.get() < 0)
+    {
+        log(CZError, CZLN, "Failed to create the event thread stop eventfd. Flip events will not be dispatched.");
+        return;
+    }
+
+    try {
+        m_eventThread = std::thread(&SRMDevice::eventThread, this);
+    }
+    catch (...) {
+        log(CZError, CZLN, "Failed to start the DRM event thread. Flip events will not be dispatched.");
+        m_eventStopFd.reset(-1);
+    }
+}
+
+void SRMDevice::stopEventThread() noexcept
+{
+    if (!m_eventThread.joinable())
+        return;
+
+    const UInt64 stop { 1 };
+    const ssize_t written { write(m_eventStopFd.get(), &stop, sizeof(stop)) };
+    CZ_UNUSED(written);
+
+    m_eventThread.join();
+}
+
+void SRMDevice::eventThread() noexcept
+{
+    t_eventDevice = this;
+
+    m_eventCtx.version = DRM_EVENT_CONTEXT_VERSION;
+    m_eventCtx.vblank_handler = NULL;
+    m_eventCtx.page_flip_handler = &SRMRenderer::PageFlipHandler;
+    m_eventCtx.page_flip_handler2 = NULL;
+    m_eventCtx.sequence_handler = NULL;
+
+    // A drained event queue must be a no-op read, never a blocking one:
+    // O_NONBLOCK only changes read() semantics, ioctls and GBM/EGL are
+    // unaffected, and drmHandleEvent return values are ignored by design.
+    const int flags { fcntl(fd(), F_GETFL) };
+    fcntl(fd(), F_SETFL, flags | O_NONBLOCK);
+
+    log(CZDebug, CZLN, "DRM event thread started");
+
+    while (true)
+    {
+        pollfd fds[2] {};
+        fds[0].fd = fd();
+        fds[0].events = POLLIN;
+        fds[1].fd = m_eventStopFd.get();
+        fds[1].events = POLLIN;
+
+        const int ret { poll(fds, 2, -1) };
+
+        if (ret < 0)
+        {
+            if (errno == EINTR)
+                continue;
+
+            log(CZError, CZLN, "Failed to poll DRM events, stopping event dispatch (errno {})", errno);
+            break;
+        }
+
+        if (ret == 0)
+            continue;
+
+        if (fds[1].revents & POLLIN) // Stop requested
+            break;
+
+        if (fds[0].revents & (POLLERR | POLLHUP))
+        {
+            log(CZError, CZLN, "DRM device error while polling events, stopping event dispatch");
+            break;
+        }
+
+        if (fds[0].revents & POLLIN)
+        {
+            const std::lock_guard<std::recursive_mutex> lock { m_pageFlipMutex };
+            drmHandleEvent(fd(), &m_eventCtx);
+        }
+    }
+
+    log(CZDebug, CZLN, "DRM event thread stopped");
+    t_eventDevice = nullptr;
+}
+
 SRMDevice::~SRMDevice() noexcept
 {
+    // Stop dispatching before the connectors (and their renderers) die.
+    // After the join no flip event can touch a destroyed renderer's
+    // frames, and late events are dropped by the armed-frame check.
+    stopEventThread();
+
     CZVectorUtils::DeleteAndPopBackAll(m_connectors);
     CZVectorUtils::DeleteAndPopBackAll(m_planes);
     CZVectorUtils::DeleteAndPopBackAll(m_encoders);
@@ -273,6 +383,10 @@ bool SRMDevice::init() noexcept
     };
 
     drmModeFreeResources(res);
+
+    if (ret)
+        startEventThread();
+
     return ret;
 }
 

@@ -22,9 +22,9 @@
 
 #include <CZ/Ream/GL/RGLMakeCurrent.h>
 
+#include <chrono>
 #include <future>
 #include <drm_fourcc.h>
-#include <sys/poll.h>
 
 using namespace CZ;
 
@@ -81,6 +81,16 @@ SRMRenderer::SRMRenderer(SRMConnector *connector, const SRMConnectorInterface *i
 
 SRMRenderer::~SRMRenderer() noexcept
 {
+    {
+        const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
+
+        while (!frameQueue.empty())
+        {
+            device()->m_armedFrames.erase(&frameQueue.back());
+            frameQueue.pop_back();
+        }
+    }
+
     if (encoder)
         encoder->m_currentConnector = nullptr;
 
@@ -159,11 +169,6 @@ bool SRMRenderer::startRenderThread() noexcept
     std::thread([this](std::promise<bool> initPromise)
     {
         threadId = std::this_thread::get_id();
-        drmEventCtx.version = DRM_EVENT_CONTEXT_VERSION,
-        drmEventCtx.vblank_handler = NULL,
-        drmEventCtx.page_flip_handler = &PageFlipHandler,
-        drmEventCtx.page_flip_handler2 = NULL;
-        drmEventCtx.sequence_handler = NULL;
 
         if (!init())
         {
@@ -808,45 +813,56 @@ void SRMRenderer::PageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec,
 {
     CZ_UNUSED(fd);
 
-    if (data)
+    if (!data)
+        return;
+
+    // Events are dispatched only by the owning device's event thread.
+    // A frame whose renderer was destroyed before its event arrived was
+    // disarmed on teardown, and its pointer must not be dereferenced.
+    SRMDevice *dev { SRMDevice::eventThreadDevice() };
+
+    if (!dev || !dev->isFrameArmed(data))
+        return;
+
+    Frame *frame { static_cast<Frame*>(data) };
+    auto *rend { frame->rend };
+
+    dev->m_armedFrames.erase(data);
+    rend->pendingPageFlip.store(false);
+    rend->m_flipCv.notify_all();
+
+    for (auto it = rend->frameQueue.begin(); it != rend->frameQueue.end();)
     {
-        Frame *frame { static_cast<Frame*>(data) };
-        auto *rend { frame->rend };
-        rend->pendingPageFlip = false;
-
-        for (auto it = rend->frameQueue.begin(); it != rend->frameQueue.end();)
+        if ((*it).info.paintEventId != frame->info.paintEventId)
         {
-            if ((*it).info.paintEventId != frame->info.paintEventId)
-            {
-                if ((*it).info.flags != 0)
-                    rend->iface->discarded(rend->conn, (*it).info.paintEventId, frame->rend->ifaceData);
+            if ((*it).info.flags != 0)
+                rend->iface->discarded(rend->conn, (*it).info.paintEventId, frame->rend->ifaceData);
 
-                it = rend->frameQueue.erase(it);
-            }
-            else
+            it = rend->eraseFrame(it);
+        }
+        else
+        {
+            if (frame->info.flags.get() != 0)
             {
-                if (frame->info.flags.get() != 0)
+                frame->info.seq = seq;
+
+                if (frame->info.flags.has(CZPresentationTime::VSync))
                 {
-                    frame->info.seq = seq;
-
-                    if (frame->info.flags.has(CZPresentationTime::VSync))
-                    {
-                        frame->info.time.tv_sec = sec;
-                        frame->info.time.tv_nsec = usec * 1000;
-                        frame->info.period = rend->conn->currentMode()->info().vrefresh == 0 ? 0 : 1000000000/rend->conn->currentMode()->info().vrefresh;
-                    }
-                    else
-                    {
-                        frame->info.period = 0;
-                        clock_gettime(rend->device()->caps().TimestampMonotonic ? CLOCK_MONOTONIC : CLOCK_REALTIME, &frame->info.time);
-                    }
-
-                    rend->iface->presented(rend->conn, (*it).info, frame->rend->ifaceData);
+                    frame->info.time.tv_sec = sec;
+                    frame->info.time.tv_nsec = usec * 1000;
+                    frame->info.period = rend->conn->currentMode()->info().vrefresh == 0 ? 0 : 1000000000/rend->conn->currentMode()->info().vrefresh;
+                }
+                else
+                {
+                    frame->info.period = 0;
+                    clock_gettime(rend->device()->caps().TimestampMonotonic ? CLOCK_MONOTONIC : CLOCK_REALTIME, &frame->info.time);
                 }
 
-                it = rend->frameQueue.erase(it);
-                break;
+                rend->iface->presented(rend->conn, (*it).info, frame->rend->ifaceData);
             }
+
+            it = rend->eraseFrame(it);
+            break;
         }
     }
 }
@@ -863,38 +879,59 @@ void SRMRenderer::waitForRepaintRequest() noexcept
     }
 }
 
+std::list<SRMRenderer::Frame>::iterator SRMRenderer::eraseFrame(std::list<Frame>::iterator it) noexcept
+{
+    const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
+    device()->m_armedFrames.erase(&*it);
+    return frameQueue.erase(it);
+}
+
 bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
 {
-    pollfd fds {};
-    fds.fd = device()->fd();
-    fds.events = POLLIN;
+    // Flip completions are dispatched by the device event thread, so
+    // waiters never poll or read the DRM fd (the old multi-waiter loop
+    // let peers drain each other's events and block in empty-queue reads
+    // while holding the device mutex). Waiters block on m_flipCv, which
+    // PageFlipHandler signals after clearing pendingPageFlip under the
+    // device page flip mutex.
+    if (iterLimit == 0)
+        return !pendingPageFlip.load();
 
-    if (pendingPageFlip)
+    if (!pendingPageFlip.load())
+        return true;
+
+    // A flip whose completion event is lost must not wedge the connector
+    // forever. Bounded callers keep their millisecond-scale budget;
+    // unbounded callers recover after 3s by discarding the frames queued
+    // for the lost event (any late arrival is dropped, disarmed).
+    const auto timeout { iterLimit < 0 ? std::chrono::seconds(3) : std::chrono::milliseconds(iterLimit) };
+    const auto deadline { std::chrono::steady_clock::now() + timeout };
+
+    std::unique_lock<std::recursive_mutex> lock { device()->m_pageFlipMutex };
+
+    while (pendingPageFlip.load())
     {
-        while (pendingPageFlip)
+        if (m_flipCv.wait_until(lock, deadline) == std::cv_status::timeout)
         {
-            if (iterLimit == 0)
-                return false;
+            if (!pendingPageFlip.load())
+                break;
 
-            const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
+            log(CZWarning, CZLN, "Page flip event not delivered: recovering connector.");
 
-            // Double check if the pageflip was notified in another thread
-            if (!pendingPageFlip)
-                return true;
+            while (!frameQueue.empty())
+            {
+                auto &frame { frameQueue.back() };
 
-            poll(&fds, 1, iterLimit == -1 ? 500 : 1);
-            drmHandleEvent(fds.fd, &drmEventCtx);
+                if (frame.info.flags.get() != 0)
+                    iface->discarded(conn, frame.info.paintEventId, ifaceData);
 
-            if (iterLimit > 0)
-                iterLimit--;
+                device()->m_armedFrames.erase(&frame);
+                frameQueue.pop_back();
+            }
+
+            pendingPageFlip.store(false);
+            return false;
         }
-    }
-    else
-    {
-        const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
-
-        while (poll(&fds, 1, 0) > 0)
-            drmHandleEvent(fds.fd, &drmEventCtx);
     }
 
     return true;
@@ -920,11 +957,20 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
         {
             auto req { SRMAtomicRequest::Make(device()) };
             atomicReqAppendPrimaryPlane(req, fb);
+
+            // Arming (frame registration + pendingPageFlip) and the commit
+            // ioctl are serialized with flip dispatch under the device mutex,
+            // so a completion can only clear the flag of a flip that was
+            // actually committed: the flag can never be left stuck armed.
+            const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
             auto frame { enqueueCurrentFrame(notify ? CZPresentationTime::HWClock | CZPresentationTime::HWCompletion : 0) };
+            pendingPageFlip.store(true);
             ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_ATOMIC_NONBLOCK, &(*frame), false);
 
             if (ret)
             {
+                pendingPageFlip.store(false);
+                device()->m_armedFrames.erase(&*frame);
                 frameQueue.erase(frame);
 
                 // Even if async flips are supported some drivers may not handle specific modifiers and report EINVAL
@@ -942,12 +988,18 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
             auto req { SRMAtomicRequest::Make(device()) };
             atomicReqAppendChanges(req, fb);
             const auto prevCursorIndex { cursorI };
+
+            const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
             auto frame { enqueueCurrentFrame(notify ? CZPresentationTime::HWClock | CZPresentationTime::HWCompletion | CZPresentationTime::VSync : 0) };
+            pendingPageFlip.store(true);
             ret = req->commit(DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK, &(*frame), false);
 
             if (ret)
             {
+                pendingPageFlip.store(false);
+                device()->m_armedFrames.erase(&*frame);
                 frameQueue.erase(frame);
+
                 if (cursorPlane)
                     cursorI = prevCursorIndex;
 
@@ -964,11 +1016,15 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
 
         if (asyncFlip)
         {
+            const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
             auto frame { enqueueCurrentFrame(notify ? CZPresentationTime::HWClock | CZPresentationTime::HWCompletion : 0) };
+            pendingPageFlip.store(true);
             ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_PAGE_FLIP_EVENT, &(*frame));
 
             if (ret)
             {
+                pendingPageFlip.store(false);
+                device()->m_armedFrames.erase(&*frame);
                 frameQueue.erase(frame);
 
                 // Even if async flips are supported some drivers may not handle specific modifiers and report EINVAL
@@ -982,12 +1038,17 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
 
         if (!asyncFlip || ret)
         {
+            const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
             auto frame { enqueueCurrentFrame(notify ? CZPresentationTime::HWClock | CZPresentationTime::HWCompletion | CZPresentationTime::VSync : 0) };
+            pendingPageFlip.store(true);
             ret = drmModePageFlip(device()->fd(), crtc->id(), primaryPlaneFb, DRM_MODE_PAGE_FLIP_EVENT, &(*frame));
 
             if (ret)
             {
+                pendingPageFlip.store(false);
+                device()->m_armedFrames.erase(&*frame);
                 frameQueue.erase(frame);
+
                 logLegacy(CZTrace, CZLN, "Failed to page flip. DRM Error: {}", strerror(-ret));
             }
         }
@@ -1001,7 +1062,6 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
     else
     {
         currentFb = fb;
-        pendingPageFlip = true;
     }
 
     if (swapchain.n == 2 || firstPageFlip)
@@ -1013,9 +1073,11 @@ void SRMRenderer::commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexc
 
 std::list<SRMRenderer::Frame>::iterator SRMRenderer::enqueueCurrentFrame(CZBitset<CZPresentationTime::Flags> flags) noexcept
 {
+    const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
     frameQueue.emplace_back(Frame{.rend = this, .info = {}});
     frameQueue.back().info.flags = flags;
     frameQueue.back().info.paintEventId = paintEventId;
+    device()->m_armedFrames.insert(&frameQueue.back());
     return std::prev(frameQueue.end());
 }
 

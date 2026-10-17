@@ -548,7 +548,13 @@ bool SRMConnector::uninitialize() noexcept
     auto future { m_rend->unitPromise->get_future() };
     unlockRenderer(false);
     assert(future.get());
-    m_rend.reset();
+    {
+        // Serialize with the device event thread: a flip event still in
+        // flight for this renderer must be fully dispatched (or dropped
+        // disarmed) before its frames are destroyed.
+        const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
+        m_rend.reset();
+    }
     log(CZInfo, CZLN, "Uninitialized");
     return true;
 }

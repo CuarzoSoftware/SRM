@@ -10,6 +10,7 @@
 #include <CZ/Ream/Ream.h>
 
 #include <atomic>
+#include <condition_variable>
 #include <future>
 #include <mutex>
 #include <memory>
@@ -117,6 +118,12 @@ public:
     static void PageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec, void *data) noexcept;
     void waitForRepaintRequest() noexcept;
     bool waitPendingPageFlip(int iterLimit) noexcept;
+
+    // Removes a frame from frameQueue and disarms it. All frameQueue
+    // mutations happen under device()->m_pageFlipMutex so flip dispatch
+    // never walks the queue while it is being modified.
+    std::list<Frame>::iterator eraseFrame(std::list<Frame>::iterator it) noexcept;
+
     void commit(std::shared_ptr<RDRMFramebuffer> fb, bool notify) noexcept;
 
     // Adds the current paint event to a "to be presented" frame queue
@@ -163,7 +170,13 @@ public:
 
     bool currentVSync { true };
     bool firstPageFlip { true };
-    bool pendingPageFlip { false };
+
+    // Armed before a flip is committed, cleared by PageFlipHandler (or by
+    // a lost-event recovery) under device()->m_pageFlipMutex. Waiters block
+    // on m_flipCv, which PageFlipHandler signals under the same mutex.
+    std::atomic<bool> pendingPageFlip { false };
+    std::condition_variable_any m_flipCv;
+
     bool pendingRepaint { false };
     bool rendering { false };
     bool isDead { false };
@@ -173,7 +186,6 @@ public:
     std::shared_ptr<const RGammaLUT> gammaLUT;
     std::shared_ptr<SRMPropertyBlob> gammaBlob;
 
-    drmEventContext drmEventCtx {};
     std::binary_semaphore repaintSemaphore { 0 };
     std::atomic<bool> repaintWakePending { false };
     std::recursive_mutex propsMutex; // Protect stuff like cursor and gamma updates

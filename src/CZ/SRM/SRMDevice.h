@@ -6,6 +6,7 @@
 #include <CZ/SRM/SRMLog.h>
 #include <CZ/Ream/RDevice.h>
 #include <CZ/Core/CZBitset.h>
+#include <condition_variable>
 #include <mutex>
 #include <string>
 #include <xf86drmMode.h>
@@ -214,8 +215,14 @@ private:
     std::vector<SRMCrtc*> m_crtcs;
     std::vector<SRMEncoder*> m_encoders;
 
-    // Prevents multiple calls to drmModeHandleEvent
-    std::recursive_mutex m_pageFlipMutex;
+    /* DRM event dispatching (page flips). All connectors of the device share the fd, so only
+     * one thread (the "dispatcher") may read it at a time. The dispatcher polls UNLOCKED and
+     * the other renderers wait on the condvar, leaving as soon as their own flip is handled —
+     * instead of blocking on a device-wide mutex held across a full-vblank poll(), which
+     * serialized the render threads and degraded performance with multiple screens. */
+    std::mutex m_evMutex;
+    std::condition_variable m_evCond;
+    bool m_evDispatching { false };
 };
 
 #endif // SRMDEVICE_H

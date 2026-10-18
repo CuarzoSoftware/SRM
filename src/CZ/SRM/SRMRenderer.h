@@ -163,7 +163,8 @@ public:
 
     bool currentVSync { true };
     bool firstPageFlip { true };
-    bool pendingPageFlip { false };
+    /* Set by the owner thread on commit, cleared by whichever thread dispatches the flip event */
+    std::atomic<bool> pendingPageFlip { false };
     bool pendingRepaint { false };
     bool rendering { false };
     bool isDead { false };

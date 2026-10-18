@@ -22,6 +22,7 @@
 
 #include <CZ/Ream/GL/RGLMakeCurrent.h>
 
+#include <chrono>
 #include <future>
 #include <drm_fourcc.h>
 #include <sys/poll.h>
@@ -812,7 +813,6 @@ void SRMRenderer::PageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec,
     {
         Frame *frame { static_cast<Frame*>(data) };
         auto *rend { frame->rend };
-        rend->pendingPageFlip = false;
 
         for (auto it = rend->frameQueue.begin(); it != rend->frameQueue.end();)
         {
@@ -848,6 +848,11 @@ void SRMRenderer::PageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec,
                 break;
             }
         }
+
+        /* Cleared last: the owner thread may poll this flag without the event mutex
+         * (e.g. before committing with triple buffering), and a false value must imply
+         * the frameQueue is no longer being accessed from here. */
+        rend->pendingPageFlip = false;
     }
 }
 
@@ -869,6 +874,18 @@ bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
     fds.fd = device()->fd();
     fds.events = POLLIN;
 
+    /* All connectors of the device share the fd, so flip events arrive interleaved and only one
+     * thread (the "dispatcher") may read it at a time. The dispatcher polls with m_evMutex
+     * UNLOCKED and the others wait on the condvar, leaving as soon as their own flip is handled.
+     * Previously the mutex was held across a full-vblank poll(), serializing the render threads
+     * and degrading performance with more than one screen.
+     *
+     * The fd is also blocking, so drmHandleEvent() is only called after a poll() reported data:
+     * being the exclusive reader guarantees the data is still there. */
+
+    auto &dev { *device() };
+    std::unique_lock<std::mutex> lock { dev.m_evMutex };
+
     if (pendingPageFlip)
     {
         while (pendingPageFlip)
@@ -876,25 +893,55 @@ bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
             if (iterLimit == 0)
                 return false;
 
-            const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
-
-            // Double check if the pageflip was notified in another thread
-            if (!pendingPageFlip)
-                return true;
-
-            poll(&fds, 1, iterLimit == -1 ? 500 : 1);
-            drmHandleEvent(fds.fd, &drmEventCtx);
+            const int timeoutMs { iterLimit == -1 ? 500 : 1 };
 
             if (iterLimit > 0)
                 iterLimit--;
+
+            if (dev.m_evDispatching)
+            {
+                /* Another renderer is reading the fd; it also dispatches our flip and
+                 * notifies after each batch of events */
+                dev.m_evCond.wait_for(lock, std::chrono::milliseconds(timeoutMs));
+            }
+            else
+            {
+                dev.m_evDispatching = true;
+                lock.unlock();
+                fds.revents = 0;
+                poll(&fds, 1, timeoutMs);
+                lock.lock();
+
+                if (fds.revents & POLLIN)
+                    drmHandleEvent(fds.fd, &drmEventCtx);
+
+                dev.m_evDispatching = false;
+                dev.m_evCond.notify_all();
+            }
         }
     }
     else
     {
-        const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
+        /* Drain already signaled events without blocking. If another thread holds the
+         * dispatcher role it is the only one allowed to read the fd, and it will
+         * process these events anyway. */
+        if (dev.m_evDispatching)
+            return true;
 
-        while (poll(&fds, 1, 0) > 0)
+        dev.m_evDispatching = true;
+
+        while (true)
+        {
+            fds.revents = 0;
+
+            if (poll(&fds, 1, 0) <= 0 || !(fds.revents & POLLIN))
+                break;
+
             drmHandleEvent(fds.fd, &drmEventCtx);
+        }
+
+        dev.m_evDispatching = false;
+        dev.m_evCond.notify_all();
     }
 
     return true;

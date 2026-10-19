@@ -3,6 +3,7 @@
 #include <CZ/SRM/SRMEncoder.h>
 #include <CZ/SRM/SRMLog.h>
 #include <CZ/SRM/SRMDevice.h>
+#include <CZ/SRM/SRMConnectorMode.h>
 #include <CZ/SRM/SRMCore.h>
 #include <CZ/SRM/SRMConnector.h>
 
@@ -469,6 +470,12 @@ bool SRMDevice::dispatchHotplugEvents() noexcept
                 conn->updateEncoders(res);
                 conn->updateModes(res);
             }
+        }
+        else if (isConnected && conn->refreshModes(res))
+        {
+            log(CZInfo, "SRMConnector ({}) {} modes changed, preferred {}",
+                conn->id(), conn->name().c_str(), *conn->preferredMode());
+            core()->onConnectorModesChanged.notify(conn);
         }
 
         drmModeFreeConnector(res);

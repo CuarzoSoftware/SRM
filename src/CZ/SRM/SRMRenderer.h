@@ -172,10 +172,12 @@ public:
     bool firstPageFlip { true };
 
     // Armed before a flip is committed, cleared by PageFlipHandler (or by
-    // a lost-event recovery) under device()->m_pageFlipMutex. Waiters block
-    // on m_flipCv, which PageFlipHandler signals under the same mutex.
+    // a lost-event recovery) under device()->m_pageFlipMutex. Waiters poll
+    // the DRM fd together with m_flipEventFd, which PageFlipHandler writes
+    // under the same mutex so a completion dispatched by a peer render
+    // thread can't be slept through (see waitPendingPageFlip()).
     std::atomic<bool> pendingPageFlip { false };
-    std::condition_variable_any m_flipCv;
+    CZSpFd m_flipEventFd;
 
     bool pendingRepaint { false };
     bool rendering { false };

@@ -190,19 +190,22 @@ private:
 
     bool dispatchHotplugEvents() noexcept;
 
-    // Sole drmHandleEvent caller. Dispatching flip completions from one
-    // dedicated thread removes the poll/read races of the old per-renderer
-    // wait loops, whose waiters could drain each other's events, block on
-    // an empty-queue read while holding m_pageFlipMutex, or sleep through
-    // a completion already dispatched by a peer.
-    void startEventThread() noexcept;
-    void stopEventThread() noexcept;
-    void eventThread() noexcept;
+    // Prepares flip-completion dispatch: event context + fd O_NONBLOCK.
+    void initEventDispatch() noexcept;
 
-    // The SRMDevice whose event thread is executing on the calling thread.
+    // Sole path into drmHandleEvent, serialized by m_pageFlipMutex. Called
+    // by whichever render thread is waiting for a flip: the fd is O_NONBLOCK
+    // so concurrent drains are harmless no-op reads, and a completion
+    // consumed on behalf of a peer wakes it through its m_flipEventFd
+    // (written by PageFlipHandler under the same mutex). No dedicated
+    // thread is needed for SRM to never get stuck: lost events are bounded
+    // by the waiters' recovery timeout.
+    void dispatchDRMEvents() noexcept;
+
+    // The SRMDevice whose events are being dispatched on the calling thread.
     // drmEventContext callbacks carry no user context, so PageFlipHandler
-    // resolves the device this way (it only ever runs on event threads).
-    static SRMDevice *eventThreadDevice() noexcept;
+    // resolves the device this way (set around drmHandleEvent).
+    static SRMDevice *dispatchingDevice() noexcept;
 
     // PageFlipHandler must validate a frame pointer without dereferencing
     // it: a renderer destroyed before its flip event arrived leaves a
@@ -245,8 +248,6 @@ private:
     // commit paths that arm frames and with renderer teardown.
     std::recursive_mutex m_pageFlipMutex;
 
-    std::thread m_eventThread;
-    CZSpFd m_eventStopFd;
     drmEventContext m_eventCtx {};
 
     // Frame pointers registered for a flip completion event. The kernel

@@ -25,6 +25,8 @@
 #include <chrono>
 #include <future>
 #include <drm_fourcc.h>
+#include <sys/eventfd.h>
+#include <poll.h>
 
 using namespace CZ;
 
@@ -77,6 +79,14 @@ SRMRenderer::SRMRenderer(SRMConnector *connector, const SRMConnectorInterface *i
     log = conn->log.newWithContext("REND");
     logAtomic = log.newWithContext("ATOMIC");
     logLegacy = log.newWithContext("LEGACY");
+
+    /* Wakes this renderer when a peer dispatches its flip completion (see
+     * waitPendingPageFlip()). If it can't be created, poll() simply ignores
+     * the negative fd and waiters fall back to their deadline re-checks. */
+    m_flipEventFd.reset(eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK));
+
+    if (m_flipEventFd.get() < 0)
+        log(CZError, CZLN, "Failed to create the flip wake-up eventfd");
 }
 
 SRMRenderer::~SRMRenderer() noexcept
@@ -816,10 +826,11 @@ void SRMRenderer::PageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec,
     if (!data)
         return;
 
-    // Events are dispatched only by the owning device's event thread.
-    // A frame whose renderer was destroyed before its event arrived was
-    // disarmed on teardown, and its pointer must not be dereferenced.
-    SRMDevice *dev { SRMDevice::eventThreadDevice() };
+    // Events are dispatched under the device page-flip mutex (see
+    // SRMDevice::dispatchDRMEvents()). A frame whose renderer was destroyed
+    // before its event arrived was disarmed on teardown, and its pointer
+    // must not be dereferenced.
+    SRMDevice *dev { SRMDevice::dispatchingDevice() };
 
     if (!dev || !dev->isFrameArmed(data))
         return;
@@ -829,7 +840,15 @@ void SRMRenderer::PageFlipHandler(Int32 fd, UInt32 seq, UInt32 sec, UInt32 usec,
 
     dev->m_armedFrames.erase(data);
     rend->pendingPageFlip.store(false);
-    rend->m_flipCv.notify_all();
+
+    /* Wakes the owner if a peer dispatched this completion. Written under the
+     * same mutex that cleared the flag, so the wake-up can't be lost. */
+    if (rend->m_flipEventFd.get() >= 0)
+    {
+        const UInt64 one { 1 };
+        const ssize_t written { write(rend->m_flipEventFd.get(), &one, sizeof(one)) };
+        CZ_UNUSED(written);
+    }
 
     for (auto it = rend->frameQueue.begin(); it != rend->frameQueue.end();)
     {
@@ -888,12 +907,13 @@ std::list<SRMRenderer::Frame>::iterator SRMRenderer::eraseFrame(std::list<Frame>
 
 bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
 {
-    // Flip completions are dispatched by the device event thread, so
-    // waiters never poll or read the DRM fd (the old multi-waiter loop
-    // let peers drain each other's events and block in empty-queue reads
-    // while holding the device mutex). Waiters block on m_flipCv, which
-    // PageFlipHandler signals after clearing pendingPageFlip under the
-    // device page flip mutex.
+    // Flip completions are dispatched, under the device page-flip mutex, by
+    // whichever render thread is waiting: the fd is O_NONBLOCK so concurrent
+    // drains are harmless no-op reads, never blocking ones. A completion
+    // consumed on behalf of a peer wakes it through m_flipEventFd, written
+    // by PageFlipHandler under the same mutex that clears pendingPageFlip,
+    // so wake-ups can't be lost. No dedicated thread is required for a
+    // waiter to never get stuck.
     if (iterLimit == 0)
         return !pendingPageFlip.load();
 
@@ -904,15 +924,23 @@ bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
     // forever. Bounded callers keep their millisecond-scale budget;
     // unbounded callers recover after 3s by discarding the frames queued
     // for the lost event (any late arrival is dropped, disarmed).
-    const auto timeout { iterLimit < 0 ? std::chrono::seconds(3) : std::chrono::milliseconds(iterLimit) };
+    const auto timeout { iterLimit < 0 ? std::chrono::milliseconds(3000) : std::chrono::milliseconds(iterLimit) };
     const auto deadline { std::chrono::steady_clock::now() + timeout };
 
-    std::unique_lock<std::recursive_mutex> lock { device()->m_pageFlipMutex };
+    pollfd fds[2] {};
+    fds[0].fd = device()->fd();
+    fds[0].events = POLLIN;
+    fds[1].fd = m_flipEventFd.get(); // Negative fds are ignored by poll()
+    fds[1].events = POLLIN;
 
     while (pendingPageFlip.load())
     {
-        if (m_flipCv.wait_until(lock, deadline) == std::cv_status::timeout)
+        const auto now { std::chrono::steady_clock::now() };
+
+        if (now >= deadline)
         {
+            const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
+
             if (!pendingPageFlip.load())
                 break;
 
@@ -932,6 +960,21 @@ bool SRMRenderer::waitPendingPageFlip(int iterLimit) noexcept
             pendingPageFlip.store(false);
             return false;
         }
+
+        const auto remainingMs { std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count() + 1 };
+        fds[0].revents = fds[1].revents = 0;
+        poll(fds, 2, static_cast<int>(remainingMs));
+
+        // A peer dispatched our completion: drain the wake-up counter
+        if (fds[1].revents & POLLIN)
+        {
+            UInt64 count;
+            const ssize_t bytesRead { read(m_flipEventFd.get(), &count, sizeof(count)) };
+            CZ_UNUSED(bytesRead);
+        }
+
+        if (fds[0].revents & POLLIN)
+            device()->dispatchDRMEvents();
     }
 
     return true;

@@ -44,9 +44,10 @@ namespace CZ
          * Called after the content submitted in a recent @ref paint callback
          * has been successfully displayed.
          *
-         * @note Dispatched from the device's DRM event thread (shared by all
-         * connectors of the device), not from the connector's rendering thread.
-         * Implementations must not block or re-enter SRM from this callback.
+         * @note May be dispatched from any render thread of the same device
+         * (whichever one drains the shared DRM event queue), not necessarily
+         * from this connector's rendering thread. Implementations must not
+         * block or re-enter SRM from this callback.
          *
          * @param connector Pointer to the SRMConnector instance.
          * @param info      Presentation timing information.
@@ -60,9 +61,11 @@ namespace CZ
          * Called when the frame submitted in a previous @ref paint event was not displayed,
          * for example due to a driver error or state change.
          *
-         * @note Dispatched from the device's DRM event thread (or the recovering
-         * renderer's thread after a lost flip event), not from the connector's
-         * rendering thread. Implementations must not block or re-enter SRM.
+         * @note May be dispatched from any render thread of the same device
+         * (whichever one drains the shared DRM event queue, or the recovering
+         * renderer's thread after a lost flip event), not necessarily from this
+         * connector's rendering thread. Implementations must not block or
+         * re-enter SRM.
          *
          * @note This does not affect internal damage tracking.
          *

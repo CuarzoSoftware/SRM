@@ -549,9 +549,10 @@ bool SRMConnector::uninitialize() noexcept
     unlockRenderer(false);
     assert(future.get());
     {
-        // Serialize with the device event thread: a flip event still in
-        // flight for this renderer must be fully dispatched (or dropped
-        // disarmed) before its frames are destroyed.
+        // Serialize with flip dispatch (a peer render thread may be inside
+        // drmHandleEvent): a flip event still in flight for this renderer
+        // must be fully dispatched (or dropped disarmed) before its frames
+        // are destroyed.
         const std::lock_guard<std::recursive_mutex> lock { device()->m_pageFlipMutex };
         m_rend.reset();
     }

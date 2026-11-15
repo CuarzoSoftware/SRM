@@ -426,6 +426,7 @@ bool SRMRenderer::applyCrtcMode() noexcept
 bool SRMRenderer::initSwapchain() noexcept
 {
     swapchain = {};
+    swapchain.n = device()->core()->m_buffering; // CZ_SRM_BUFFERING
 
     strategy = Self;
     if (initSwapchainSelf()) return true;

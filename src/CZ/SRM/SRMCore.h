@@ -171,6 +171,7 @@ private:
     bool m_disableCursor {};
     bool m_disableScanout {};
     bool m_inFenceFd { true };
+    UInt32 m_buffering { 2 }; // Swapchain images per connector (CZ_SRM_BUFFERING: 1, 2 or 3)
 
     std::shared_ptr<RCore> m_ream;
 

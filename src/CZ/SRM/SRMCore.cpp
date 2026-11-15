@@ -143,6 +143,23 @@ bool SRMCore::init() noexcept
     m_inFenceFd = !env || atoi(env) != 0;
     SRMLog(CZInfo, "Primary Plane IN_FENCE_FD Enabled: {}.", m_inFenceFd);
 
+    // Swapchain images per connector: 2 (default) waits for each page flip right after
+    // committing, 3 renders the next frame while a flip is still pending (lower latency under load,
+    // one more frame in flight), 1 renders into the image being scanned out (tearing)
+    env = getenv("CZ_SRM_BUFFERING");
+
+    if (env)
+    {
+        const int n { atoi(env) };
+
+        if (n >= 1 && n <= 3)
+            m_buffering = UInt32(n);
+        else
+            SRMLog(CZWarning, CZLN, "Invalid CZ_SRM_BUFFERING value \"{}\" (1, 2 or 3), using {}.", env, m_buffering);
+    }
+
+    SRMLog(CZInfo, "Buffering: {}.", m_buffering);
+
     const bool ret {
         initUdev() &&
         initDevices() &&

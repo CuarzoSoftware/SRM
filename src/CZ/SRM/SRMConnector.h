@@ -72,7 +72,6 @@ public:
      *
      * This function returns the DRM type associated with the connector (**DRM_MODE_CONNECTOR_xx** macros defined in `drm_mode.h`).
      *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the type.
      * @return The DRM type of the connector.
      */
     UInt32 type() const noexcept { return m_type; }
@@ -216,7 +215,7 @@ public:
     /**
      * @brief Set the cursor position.
      *
-     * @param po Position in pixel coords relative to the top-left origin of the connector image.
+     * @param pos Position in pixel coords relative to the top-left origin of the connector image.
      */
     bool setCursorPos(SkIPoint pos) noexcept;
 
@@ -231,9 +230,8 @@ public:
      * This function initializes the given @ref SRMConnector. After initialization, calling srmConnectorRepaint()
      * schedules a new rendering frame, which invokes `paintGL()` followed by a `pageFlipped()` event.
      *
-     * @param connector Pointer to the @ref SRMConnector to initialize.
-     * @param interface Pointer to the @ref SRMConnectorInterface struct to handle events.
-     * @param userData Pointer to user data to be associated with the connector.
+     * @param iface Pointer to the @ref SRMConnectorInterface struct to handle events.
+     * @param data Pointer to user data to be associated with the connector.
      * @return 1 if initialization is successful, 0 if an error occurs.
      *
      * @warning Make sure to correctly set up the @ref SRMConnectorInterface to handle all its events, otherwise, it may crash.
@@ -247,7 +245,6 @@ public:
      * multiple times during the same frame will not invoke `paintGL()` multiple times, only once.
      * After each `paintGL()` event, this method must be called again to schedule a new frame.
      *
-     * @param connector Pointer to the @ref SRMConnector to schedule a new rendering frame.
      * @return 1 if scheduling is successful, 0 otherwise.
      *
      * @note This function triggers paintGL() and pageFlipped() events in the rendering process.
@@ -262,16 +259,13 @@ public:
     bool uninitialize() noexcept;
 
     /**
-     * @brief Returns the buffer of a specific framebuffer index, usable as a texture for rendering.
+     * @brief Returns the framebuffer images of the connector, usable as textures for rendering.
      *
-     * This function returns the buffer of the specified framebuffer index of the given @ref SRMConnector.
-     * This buffer can be used as a texture for rendering, but it may not always be supported. Always check if `NULL` is returned.
+     * Use imageIndex() to know which one is currently being rendered.
      *
-     * Additionally, note that the buffer may not always be shared among all GPUs. In such cases, calling srmBufferGetTextureID() may return 0.
+     * Note that the images may not always be shared among all GPUs.
      *
-     * @param connector Pointer to the @ref SRMConnector for which to retrieve the framebuffer buffer.
-     * @param bufferIndex The index of the framebuffer buffer to retrieve.
-     * @return A pointer to the @ref SRMBuffer if available, or `NULL` if not supported.
+     * @return The list of framebuffer images of the connector.
      */
     const std::vector<std::shared_ptr<RImage>> &images() const noexcept;
 
@@ -281,7 +275,6 @@ public:
      * This function returns the index of the current framebuffer where the rendered content is stored
      * during a `paintGL()` event.
      *
-     * @param connector Pointer to the @ref SRMConnector to query for the current framebuffer index.
      * @return The current framebuffer index.
      */
     UInt32 imageIndex() const noexcept;
@@ -306,9 +299,8 @@ public:
      * red, green, and blue subpixels are arranged in relation to each other.
      *
      * @note The returned value is only meaningful when a display is connected. If the subpixel layout is unknown or not applicable,
-     *       the method may return @ref SRM_CONNECTOR_SUBPIXEL_UNKNOWN or @ref SRM_CONNECTOR_SUBPIXEL_NONE, respectively.
+     *       the method may return @ref RSubpixel::Unknown or @ref RSubpixel::None, respectively.
      *
-     * @param connector Pointer to the @ref SRMConnector for which the subpixel layout is requested.
      * @return The subpixel layout associated with the connector.
      *
      */
@@ -325,7 +317,6 @@ public:
      *       If the connector is initialized and this method returns 0, it indicates that the driver
      *       does not support gamma correction.
      *
-     * @param connector Pointer to the @ref SRMConnector.
      * @return The number of elements used to represent each RGB gamma correction curve, or 0 if the connector is uninitialized or
      *         if the driver does not support gamma correction.
      */
@@ -351,7 +342,6 @@ public:
      *
      * Returns 1 if vsync is enabled, 0 otherwise. V-Sync is enabled by default.
      *
-     * @param connector The @ref SRMConnector instance.
      * @return 1 if vsync is enabled, 0 if not.
      */
     bool isVSyncEnabled() const noexcept { return m_vsync; }
@@ -365,7 +355,6 @@ public:
      * @note Disabling vsync for the atomic API is supported only starting from Linux version 6.8.
      *       If you wish to enforce the use of the legacy API, set the **SRM_FORCE_LEGACY_API** environment variable to 1.
      *
-     * @param connector The @ref SRMConnector instance.
      * @param enabled Set to 1 to enable vsync, 0 to disable vsync.
      * @return 1 if the vsync change was successful, 0 otherwise.
      */
@@ -384,12 +373,11 @@ public:
     /**
      * @brief Sets a hint of the content type being displayed.
      *
-     * @see @ref SRM_CONNECTOR_CONTENT_TYPE
+     * @see @ref RContentType
      *
-     * @note The default value is @ref SRM_CONNECTOR_CONTENT_TYPE_GRAPHICS
+     * @note The default value is @ref RContentType::Graphics
      *
-     * @param connector A pointer to the @ref SRMConnector instance.
-     * @param contentType The content type hint.
+     * @param type The content type hint.
      */
     void setContentType(RContentType type, bool force = false) noexcept;
 
@@ -398,7 +386,6 @@ public:
      *
      * @see srmConnectorSetContentType()
      *
-     * @param connector A pointer to the @ref SRMConnector instance.
      */
     RContentType contentType() const noexcept { return m_contentType; }
 
@@ -418,8 +405,7 @@ public:
      *
      * @note If `SRM_DISABLE_CUSTOM_SCANOUT` is set to 1, this function always return 0.
      *
-     * @param connector A pointer to the @ref SRMConnector instance.
-     * @param buffer The buffer to scan, or `NULL` to restore the default connector framebuffers.
+     * @param image The image to scan, or `nullptr` to restore the default connector framebuffers.
      * @return 1 if the custom buffer will be scanned, 0 otherwise.
      */
     bool setCustomScanoutImage(std::shared_ptr<RImage> image) noexcept;
@@ -438,8 +424,7 @@ public:
      *
      * When set to 1, no `paintGL()` or `pageFlipped()` events are triggered. The default value is 0.
      *
-     * @param connector The @ref SRMConnector instance.
-     * @param locked    A value of 1 locks the current buffer, 0 unlocks it.
+     * @param lock `true` locks the current buffer, `false` unlocks it.
      */
     void lockCurrentBuffer(bool lock) noexcept;
 
@@ -448,7 +433,6 @@ public:
      *
      * @see srmConnectorSetCurrentBufferLocked()
      *
-     * @param connector The @ref SRMConnector instance.
      * @return          A value of 1 indicates the current buffer is locked, 0 indicates it is unlocked.
      */
     bool isCurrentBufferLocked() const noexcept;

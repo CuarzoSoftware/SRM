@@ -38,7 +38,6 @@ public:
     /**
      * @brief Get the unique identifier of a DRM plane.
      *
-     * @param plane A pointer to the @ref SRMPlane instance.
      *
      * @return The unique identifier of the DRM plane.
      */
@@ -47,16 +46,14 @@ public:
     /**
      * @brief Get the type of a DRM plane.
      *
-     * @param plane A pointer to the @ref SRMPlane instance.
      *
-     * @return The type of the DRM plane, as an @ref SRM_PLANE_TYPE enumeration value.
+     * @return The type of the DRM plane, as a SRMPlane::Type enumeration value.
      */
     Type type() const noexcept { return m_type; }
 
     /**
      * @brief Get the DRM device to which a DRM plane belongs.
      *
-     * @param plane A pointer to the @ref SRMPlane instance.
      *
      * @return A pointer to the @ref SRMDevice representing the DRM device.
      */
@@ -65,7 +62,6 @@ public:
     /**
      * @brief Get the current connector associated with a DRM plane.
      *
-     * @param plane A pointer to the @ref SRMPlane instance.
      *
      * @return A pointer to the @ref SRMConnector representing the current connector, or `NULL` if not associated with any.
      */
@@ -74,7 +70,6 @@ public:
     /**
      * @brief Get a list of CRTCs associated with a DRM plane.
      *
-     * @param plane A pointer to the @ref SRMPlane instance.
      *
      * @return A list of @ref SRMCrtc instances representing the CRTCs associated with the plane.
      */
@@ -83,7 +78,6 @@ public:
     /**
      * @brief Get a list of DRM framebuffer formats supported by the plane.
      * *
-     * @param plane A pointer to the @ref SRMPlane instance.
      *
      * @return A list of DRM formats/modifiers supported by the plane.
      */

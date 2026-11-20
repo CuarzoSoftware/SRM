@@ -21,7 +21,6 @@ public:
     /**
      * @brief Get the unique identifier of the encoder.
      *
-     * @param encoder A pointer to the @ref SRMEncoder instance.
      *
      * @return The ID of the encoder.
      */
@@ -30,7 +29,6 @@ public:
     /**
      * @brief Get the device to which this encoder belongs.
      *
-     * @param encoder A pointer to the @ref SRMEncoder instance.
      *
      * @return A pointer to the @ref SRMDevice representing the device to which the encoder belongs.
      */
@@ -39,7 +37,6 @@ public:
     /**
      * @brief Get a list of CRTCs (Cathode Ray Tube Controllers) compatible with this encoder.
      *
-     * @param encoder A pointer to the @ref SRMEncoder instance.
      *
      * @return A list of pointers to the CRTCs (@ref SRMCrtc) compatible with the encoder.
      */
@@ -48,7 +45,6 @@ public:
     /**
      * @brief Get the connector that is currently using this encoder.
      *
-     * @param encoder A pointer to the @ref SRMEncoder instance.
      *
      * @return A pointer to the @ref SRMConnector currently utilizing this encoder, or `NULL` if not in use.
      */

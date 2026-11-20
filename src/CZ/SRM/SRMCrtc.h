@@ -18,7 +18,6 @@ public:
     /**
      * @brief Get the DRM ID of this CRTC.
      *
-     * @param crtc A pointer to the @ref SRMCrtc instance.
      *
      * @return The DRM ID of the CRTC.
      */
@@ -27,7 +26,6 @@ public:
     /**
      * @brief Get the device this CRTC belongs to.
      *
-     * @param crtc A pointer to the @ref SRMCrtc instance.
      *
      * @return A pointer to the @ref SRMDevice that this CRTC belongs to.
      */
@@ -37,7 +35,6 @@ public:
      * @brief Returns a pointer to the @ref SRMConnector that is currently using this CRTC,
      *        or `NULL` if it is not used by any connector.
      *
-     * @param crtc A pointer to the @ref SRMCrtc instance.
      *
      * @return A pointer to the @ref SRMConnector currently using this CRTC, or `NULL` if not in use.
      */
@@ -51,7 +48,6 @@ public:
      *
      * @see srmConnectorSetGamma()
      *
-     * @param connector Pointer to the @ref SRMCrtc.
      * @return The number of elements used to represent each RGB gamma correction curve, or 0
      *         if the driver does not support gamma correction.
      */

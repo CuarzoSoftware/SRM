@@ -61,7 +61,7 @@ public:
      *       as SRM relies on it to register its event source.
      *       Use CZCore::dispatch() to process hotplug events.
      *
-     * @param interface A pointer to the @ref SRMInterface that provides access to DRM devices.
+     * @param iface A pointer to the @ref SRMInterface that provides access to DRM devices.
      * @param userData  A pointer to the user data to associate with the @ref SRMCore instance.
      *
      * @return A shared pointer to the created @ref SRMCore instance, or `nullptr` on failure.
@@ -88,7 +88,6 @@ public:
      *
      * While suspended, no KMS operations can be performed.
      *
-     * @param core A pointer to the @ref SRMCore instance.
      * @return true on success or if already suspended, false on failure.
      */
     bool suspend() noexcept;

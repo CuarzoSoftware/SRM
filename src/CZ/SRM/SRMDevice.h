@@ -85,7 +85,6 @@ public:
     /**
      * @brief Get the @ref SRMCore instance to which this device belongs.
      *
-     * @param device A pointer to the @ref SRMDevice instance.
      *
      * @return A pointer to the @ref SRMCore instance that this device belongs to.
      */
@@ -105,7 +104,6 @@ public:
     /**
      * @brief Get the DRM device name (e.g., `/dev/dri/card0`) associated with this device.
      *
-     * @param device A pointer to the @ref SRMDevice instance.
      *
      * @return The name of the DRM device associated with this @ref SRMDevice.
      */
@@ -122,7 +120,6 @@ public:
     /**
      * @brief Get the file descriptor of the DRM device associated with this device.
      *
-     * @param device A pointer to the @ref SRMDevice instance.
      *
      * @return The file descriptor of the DRM device.
      */
@@ -131,7 +128,6 @@ public:
     /**
      * @brief Get a list of connectors of this device.
      *
-     * @param device A pointer to the @ref SRMDevice instance.
      *
      * @return A list of pointers to the connectors (@ref SRMConnector) associated with this device.
      */
@@ -140,7 +136,6 @@ public:
     /**
      * @brief Get a list of planes of this device.
      *
-     * @param device A pointer to the @ref SRMDevice instance.
      *
      * @return A list of pointers to the planes (@ref SRMPlane) associated with this device.
      */
@@ -149,7 +144,6 @@ public:
     /**
      * @brief Get a list of CRTCs (Cathode Ray Tube Controllers) of this device.
      *
-     * @param device A pointer to the @ref SRMDevice instance.
      *
      * @return A list of pointers to the CRTCs (@ref SRMCrtc) associated with this device.
      */
@@ -158,7 +152,6 @@ public:
     /**
      * @brief Get a list of encoders of this device.
      *
-     * @param device A pointer to the @ref SRMDevice instance.
      *
      * @return A list of pointers to the encoders (@ref SRMEncoder) associated with this device.
      */

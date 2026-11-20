@@ -9,6 +9,8 @@
   </a>
 </p>
 
+> This project is part of the [Cuarzo Framework](https://github.com/CuarzoSoftware/Cuarzo). Follow the instructions there to build and install it.
+
 SRM is a C++ library that simplifies the development of Linux DRM/KMS applications.
 
 > Check the releases section for stable versions. The web documentation corresponds to the latest release.
